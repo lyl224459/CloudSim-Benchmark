@@ -59,9 +59,11 @@ jobs:
         
     - name: Get version from Gradle
       id: gradle-version
+      shell: bash
       run: |
-        VERSION=$(./gradlew properties --no-daemon -q | grep "^version:" | awk '{print $2}')
+        VERSION=$(gradlew.bat properties --no-daemon -q | grep "^version:" | awk '{print $2}')
         echo "gradle-version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Gradle version: $VERSION"
         
     - name: Create release archive
       shell: bash
