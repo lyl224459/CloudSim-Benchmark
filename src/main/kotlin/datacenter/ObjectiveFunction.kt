@@ -157,7 +157,7 @@ class SchedulerObjectiveFunction(
      * 估算最大负载均衡度（使用随机分配）
      */
     private fun estimateMaxLB(): Double {
-        val random = java.util.Random(Constants.DEFAULT_RANDOM_SEED)
+        val random = java.util.Random(0L)
         val cloudletToVm = IntArray(cloudletNum) { random.nextInt(vmNum) }
         return estimateLB(cloudletToVm)
     }
