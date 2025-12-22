@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, dev ]
   workflow_dispatch:
+    # 手动触发构建
+
+env:
+  GRADLE_OPTS: "-Dfile.encoding=UTF-8"
 
 jobs:
   build:
@@ -34,11 +38,21 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
+    - name: Check CloudSim Plus dependency
+      run: |
+        echo "⚠️  注意: 项目依赖 CloudSim Plus 9.0.0-SNAPSHOT (本地构建版本)"
+        echo "如果构建失败，可能需要先构建 CloudSim Plus 并安装到本地 Maven 仓库"
+        echo "或者修改 build.gradle.kts 使用已发布的 CloudSim Plus 版本"
+        
     - name: Build with Gradle
       run: ./gradlew clean build --no-daemon
-      
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        
     - name: Build fat JAR
       run: ./gradlew fatJar --no-daemon
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       
     - name: Upload JAR artifact
       uses: actions/upload-artifact@v4
