@@ -29,12 +29,12 @@ jobs:
     # Gradle 缓存已由 setup-java 的 cache: 'gradle' 自动处理
           
     - name: Build with Gradle
-      run: gradlew.bat clean build --no-daemon --stacktrace
+      run: .\gradlew.bat clean build --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         
     - name: Build fat JAR
-      run: gradlew.bat fatJar --no-daemon --stacktrace
+      run: .\gradlew.bat fatJar --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       

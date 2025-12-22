@@ -40,13 +40,13 @@ jobs:
     # Windows 环境，不需要设置执行权限
       
     - name: Build with Gradle
-      run: gradlew.bat clean build --no-daemon --stacktrace
+      run: .\gradlew.bat clean build --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       continue-on-error: false
         
     - name: Build fat JAR
-      run: gradlew.bat fatJar --no-daemon --stacktrace
+      run: .\gradlew.bat fatJar --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       continue-on-error: false
