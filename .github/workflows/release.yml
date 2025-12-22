@@ -50,10 +50,12 @@ jobs:
       
     - name: Get version
       id: version
-      shell: bash
+      shell: pwsh
       run: |
-        VERSION=$(.\gradlew.bat properties --no-daemon | grep "^version:" | awk '{print $2}')
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        $output = & .\gradlew.bat properties --no-daemon
+        $versionLine = $output | Select-String -Pattern "^version:"
+        $version = ($versionLine -split '\s+')[1]
+        echo "version=$version" >> $env:GITHUB_OUTPUT
         
     - name: Create release archives
       shell: pwsh
