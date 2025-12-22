@@ -89,7 +89,7 @@ CloudSim-Benchmark 是一个专业的云任务调度算法对比实验平台，�
 - **JDK**: 23+ (项目使用 JVM 23)
 - **Gradle**: 9.2.1+
 - **Kotlin**: 2.1.21+
-- **CloudSim Plus**: 9.0.0-SNAPSHOT (本地构建版本)
+- **CloudSim Plus**: 8.1.0 (从 Maven Central 获取)
 
 ### 1. 克隆项目
 
@@ -854,9 +854,7 @@ cloudsim-benchmark/
 
 ### 注意事项
 
-⚠️ **CloudSim Plus 依赖**: 项目依赖 CloudSim Plus 9.0.0-SNAPSHOT（本地构建版本）。如果 CI 构建失败，可能需要：
-- 先构建 CloudSim Plus 并发布到 Maven 仓库
-- 或修改 `build.gradle.kts` 使用已发布的 CloudSim Plus 版本
+✅ **CloudSim Plus 依赖**: 项目使用 CloudSim Plus 8.1.0（已发布版本），从 Maven Central 自动获取，无需本地构建。
 
 ## 🛠️ 开发指南
 

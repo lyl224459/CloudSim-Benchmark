@@ -133,8 +133,9 @@ class ComparisonRunner(
                 }
                 
                 val vmId = cloudlet.vm.id.toInt()
-                val actualCPUTime = cloudlet.totalExecutionTime
-                executeTimeOfVM[vmId] += actualCPUTime
+                // CloudSim Plus 8.1.0 API: 使用 actualCpuTime 属性
+                val actualCPUTime = cloudlet.actualCpuTime
+                executeTimeOfVM[vmId] += actualCPUTime.toDouble()
                 
                 val vm = cloudlet.vm
                 val costPerSec = when {
