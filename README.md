@@ -4,7 +4,7 @@
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.21-blue.svg)](https://kotlinlang.org/)
 [![Gradle](https://img.shields.io/badge/Gradle-9.2.1-green.svg)](https://gradle.org/)
 
-> **CloudSim-Benchmark** 是一个基于 CloudSim Plus 和 Kotlin 开发的云任务调度算法对比实验平台，支持批处理和实时调度两种模式，集成了多种群体智能优化算法，为云计算任务调度研究提供完整的实验框架。
+> **CloudSim-Benchmark** 是一个基于 CloudSim Plus 和 Kotlin 开发的云任务调度算法对比实验平台，支持批处理和实时调度两种模式，集成了多种群体智能优化算法（PSO、WOA、GWO、HHO），提供批量任务数实验、多次运行统计等功能，为云计算任务调度研究提供完整的实验框架。
 
 ## 📋 目录
 
@@ -26,11 +26,12 @@
 
 CloudSim-Benchmark 是一个专业的云任务调度算法对比实验平台，旨在为研究人员和开发者提供：
 
-- **完整的实验框架**：从任务生成到结果分析的完整流程
-- **多种调度模式**：支持批处理和实时调度两种场景
-- **丰富的算法库**：集成 PSO、WOA、GWO、HHO 等群体智能算法
-- **灵活的配置系统**：统一的配置管理，支持多种任务生成器
-- **可靠的实验结果**：支持多次运行取平均值，确保结果的可重复性
+- **完整的实验框架**：从任务生成、算法执行到结果分析的完整流程
+- **多种调度模式**：支持批处理和实时调度两种场景，满足不同研究需求
+- **丰富的算法库**：集成 PSO、WOA、GWO、HHO 等群体智能优化算法
+- **灵活的配置系统**：统一的配置管理，支持多种任务生成器和参数调整
+- **可靠的实验结果**：支持多次运行统计（平均值、标准差、最小值、最大值），确保结果的可重复性和统计显著性
+- **批量任务数实验**：支持按不同任务数批量执行实验，研究算法在不同规模下的性能表现
 
 ## ✨ 核心特性
 
@@ -128,8 +129,14 @@ run-batch.bat PSO,WOA 42 10
 # 批量任务数实验模式 - 测试多个任务数
 run-batch-multi.bat 50,100,200,500
 
+# 批量任务数实验模式 - 指定运行次数（每个任务数运行10次）
+run-batch-multi.bat 50,100,200,500 10
+
 # 批量任务数实验模式 - 指定算法
 run-batch-multi.bat 50,100,200 PSO,WOA
+
+# 批量任务数实验模式 - 指定运行次数和算法
+run-batch-multi.bat 50,100,200,500 10 PSO,WOA
 
 # 实时调度模式
 run-realtime.bat
@@ -164,7 +171,15 @@ chmod +x run.sh
 
 # 批量任务数实验模式
 ./run.sh batch-multi 50,100,200,500
+
+# 批量任务数实验模式 - 指定运行次数
+./run.sh batch-multi 50,100,200,500 10
+
+# 批量任务数实验模式 - 指定算法
 ./run.sh batch-multi 50,100,200 PSO,WOA
+
+# 批量任务数实验模式 - 指定运行次数和算法
+./run.sh batch-multi 50,100,200,500 10 PSO,WOA
 
 # 实时调度模式
 ./run.sh realtime PSO_REALTIME,WOA_REALTIME 123
@@ -204,6 +219,9 @@ gradle runBatchMulti -PcloudletCounts=50,100,200,500,1000
 
 # 批处理模式批量任务数实验 - 指定任务数和算法
 gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA
+
+# 批处理模式批量任务数实验 - 指定运行次数
+gradle runBatchMulti -PcloudletCounts=50,100,200,500 -Pruns=10
 
 # 批处理模式批量任务数实验 - 完整参数
 gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA -Pseed=42
@@ -247,11 +265,17 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA 42
 # 批量任务数实验 - 测试多个任务数
 java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500
 
+# 批量任务数实验 - 指定运行次数（每个任务数运行10次）
+java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10
+
 # 批量任务数实验 - 指定算法
 java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA
 
-# 批量任务数实验 - 指定算法和随机种子
-java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA 42
+# 批量任务数实验 - 指定运行次数、算法和随机种子
+java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10 PSO,WOA 42
+
+# 实时调度模式批量任务数实验
+java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500
 
 # 实时调度模式
 java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime
@@ -264,40 +288,66 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 
 ### 命令行参数
 
+#### 基本模式
+
+**批处理模式** (`batch`)：
 ```
-用法: java -jar cloudsim-benchmark-1.0.0-all.jar [batch|realtime|batch-multi|realtime-multi] [algorithms] [randomSeed]
+用法: java -jar cloudsim-benchmark-1.0.0-all.jar batch [algorithms] [randomSeed]
+```
 
-模式:
-  batch         - 批处理调度模式（所有任务一次性提交）
-  batch-multi   - 批处理模式批量任务数实验（按不同任务数批量执行）
-  realtime      - 实时调度模式（任务动态到达，默认）
-  realtime-multi - 实时调度模式批量任务数实验（按不同任务数批量执行）
+**实时调度模式** (`realtime`)：
+```
+用法: java -jar cloudsim-benchmark-1.0.0-all.jar realtime [algorithms] [randomSeed]
+```
 
-参数:
-  algorithms   - 要运行的算法列表（可选，默认: 所有算法）
-                批处理模式: RANDOM, PSO, WOA, GWO, HHO
-                实时模式: MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME
-                多个算法用逗号分隔，例如: PSO,WOA
-  randomSeed   - 随机数种子（可选，默认: 0）
+#### 批量任务数实验模式
+
+**批处理模式批量任务数实验** (`batch-multi`)：
+```
+用法: java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi <cloudletCounts> [runs] [algorithms] [randomSeed]
+
+参数说明:
+  cloudletCounts - 任务数列表（必需），用逗号分隔，例如: 50,100,200,500
+  runs          - 每个任务数的运行次数（可选，默认: 1），用于计算平均值和标准差
+  algorithms    - 要运行的算法列表（可选，默认: 所有算法）
+                  批处理模式: RANDOM, PSO, WOA, GWO, HHO
+                  多个算法用逗号分隔，例如: PSO,WOA
+  randomSeed    - 随机数种子（可选，默认: 0）
 
 示例:
-  # 运行所有算法
-  java -jar cloudsim-benchmark-1.0.0-all.jar batch
-
-  # 只运行 PSO 和 WOA
-  java -jar cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA
-
-  # 运行指定算法并使用自定义随机种子
-  java -jar cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA 42
-
-  # 批量任务数实验（测试 50, 100, 200, 500 个任务）
+  # 测试多个任务数，每个任务数运行1次
   java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500
 
-  # 批量任务数实验，指定算法
-  java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA
+  # 测试多个任务数，每个任务数运行10次
+  java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10
 
-  # 实时模式，只运行 PSO 和 WOA
-  java -jar cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_REALTIME
+  # 指定运行次数和算法
+  java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10 PSO,WOA
+
+  # 完整参数：运行次数、算法和随机种子
+  java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10 PSO,WOA 42
+```
+
+**实时调度模式批量任务数实验** (`realtime-multi`)：
+```
+用法: java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi <cloudletCounts> [algorithms] [randomSeed]
+
+参数说明:
+  cloudletCounts - 任务数列表（必需），用逗号分隔，例如: 50,100,200,500
+  algorithms    - 要运行的算法列表（可选，默认: 所有算法）
+                  实时模式: MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME
+                  多个算法用逗号分隔，例如: PSO_REALTIME,WOA_REALTIME
+  randomSeed    - 随机数种子（可选，默认: 0）
+
+示例:
+  # 测试多个任务数
+  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500
+
+  # 指定算法
+  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME
+
+  # 指定算法和随机种子
+  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME 42
 ```
 
 ### 算法选择
@@ -319,17 +369,23 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 
 ### 批量任务数实验
 
-批量任务数实验模式可以按照不同的任务数批量执行实验，每个任务数可以运行多次并取平均值。这对于研究算法在不同规模任务下的性能表现非常有用。
+批量任务数实验模式可以按照不同的任务数批量执行实验，每个任务数可以运行多次并计算统计值（平均值、标准差、最小值、最大值）。这对于研究算法在不同规模任务下的性能表现非常有用。
 
-批量任务数实验功能由两个专门的运行器类实现：
-- **`BatchCloudletCountRunner`**: 批处理模式批量任务数实验运行器，位于 `src/main/kotlin/datacenter/BatchCloudletCountRunner.kt`
-- **`RealtimeCloudletCountRunner`**: 实时调度模式批量任务数实验运行器，位于 `src/main/kotlin/datacenter/RealtimeCloudletCountRunner.kt`
+**核心功能**：
+- 🔄 **多任务数批量执行**：一次测试多个不同的任务数，自动循环执行
+- 📊 **统计值计算**：每个任务数多次运行，自动计算平均值、标准差、最小值、最大值
+- 📈 **结果汇总**：所有任务数的结果自动汇总到一个 CSV 文件中
+- 📋 **对比表格**：打印每个指标在不同任务数下的详细对比表格
 
-这两个运行器类封装了批量任务数实验的完整流程，包括：
-- 按不同任务数循环执行实验
-- 每个任务数多次运行并计算统计值（平均值、标准差、最小值、最大值）
-- 自动汇总所有任务数的结果
-- 导出 CSV 文件和打印汇总表格
+**实现类**：
+- **`BatchCloudletCountRunner`** (`src/main/kotlin/datacenter/BatchCloudletCountRunner.kt`)
+  - 批处理模式批量任务数实验运行器
+  - 支持批处理调度算法（RANDOM, PSO, WOA, GWO, HHO）
+  
+- **`RealtimeCloudletCountRunner`** (`src/main/kotlin/datacenter/RealtimeCloudletCountRunner.kt`)
+  - 实时调度模式批量任务数实验运行器
+  - 支持实时调度算法（MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME）
+  - 包含实时调度特有指标（平均等待时间、平均响应时间）
 
 #### 批处理模式批量任务数实验 (`batch-multi`)
 
@@ -353,10 +409,10 @@ java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10 PSO,WOA
 
 **功能特性**：
 
-- ✅ **多任务数批量执行**：支持一次测试多个不同的任务数
-- ✅ **多次运行取平均值**：每个任务数会运行 `config.batch.runs` 次并计算平均值和标准差
-- ✅ **自动汇总结果**：所有任务数的结果会汇总到一个 CSV 文件中
-- ✅ **详细统计表格**：打印每个指标在不同任务数下的对比表格
+- ✅ **多任务数批量执行**：支持一次测试多个不同的任务数（如：50, 100, 200, 500）
+- ✅ **多次运行统计**：每个任务数可运行多次（通过 `runs` 参数指定），自动计算平均值、标准差、最小值、最大值
+- ✅ **自动汇总结果**：所有任务数的结果自动汇总到一个 CSV 文件中，便于对比分析
+- ✅ **详细统计表格**：控制台输出每个指标在不同任务数下的详细对比表格
 
 **输出结果**：
 
@@ -372,13 +428,19 @@ CSV 文件包含以下列：
 - `Fitness_Mean`, `Fitness_StdDev` - 适应度的平均值和标准差
 - `Runs` - 运行次数
 
-**配置说明**：
+**参数说明**：
 
-批量任务数实验的配置继承自 `config.batch`：
-- `runs` - 每个任务数的运行次数（默认: 1）
-- `population` - 优化算法的种群大小
-- `maxIter` - 优化算法的最大迭代次数
-- `algorithms` - 要运行的算法列表（空列表 = 所有算法）
+- **任务数列表** (`cloudletCounts`): 必需参数，用逗号分隔，例如 `50,100,200,500`
+- **运行次数** (`runs`): 可选参数，每个任务数的运行次数（默认: 1），用于计算统计值
+- **算法列表** (`algorithms`): 可选参数，要运行的算法列表（默认: 所有算法）
+- **随机种子** (`randomSeed`): 可选参数，随机数种子（默认: 0）
+
+**配置继承**：
+
+批量任务数实验的其他配置继承自 `config.batch`：
+- `population` - 优化算法的种群大小（默认: 30）
+- `maxIter` - 优化算法的最大迭代次数（默认: 50）
+- `generatorType` - 任务生成器类型（默认: LOG_NORMAL）
 
 **运行脚本**：
 
@@ -417,11 +479,11 @@ java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIM
 
 **功能特性**：
 
-- ✅ **多任务数批量执行**：支持一次测试多个不同的任务数
-- ✅ **多次运行取平均值**：每个任务数会运行 `config.realtime.runs` 次并计算平均值和标准差
+- ✅ **多任务数批量执行**：支持一次测试多个不同的任务数（如：50, 100, 200, 500）
+- ✅ **多次运行统计**：每个任务数可运行多次（通过配置 `runs` 参数），自动计算平均值、标准差、最小值、最大值
 - ✅ **实时调度指标**：包含平均等待时间和平均响应时间等实时调度特有指标
-- ✅ **自动汇总结果**：所有任务数的结果会汇总到一个 CSV 文件中
-- ✅ **详细统计表格**：打印每个指标在不同任务数下的对比表格
+- ✅ **自动汇总结果**：所有任务数的结果自动汇总到一个 CSV 文件中，便于对比分析
+- ✅ **详细统计表格**：控制台输出每个指标在不同任务数下的详细对比表格
 
 **输出结果**：
 
@@ -439,15 +501,21 @@ CSV 文件包含以下列：
 - `AvgResponseTime_Mean`, `AvgResponseTime_StdDev` - 平均响应时间的平均值和标准差
 - `Runs` - 运行次数
 
-**配置说明**：
+**参数说明**：
 
-实时调度模式批量任务数实验的配置继承自 `config.realtime`：
-- `runs` - 每个任务数的运行次数（默认: 1）
-- `simulationDuration` - 仿真持续时间（秒）
-- `arrivalRate` - 平均每秒到达的任务数
-- `population` - 优化算法的种群大小（来自 `config.optimizer`）
-- `maxIter` - 优化算法的最大迭代次数（来自 `config.optimizer`）
-- `algorithms` - 要运行的算法列表（空列表 = 所有算法）
+- **任务数列表** (`cloudletCounts`): 必需参数，用逗号分隔，例如 `50,100,200,500`
+- **算法列表** (`algorithms`): 可选参数，要运行的算法列表（默认: 所有算法）
+- **随机种子** (`randomSeed`): 可选参数，随机数种子（默认: 0）
+
+**配置继承**：
+
+实时调度模式批量任务数实验的其他配置继承自 `config.realtime` 和 `config.optimizer`：
+- `runs` - 每个任务数的运行次数（默认: 1），用于计算统计值
+- `simulationDuration` - 仿真持续时间（秒，默认: 500.0）
+- `arrivalRate` - 平均每秒到达的任务数（默认: 5.0）
+- `population` - 优化算法的种群大小（默认: 20）
+- `maxIter` - 优化算法的最大迭代次数（默认: 20）
+- `generatorType` - 任务生成器类型（默认: LOG_NORMAL）
 
 **运行脚本**：
 
@@ -466,24 +534,34 @@ run-realtime-multi.bat 50,100,200 PSO_REALTIME,WOA_REALTIME 42
 
 ### 多次运行取平均值
 
-为了获得更可靠的实验结果，可以配置多次运行并计算平均值和标准差：
+为了获得更可靠的实验结果，可以配置多次运行并计算统计值（平均值、标准差、最小值、最大值）：
+
+**命令行方式**（推荐）：
+```bash
+# 批处理模式：运行10次
+java -jar cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA 42 10
+
+# 批量任务数实验：每个任务数运行10次
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10
+```
 
 **代码配置方式**:
 ```kotlin
 val config = ExperimentConfig(
     batch = BatchConfig(
-        runs = 10  // 运行10次，计算平均值和标准差
+        runs = 10  // 运行10次，计算统计值
     ),
     realtime = RealtimeConfig(
-        runs = 10  // 运行10次，计算平均值和标准差
+        runs = 10  // 运行10次，计算统计值
     )
 )
 ```
 
-**注意**: 
+**统计值说明**: 
 - 多次运行时，每次运行使用不同的随机种子（`randomSeed + run`），确保实验的独立性
-- 结果会显示平均值 ± 标准差
-- CSV 导出文件会包含平均值和标准差列
+- 结果会显示平均值 ± 标准差，以及最小值和最大值
+- CSV 导出文件会包含平均值、标准差、最小值、最大值列
+- 适用于需要统计显著性验证的科学实验
 
 ## 🧪 算法说明
 
