@@ -24,27 +24,20 @@ jobs:
       with:
         java-version: '23'
         distribution: 'temurin'
+        cache: 'gradle'
         
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
+    # Gradle 缓存已由 setup-java 的 cache: 'gradle' 自动处理
           
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
     - name: Build with Gradle
-      run: ./gradlew clean build --no-daemon
+      run: ./gradlew clean build --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         
     - name: Build fat JAR
-      run: ./gradlew fatJar --no-daemon
+      run: ./gradlew fatJar --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       
