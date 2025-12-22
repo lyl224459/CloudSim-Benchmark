@@ -38,11 +38,33 @@ jobs:
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       
+    - name: Create source archive
+      shell: bash
+      run: |
+        zip -r source.zip \
+          src/ \
+          build.gradle.kts \
+          gradle/ \
+          gradlew \
+          gradlew.bat \
+          settings.gradle.kts \
+          README.md \
+          LICENSE \
+          .gitignore \
+          -x "*.class" "build/*" ".gradle/*" "*.iml" ".idea/*" "results/*"
+    
     - name: Upload JAR artifact
       uses: actions/upload-artifact@v4
       with:
         name: cloudsim-benchmark-jar
         path: build/libs/cloudsim-benchmark-*.jar
+        retention-days: 30
+        
+    - name: Upload source archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloudsim-benchmark-source
+        path: source.zip
         retention-days: 30
         
     - name: Upload build reports

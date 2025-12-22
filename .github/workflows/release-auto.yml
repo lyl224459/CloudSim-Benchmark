@@ -65,14 +65,29 @@ jobs:
         echo "gradle-version=$VERSION" >> $GITHUB_OUTPUT
         echo "Gradle version: $VERSION"
         
-    - name: Create release archive
+    - name: Create release archives
       shell: bash
       run: |
         mkdir -p release
+        # 复制 JAR 文件
         cp build/libs/cloudsim-benchmark-*.jar release/
+        # 创建 Windows ZIP 压缩包（包含 JAR）
         cd release
         zip -r cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip *.jar
-        ls -lh
+        cd ..
+        # 创建源码压缩包
+        zip -r release/cloudsim-benchmark-${{ steps.version.outputs.version }}-source.zip \
+          src/ \
+          build.gradle.kts \
+          gradle/ \
+          gradlew \
+          gradlew.bat \
+          settings.gradle.kts \
+          README.md \
+          LICENSE \
+          .gitignore \
+          -x "*.class" "build/*" ".gradle/*" "*.iml" ".idea/*" "results/*"
+        ls -lh release/
         
     - name: Generate release notes
       id: release-notes
@@ -88,8 +103,9 @@ jobs:
         
         ## 📥 下载
         
-        - **JAR 文件**: \`cloudsim-benchmark-${{ steps.gradle-version.outputs.gradle-version }}-all.jar\`
-        - **Windows ZIP**: \`cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip\`
+        - **JAR 文件**: \`cloudsim-benchmark-${{ steps.gradle-version.outputs.gradle-version }}-all.jar\` - 可直接运行的 JAR 包
+        - **Windows ZIP**: \`cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip\` - Windows 版本压缩包（包含 JAR）
+        - **源码 ZIP**: \`cloudsim-benchmark-${{ steps.version.outputs.version }}-source.zip\` - 完整源码压缩包
         
         ## 🚀 快速开始
         
@@ -120,6 +136,7 @@ jobs:
         files: |
           build/libs/cloudsim-benchmark-*.jar
           release/cloudsim-benchmark-*-windows.zip
+          release/cloudsim-benchmark-*-source.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
