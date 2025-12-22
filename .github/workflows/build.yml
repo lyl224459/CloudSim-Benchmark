@@ -38,12 +38,6 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
       
-    - name: Check CloudSim Plus dependency
-      run: |
-        echo "⚠️  注意: 项目依赖 CloudSim Plus 9.0.0-SNAPSHOT (本地构建版本)"
-        echo "如果构建失败，可能需要先构建 CloudSim Plus 并安装到本地 Maven 仓库"
-        echo "或者修改 build.gradle.kts 使用已发布的 CloudSim Plus 版本"
-        
     - name: Build with Gradle
       run: ./gradlew clean build --no-daemon
       env:
