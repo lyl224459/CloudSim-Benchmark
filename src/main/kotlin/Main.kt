@@ -234,12 +234,13 @@ private fun parseCloudletCounts(args: Array<String>): List<Int> {
  * 打印使用说明
  */
 private fun printUsage() {
-    Logger.info("用法: java -jar cloudsim-benchmark-1.0.0-all.jar [batch|realtime|batch-multi] [algorithms] [randomSeed]")
+    Logger.info("用法: java -jar cloudsim-benchmark-1.0.0-all.jar [batch|realtime|batch-multi|realtime-multi] [algorithms] [randomSeed]")
     Logger.info("")
     Logger.info("模式:")
-    Logger.info("  batch        - 批处理调度模式（所有任务一次性提交）")
-    Logger.info("  batch-multi  - 批量任务数实验模式（按不同任务数批量执行）")
-    Logger.info("  realtime     - 实时调度模式（任务动态到达，默认）")
+    Logger.info("  batch         - 批处理调度模式（所有任务一次性提交）")
+    Logger.info("  batch-multi   - 批处理模式批量任务数实验（按不同任务数批量执行）")
+    Logger.info("  realtime      - 实时调度模式（任务动态到达，默认）")
+    Logger.info("  realtime-multi - 实时调度模式批量任务数实验（按不同任务数批量执行）")
     Logger.info("")
     Logger.info("参数:")
     Logger.info("  algorithms   - 要运行的算法列表（可选，默认: 所有算法）")
