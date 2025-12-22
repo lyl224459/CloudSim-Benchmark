@@ -472,14 +472,17 @@ run-batch-multi.bat 50,100,200,500 10 PSO,WOA 42
 **使用方法**：
 
 ```bash
-# 基本用法：测试多个任务数
+# 基本用法：测试多个任务数（每个任务数运行1次）
 java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500
 
-# 指定算法
-java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME
+# 指定运行次数（每个任务数运行10次）
+java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500 10
 
-# 指定算法和随机种子
-java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME 42
+# 指定运行次数和算法
+java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME
+
+# 指定运行次数、算法和随机种子
+java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME 42
 ```
 
 **功能特性**：
