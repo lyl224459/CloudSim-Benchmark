@@ -1,5 +1,6 @@
 package datacenter
 
+import config.DatacenterConfig
 import org.cloudsimplus.brokers.DatacenterBroker
 import org.cloudsimplus.brokers.DatacenterBrokerSimple
 import org.cloudsimplus.core.CloudSimPlus
@@ -26,29 +27,29 @@ object DatacenterCreator {
         val (ram, bw, mips, storage, costPerSec) = when (type) {
             DatacenterType.LOW -> {
                 Tuple5(
-                    Constants.RAM * Constants.L_VM_N,
-                    Constants.BW * Constants.L_VM_N,
-                    Constants.L_MIPS * Constants.L_VM_N,
-                    Constants.STORAGE * Constants.L_VM_N,
-                    Constants.L_PRICE
+                    DatacenterConfig.RAM * DatacenterConfig.L_VM_N,
+                    DatacenterConfig.BW * DatacenterConfig.L_VM_N,
+                    DatacenterConfig.L_MIPS * DatacenterConfig.L_VM_N,
+                    DatacenterConfig.STORAGE * DatacenterConfig.L_VM_N,
+                    DatacenterConfig.L_PRICE
                 )
             }
             DatacenterType.MEDIUM -> {
                 Tuple5(
-                    Constants.RAM * Constants.M_VM_N,
-                    Constants.BW * Constants.M_VM_N,
-                    Constants.M_MIPS * Constants.M_VM_N,
-                    Constants.STORAGE * Constants.M_VM_N,
-                    Constants.M_PRICE
+                    DatacenterConfig.RAM * DatacenterConfig.M_VM_N,
+                    DatacenterConfig.BW * DatacenterConfig.M_VM_N,
+                    DatacenterConfig.M_MIPS * DatacenterConfig.M_VM_N,
+                    DatacenterConfig.STORAGE * DatacenterConfig.M_VM_N,
+                    DatacenterConfig.M_PRICE
                 )
             }
             DatacenterType.HIGH -> {
                 Tuple5(
-                    Constants.RAM * Constants.H_VM_N,
-                    Constants.BW * Constants.H_VM_N,
-                    Constants.H_MIPS * Constants.H_VM_N,
-                    Constants.STORAGE * Constants.H_VM_N,
-                    Constants.H_PRICE
+                    DatacenterConfig.RAM * DatacenterConfig.H_VM_N,
+                    DatacenterConfig.BW * DatacenterConfig.H_VM_N,
+                    DatacenterConfig.H_MIPS * DatacenterConfig.H_VM_N,
+                    DatacenterConfig.STORAGE * DatacenterConfig.H_VM_N,
+                    DatacenterConfig.H_PRICE
                 )
             }
         }
@@ -70,38 +71,38 @@ object DatacenterCreator {
         val vmList = mutableListOf<Vm>()
         val pesNumber: Long = 1L
         
-        val ram: Long = Constants.RAM.toLong()
-        val bw: Long = Constants.BW.toLong()
+        val ram: Long = DatacenterConfig.RAM.toLong()
+        val bw: Long = DatacenterConfig.BW.toLong()
         
         // 创建低配置虚拟机
-        repeat(Constants.L_VM_N) {
+        repeat(DatacenterConfig.L_VM_N) {
             vmList.add(
-                VmSimple(Constants.L_MIPS.toDouble(), pesNumber)
+                VmSimple(DatacenterConfig.L_MIPS.toDouble(), pesNumber)
                     .setRam(ram)
                     .setBw(bw)
-                    .setSize(Constants.IMAGE_SIZE)
+                    .setSize(DatacenterConfig.IMAGE_SIZE)
                     .setCloudletScheduler(CloudletSchedulerSpaceShared())
             )
         }
         
         // 创建中配置虚拟机
-        repeat(Constants.M_VM_N) {
+        repeat(DatacenterConfig.M_VM_N) {
             vmList.add(
-                VmSimple(Constants.M_MIPS.toDouble(), pesNumber)
+                VmSimple(DatacenterConfig.M_MIPS.toDouble(), pesNumber)
                     .setRam(ram)
                     .setBw(bw)
-                    .setSize(Constants.IMAGE_SIZE)
+                    .setSize(DatacenterConfig.IMAGE_SIZE)
                     .setCloudletScheduler(CloudletSchedulerSpaceShared())
             )
         }
         
         // 创建高配置虚拟机
-        repeat(Constants.H_VM_N) {
+        repeat(DatacenterConfig.H_VM_N) {
             vmList.add(
-                VmSimple(Constants.H_MIPS.toDouble(), pesNumber)
+                VmSimple(DatacenterConfig.H_MIPS.toDouble(), pesNumber)
                     .setRam(ram)
                     .setBw(bw)
-                    .setSize(Constants.IMAGE_SIZE)
+                    .setSize(DatacenterConfig.IMAGE_SIZE)
                     .setCloudletScheduler(CloudletSchedulerSpaceShared())
             )
         }

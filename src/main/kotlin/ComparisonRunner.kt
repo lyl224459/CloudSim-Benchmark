@@ -39,10 +39,10 @@ data class AlgorithmStatistics(
  * 算法对比运行器
  */
 class ComparisonRunner(
-    private val cloudletCount: Int = Constants.CLOUDLET_N,
+    private val cloudletCount: Int = config.DatacenterConfig.DEFAULT_CLOUDLET_N,
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val randomSeed: Long = Constants.DEFAULT_RANDOM_SEED,
+    private val randomSeed: Long = 0L,
     private val algorithms: List<config.BatchAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE
@@ -139,10 +139,10 @@ class ComparisonRunner(
                 
                 val vm = cloudlet.vm
                 val costPerSec = when {
-                    vm.mips == Constants.L_MIPS.toDouble() -> Constants.L_PRICE
-                    vm.mips == Constants.M_MIPS.toDouble() -> Constants.M_PRICE
-                    vm.mips == Constants.H_MIPS.toDouble() -> Constants.H_PRICE
-                    else -> Constants.L_PRICE
+                    vm.mips == config.DatacenterConfig.L_MIPS.toDouble() -> config.DatacenterConfig.L_PRICE
+                    vm.mips == config.DatacenterConfig.M_MIPS.toDouble() -> config.DatacenterConfig.M_PRICE
+                    vm.mips == config.DatacenterConfig.H_MIPS.toDouble() -> config.DatacenterConfig.H_PRICE
+                    else -> config.DatacenterConfig.L_PRICE
                 }
                 cost += actualCPUTime * costPerSec
             }

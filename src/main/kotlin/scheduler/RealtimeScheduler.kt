@@ -58,7 +58,7 @@ abstract class RealtimeSchedulerBase(
  */
 class RealtimeRandomScheduler(
     vmList: List<Vm>, 
-    private val random: Random = Random(datacenter.Constants.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(0L)
 ) : RealtimeSchedulerBase(vmList) {
     
     override fun scheduleOnArrival(
@@ -92,7 +92,7 @@ class RealtimePSOScheduler(
     vmList: List<Vm>,
     private val population: Int = 20,
     private val maxIter: Int = 20,
-    private val random: Random = Random(datacenter.Constants.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(0L)
 ) : RealtimeSchedulerBase(vmList) {
     
     override fun scheduleOnArrival(
@@ -122,7 +122,7 @@ class RealtimeWOAScheduler(
     vmList: List<Vm>,
     private val population: Int = 20,
     private val maxIter: Int = 20,
-    private val random: Random = Random(datacenter.Constants.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(0L)
 ) : RealtimeSchedulerBase(vmList) {
     
     override fun scheduleOnArrival(

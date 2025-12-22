@@ -87,10 +87,10 @@ class SchedulerObjectiveFunction(
             val mips = vmList[vmId].mips
             
             val costPerSec = when {
-                mips == Constants.L_MIPS.toDouble() -> Constants.L_PRICE
-                mips == Constants.M_MIPS.toDouble() -> Constants.M_PRICE
-                mips == Constants.H_MIPS.toDouble() -> Constants.H_PRICE
-                else -> Constants.L_PRICE
+                mips == config.DatacenterConfig.L_MIPS.toDouble() -> config.DatacenterConfig.L_PRICE
+                mips == config.DatacenterConfig.M_MIPS.toDouble() -> config.DatacenterConfig.M_PRICE
+                mips == config.DatacenterConfig.H_MIPS.toDouble() -> config.DatacenterConfig.H_PRICE
+                else -> config.DatacenterConfig.L_PRICE
             }
             
             cost += length / mips * costPerSec

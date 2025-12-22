@@ -28,7 +28,7 @@ class RealtimeCloudletGenerator(
      */
     fun createRealtimeCloudlets(
         userId: Int, 
-        count: Int = Constants.CLOUDLET_N,
+        count: Int = config.DatacenterConfig.DEFAULT_CLOUDLET_N,
         simulationDuration: Double = 1000.0
     ): List<Cloudlet> {
         // 使用指数分布生成任务到达间隔（泊松过程的到达间隔）

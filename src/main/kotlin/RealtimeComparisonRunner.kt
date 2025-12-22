@@ -48,7 +48,7 @@ class RealtimeComparisonRunner(
     private val arrivalRate: Double = 10.0,  // 每秒到达的任务数
     private val population: Int = 20,
     private val maxIter: Int = 20,
-    private val randomSeed: Long = Constants.DEFAULT_RANDOM_SEED,
+    private val randomSeed: Long = 0L,
     private val algorithms: List<config.RealtimeAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE
@@ -156,10 +156,10 @@ class RealtimeComparisonRunner(
                 // 计算成本
                 val vm = cloudlet.vm
                 val costPerSec = when {
-                    vm.mips == Constants.L_MIPS.toDouble() -> Constants.L_PRICE
-                    vm.mips == Constants.M_MIPS.toDouble() -> Constants.M_PRICE
-                    vm.mips == Constants.H_MIPS.toDouble() -> Constants.H_PRICE
-                    else -> Constants.L_PRICE
+                    vm.mips == config.DatacenterConfig.L_MIPS.toDouble() -> config.DatacenterConfig.L_PRICE
+                    vm.mips == config.DatacenterConfig.M_MIPS.toDouble() -> config.DatacenterConfig.M_PRICE
+                    vm.mips == config.DatacenterConfig.H_MIPS.toDouble() -> config.DatacenterConfig.H_PRICE
+                    else -> config.DatacenterConfig.L_PRICE
                 }
                 cost += actualCPUTime * costPerSec
                 

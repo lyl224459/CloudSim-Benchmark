@@ -41,7 +41,6 @@
     <!-- 项目日志配置 -->
     <logger name="datacenter" level="INFO"/>
     <logger name="scheduler" level="INFO"/>
-    <logger name="optimizer" level="DEBUG"/>
     <logger name="config" level="INFO"/>
     
     <!-- 结果日志（用于记录实验结果） -->

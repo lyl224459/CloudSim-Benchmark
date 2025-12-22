@@ -113,7 +113,7 @@ class WOAScheduler(
     vmList: List<Vm>,
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val random: Random = Random(datacenter.Constants.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(0L)
 ) : Scheduler(cloudletList, vmList) {
     
     private val woa: WOA
