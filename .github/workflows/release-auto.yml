@@ -111,6 +111,7 @@ jobs:
         
     - name: Generate release notes
       id: release-notes
+      shell: bash
       run: |
         cat > release-notes.md << EOF
         # CloudSim-Benchmark ${{ steps.version.outputs.version }}

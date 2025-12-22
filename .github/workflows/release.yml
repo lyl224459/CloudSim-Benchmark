@@ -24,16 +24,7 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
         
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-          
+    # Gradle 缓存已由 setup-java 的 cache: 'gradle' 自动处理
     # Windows 环境，不需要设置执行权限
       
     - name: Build with Gradle
