@@ -827,6 +827,36 @@ cloudsim-benchmark/
 - **WARN**: 警告信息
 - **ERROR**: 错误信息
 
+## 🔄 CI/CD 持续集成
+
+项目配置了 GitHub Actions 自动构建和打包：
+
+### 自动构建
+
+每次推送到 `main` 或 `dev` 分支时，GitHub Actions 会自动：
+- ✅ 运行测试
+- ✅ 构建项目
+- ✅ 生成 fat JAR 文件
+- ✅ 上传构建产物作为 artifact
+
+### 工作流文件
+
+- **`.github/workflows/build.yml`** - 基本构建工作流（Ubuntu）
+- **`.github/workflows/build-matrix.yml`** - 多操作系统构建（Ubuntu、Windows、macOS）
+- **`.github/workflows/release.yml`** - 发布构建工作流
+
+### 下载构建产物
+
+1. 进入 GitHub 仓库的 Actions 页面
+2. 选择最新的工作流运行
+3. 在 Artifacts 部分下载 `cloudsim-benchmark-jar`
+
+### 注意事项
+
+⚠️ **CloudSim Plus 依赖**: 项目依赖 CloudSim Plus 9.0.0-SNAPSHOT（本地构建版本）。如果 CI 构建失败，可能需要：
+- 先构建 CloudSim Plus 并发布到 Maven 仓库
+- 或修改 `build.gradle.kts` 使用已发布的 CloudSim Plus 版本
+
 ## 🛠️ 开发指南
 
 ### 添加新算法
