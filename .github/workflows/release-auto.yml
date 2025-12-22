@@ -16,7 +16,7 @@ env:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     permissions:
       contents: write  # 需要写入权限来创建 release
     
@@ -33,16 +33,13 @@ jobs:
         
     # Gradle 缓存已由 setup-java 的 cache: 'gradle' 自动处理
           
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
     - name: Build with Gradle
-      run: ./gradlew clean build --no-daemon --stacktrace
+      run: gradlew.bat clean build --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         
     - name: Build fat JAR
-      run: ./gradlew fatJar --no-daemon --stacktrace
+      run: gradlew.bat fatJar --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         
@@ -67,12 +64,12 @@ jobs:
         echo "gradle-version=$VERSION" >> $GITHUB_OUTPUT
         
     - name: Create release archive
+      shell: bash
       run: |
         mkdir -p release
         cp build/libs/cloudsim-benchmark-*.jar release/
         cd release
-        tar -czf cloudsim-benchmark-${{ steps.version.outputs.version }}-linux.tar.gz *.jar
-        zip -r cloudsim-benchmark-${{ steps.version.outputs.version }}-linux.zip *.jar
+        zip -r cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip *.jar
         ls -lh
         
     - name: Generate release notes
@@ -90,8 +87,7 @@ jobs:
         ## 📥 下载
         
         - **JAR 文件**: \`cloudsim-benchmark-${{ steps.gradle-version.outputs.gradle-version }}-all.jar\`
-        - **Linux 压缩包**: \`cloudsim-benchmark-${{ steps.version.outputs.version }}-linux.tar.gz\`
-        - **Linux ZIP**: \`cloudsim-benchmark-${{ steps.version.outputs.version }}-linux.zip\`
+        - **Windows ZIP**: \`cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip\`
         
         ## 🚀 快速开始
         
@@ -103,7 +99,7 @@ jobs:
         ## 📋 系统要求
         
         - JDK 23+
-        - 支持的操作系统: Linux, Windows, macOS
+        - Windows 操作系统
         
         ## 📚 更多信息
         
@@ -121,8 +117,7 @@ jobs:
         prerelease: false
         files: |
           build/libs/cloudsim-benchmark-*.jar
-          release/cloudsim-benchmark-*.tar.gz
-          release/cloudsim-benchmark-*.zip
+          release/cloudsim-benchmark-*-windows.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

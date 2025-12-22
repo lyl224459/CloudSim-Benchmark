@@ -12,7 +12,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     
     steps:
     - name: Checkout code
@@ -55,12 +55,12 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         
     - name: Create release archive
+      shell: bash
       run: |
         mkdir -p release
         cp build/libs/cloudsim-benchmark-*.jar release/
         cd release
-        tar -czf cloudsim-benchmark-${{ steps.version.outputs.version }}-linux.tar.gz *.jar
-        zip -r cloudsim-benchmark-${{ steps.version.outputs.version }}-linux.zip *.jar
+        zip -r cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip *.jar
         
     - name: Upload release assets
       uses: actions/upload-artifact@v4

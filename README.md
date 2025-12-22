@@ -853,20 +853,21 @@ cloudsim-benchmark/
 
 ### 工作流文件
 
-- **`.github/workflows/build.yml`** - 基本构建工作流（Ubuntu）
+- **`.github/workflows/build.yml`** - 基本构建工作流（Windows）
   - 每次推送时自动触发
   - 构建项目并上传 artifact
   
-- **`.github/workflows/build-matrix.yml`** - 多操作系统构建（Ubuntu、Windows、macOS）
-  - 验证跨平台兼容性
+- **`.github/workflows/build-matrix.yml`** - Windows 构建
+  - 验证 Windows 平台兼容性
   
 - **`.github/workflows/release.yml`** - 发布构建工作流
   - 创建 Release 时触发
   
-- **`.github/workflows/release-auto.yml`** - 自动发布工作流（新增）
+- **`.github/workflows/release-auto.yml`** - 自动发布工作流（Windows）
   - 推送版本标签（如 `v1.0.0`）时自动触发
+  - 在 Windows 上构建项目
   - 构建成功后自动创建 GitHub Release
-  - 自动上传 JAR 文件和压缩包
+  - 自动上传 JAR 文件和 Windows ZIP 压缩包
 
 ### 下载构建产物
 
