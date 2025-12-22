@@ -72,8 +72,13 @@ jobs:
       shell: pwsh
       run: |
         New-Item -ItemType Directory -Force -Path release | Out-Null
-        # 复制 JAR 文件
-        Copy-Item -Path build/libs/cloudsim-benchmark-*.jar -Destination release/
+        # 检查并复制 JAR 文件
+        $jarFiles = Get-ChildItem -Path build/libs/cloudsim-benchmark-*.jar -ErrorAction SilentlyContinue
+        if ($null -eq $jarFiles -or $jarFiles.Count -eq 0) {
+          Write-Error "No JAR files found in build/libs/"
+          exit 1
+        }
+        Copy-Item -Path $jarFiles -Destination release/
         # 创建 Windows ZIP 压缩包（包含 JAR）
         Compress-Archive -Path release\*.jar -DestinationPath "release\cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip" -Force
         # 创建源码压缩包
