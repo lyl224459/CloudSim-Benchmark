@@ -12,7 +12,7 @@ object CloudletGeneratorFactory {
      */
     fun createGenerator(
         type: CloudletGeneratorType,
-        random: Random = Random(0)
+        random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
     ): CloudletGeneratorStrategy {
         return when (type) {
             CloudletGeneratorType.LOG_NORMAL -> LogNormalCloudletGenerator()

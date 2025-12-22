@@ -12,7 +12,7 @@ import java.util.*
  * 生成带有到达时间的任务，模拟实时任务调度场景
  */
 class RealtimeCloudletGenerator(
-    private val random: Random = Random(0),
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
     private val arrivalRate: Double = 10.0,  // 平均每秒到达的任务数（泊松分布）
     private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE
 ) {
