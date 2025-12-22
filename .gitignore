@@ -57,6 +57,12 @@ results_*.csv
 results_comparison.csv
 results_realtime_comparison.csv
 
+# 可视化结果
+figures/
+*.png
+*.jpg
+*.jpeg
+
 # ============================================
 # 操作系统文件
 # ============================================
@@ -117,6 +123,12 @@ $RECYCLE.BIN/
 .nyc_output/
 coverage/
 *.lcov
+
+# ============================================
+# Jupyter Notebook 文件
+# ============================================
+*.ipynb
+.ipynb_checkpoints/
 
 # ============================================
 # 其他
