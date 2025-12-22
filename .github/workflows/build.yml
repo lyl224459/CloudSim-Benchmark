@@ -89,10 +89,12 @@ jobs:
     - name: Upload build reports
       uses: actions/upload-artifact@v4
       if: always()
+      continue-on-error: true
       with:
         name: build-reports
         path: |
           build/reports/
           build/test-results/
         retention-days: 7
+        if-no-files-found: ignore
 
