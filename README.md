@@ -94,8 +94,8 @@ CloudSim-Benchmark 是一个专业的云任务调度算法对比实验平台，�
 ### 1. 克隆项目
 
 ```bash
-git clone <repository-url>
-cd cloudsim-b
+git clone https://github.com/lyl224459/CloudSim-Benchmark.git
+cd CloudSim-Benchmark
 ```
 
 ### 2. 构建项目
@@ -248,8 +248,8 @@ gradle runExp -Pmode=realtime-multi -Palgorithms=PSO_REALTIME,WOA_REALTIME
 
 **注意**: 
 - Gradle 任务会自动编译代码并运行，无需先构建 JAR 文件
-- 如果遇到 `NoClassDefFoundError` 错误，请确保 CloudSim Plus 已正确安装到本地 Maven 仓库
-- 或者使用 fatJar 方式运行（见方式三），fatJar 包含所有依赖，无需本地 Maven 仓库
+- 如果遇到 `NoClassDefFoundError` 错误，请检查网络连接，确保能够从 Maven Central 下载 CloudSim Plus 依赖
+- 或者使用 fatJar 方式运行（见方式三），fatJar 包含所有依赖，无需额外配置
 
 #### 方式三：直接运行 JAR
 
@@ -331,24 +331,28 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 
 **实时调度模式批量任务数实验** (`realtime-multi`)：
 ```
-用法: java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi <cloudletCounts> [algorithms] [randomSeed]
+用法: java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi <cloudletCounts> [runs] [algorithms] [randomSeed]
 
 参数说明:
   cloudletCounts - 任务数列表（必需），用逗号分隔，例如: 50,100,200,500
+  runs          - 每个任务数的运行次数（可选，默认: 1），用于计算平均值和标准差
   algorithms    - 要运行的算法列表（可选，默认: 所有算法）
                   实时模式: MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME
                   多个算法用逗号分隔，例如: PSO_REALTIME,WOA_REALTIME
   randomSeed    - 随机数种子（可选，默认: 0）
 
 示例:
-  # 测试多个任务数
+  # 测试多个任务数，每个任务数运行1次
   java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500
 
-  # 指定算法
-  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME
+  # 测试多个任务数，每个任务数运行10次
+  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500 10
 
-  # 指定算法和随机种子
-  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME 42
+  # 指定运行次数和算法
+  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME
+
+  # 完整参数：运行次数、算法和随机种子
+  java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME 42
 ```
 
 ### 算法选择
@@ -505,6 +509,7 @@ CSV 文件包含以下列：
 **参数说明**：
 
 - **任务数列表** (`cloudletCounts`): 必需参数，用逗号分隔，例如 `50,100,200,500`
+- **运行次数** (`runs`): 可选参数，每个任务数的运行次数（默认: 1），用于计算统计值
 - **算法列表** (`algorithms`): 可选参数，要运行的算法列表（默认: 所有算法）
 - **随机种子** (`randomSeed`): 可选参数，随机数种子（默认: 0）
 
@@ -523,14 +528,17 @@ CSV 文件包含以下列：
 Windows 用户可以使用专门的脚本 `run-realtime-multi.bat`：
 
 ```bash
-# 基本用法
+# 基本用法（每个任务数运行1次）
 run-realtime-multi.bat 50,100,200,500
 
-# 指定算法
-run-realtime-multi.bat 50,100,200 PSO_REALTIME,WOA_REALTIME
+# 指定运行次数（每个任务数运行10次）
+run-realtime-multi.bat 50,100,200,500 10
 
-# 指定算法和随机种子
-run-realtime-multi.bat 50,100,200 PSO_REALTIME,WOA_REALTIME 42
+# 指定运行次数和算法
+run-realtime-multi.bat 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME
+
+# 指定运行次数、算法和随机种子
+run-realtime-multi.bat 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME 42
 ```
 
 ### 多次运行取平均值

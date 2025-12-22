@@ -9,8 +9,8 @@ version = "1.0.0"
 description = "CloudSim-Benchmark: 云任务调度算法对比实验平台"
 
 repositories {
-    mavenLocal()
     mavenCentral()
+    // mavenLocal() - 已移除，使用 Maven Central 的已发布版本 8.5.5
 }
 
 java {
