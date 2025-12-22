@@ -1,9 +1,10 @@
 @echo off
 REM 批量任务数实验模式运行脚本
-REM 用法: run-batch-multi.bat [cloudletCounts] [algorithms] [randomSeed]
+REM 用法: run-batch-multi.bat [cloudletCounts] [runs] [algorithms] [randomSeed]
 REM 示例: run-batch-multi.bat 50,100,200,500
-REM 示例: run-batch-multi.bat 50,100,200 PSO,WOA
-REM 示例: run-batch-multi.bat 50,100,200 PSO,WOA 42
+REM 示例: run-batch-multi.bat 50,100,200,500 10
+REM 示例: run-batch-multi.bat 50,100,200,500 10 PSO,WOA
+REM 示例: run-batch-multi.bat 50,100,200,500 10 PSO,WOA 42
 
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
@@ -20,6 +21,7 @@ set ARGS=batch-multi
 if not "%~1"=="" set ARGS=!ARGS! %~1
 if not "%~2"=="" set ARGS=!ARGS! %~2
 if not "%~3"=="" set ARGS=!ARGS! %~3
+if not "%~4"=="" set ARGS=!ARGS! %~4
 
 echo ========================================
 echo 批量任务数实验模式

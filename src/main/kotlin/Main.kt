@@ -37,13 +37,20 @@ fun main(args: Array<String>) {
         "batch-multi", "bm" -> {
             // 批处理模式批量任务数实验
             Logger.info("开始批处理模式批量任务数实验...")
-            val cloudletCounts = parseCloudletCounts(args)
+            val (cloudletCounts, runs, algorithms, randomSeed) = parseBatchMultiArgs(args)
+            val updatedConfig = config.copy(
+                randomSeed = randomSeed,
+                batch = config.batch.copy(
+                    runs = runs,
+                    algorithms = if (algorithms.isEmpty()) config.batch.algorithms else algorithms
+                )
+            )
             if (cloudletCounts.isEmpty()) {
                 Logger.error("未指定任务数列表！使用默认值: 50, 100, 200, 500")
                 val defaultCounts = listOf(50, 100, 200, 500)
-                runBatchCloudletCountExperiment(defaultCounts, config)
+                runBatchCloudletCountExperiment(defaultCounts, updatedConfig)
             } else {
-                runBatchCloudletCountExperiment(cloudletCounts, config)
+                runBatchCloudletCountExperiment(cloudletCounts, updatedConfig)
             }
         }
         "realtime-multi", "rm" -> {
@@ -215,8 +222,70 @@ private fun runRealtimeCloudletCountExperiment(cloudletCounts: List<Int>, config
 }
 
 /**
- * 解析任务数列表
- * 格式: batch-multi/realtime-multi 50,100,200,500 [algorithms] [randomSeed]
+ * 解析批处理模式批量任务数实验参数
+ * 格式: batch-multi 50,100,200,500 [runs] [algorithms] [randomSeed]
+ * 示例: batch-multi 50,100,200,500 10
+ * 示例: batch-multi 50,100,200,500 10 PSO,WOA
+ * 示例: batch-multi 50,100,200,500 10 PSO,WOA 42
+ */
+private fun parseBatchMultiArgs(args: Array<String>): Quadruple<List<Int>, Int, List<config.BatchAlgorithmType>, Long> {
+    if (args.size < 2) return Quadruple(emptyList(), 1, emptyList(), 0L)
+    
+    var cloudletCounts = emptyList<Int>()
+    var runs = 1
+    val algorithms = mutableListOf<config.BatchAlgorithmType>()
+    var randomSeed = 0L
+    
+    // 第一个参数是任务数列表（必需）
+    val firstArg = args[1]
+    if (firstArg.contains(",") && firstArg.split(",").all { it.trim().toIntOrNull() != null }) {
+        cloudletCounts = firstArg.split(",").map { it.trim().toInt() }
+    }
+    
+    // 从第二个参数开始解析
+    for (i in 2 until args.size) {
+        val arg = args[i]
+        
+        // 尝试解析为运行次数（纯数字，且较小，通常 <= 100）
+        val runsValue = arg.toIntOrNull()
+        if (runsValue != null && runsValue > 0 && runsValue <= 100) {
+            runs = runsValue
+            continue
+        }
+        
+        // 尝试解析为随机种子（纯数字，且较大，通常 > 1000）
+        val seedValue = arg.toLongOrNull()
+        if (seedValue != null && seedValue > 1000) {
+            randomSeed = seedValue
+            continue
+        }
+        
+        // 尝试解析为算法列表
+        if (arg.contains(",")) {
+            val parts = arg.split(",").map { it.trim() }
+            parts.forEach { algName ->
+                try {
+                    algorithms.add(config.BatchAlgorithmType.valueOf(algName.uppercase()))
+                } catch (e: IllegalArgumentException) {
+                    Logger.warn("未知的批处理算法: {}，已忽略", algName)
+                }
+            }
+        } else {
+            // 单个算法名称
+            try {
+                algorithms.add(config.BatchAlgorithmType.valueOf(arg.uppercase()))
+            } catch (e: IllegalArgumentException) {
+                Logger.warn("未知的批处理算法: {}，已忽略", arg)
+            }
+        }
+    }
+    
+    return Quadruple(cloudletCounts, runs, algorithms, randomSeed)
+}
+
+/**
+ * 解析任务数列表（用于实时调度模式）
+ * 格式: realtime-multi 50,100,200,500 [algorithms] [randomSeed]
  */
 private fun parseCloudletCounts(args: Array<String>): List<Int> {
     if (args.size < 2) return emptyList()
@@ -229,6 +298,16 @@ private fun parseCloudletCounts(args: Array<String>): List<Int> {
     
     return emptyList()
 }
+
+/**
+ * 四元组类
+ */
+private data class Quadruple<A, B, C, D>(
+    val first: A,
+    val second: B,
+    val third: C,
+    val fourth: D
+)
 
 /**
  * 打印使用说明
