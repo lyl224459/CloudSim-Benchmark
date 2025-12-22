@@ -1,8 +1,7 @@
 name: Release Build
 
 on:
-  release:
-    types: [created]
+  # 禁用此工作流，只使用 release-auto.yml
   workflow_dispatch:
     inputs:
       version:

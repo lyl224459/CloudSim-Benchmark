@@ -60,11 +60,13 @@ jobs:
         
     - name: Get version from Gradle
       id: gradle-version
-      shell: bash
+      shell: pwsh
       run: |
-        VERSION=$(.\gradlew.bat properties --no-daemon -q | grep "^version:" | awk '{print $2}')
-        echo "gradle-version=$VERSION" >> $GITHUB_OUTPUT
-        echo "Gradle version: $VERSION"
+        $output = & .\gradlew.bat properties --no-daemon -q
+        $versionLine = $output | Select-String -Pattern "^version:"
+        $version = ($versionLine -split '\s+')[1]
+        echo "gradle-version=$version" >> $env:GITHUB_OUTPUT
+        echo "Gradle version: $version"
         
     - name: Create release archives
       shell: pwsh

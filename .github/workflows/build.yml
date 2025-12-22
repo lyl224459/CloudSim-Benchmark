@@ -1,12 +1,9 @@
 name: Build and Package
 
 on:
-  push:
-    branches: [ main, dev ]
-  pull_request:
-    branches: [ main, dev ]
+  # 禁用此工作流，只使用 release-auto.yml
   workflow_dispatch:
-    # 手动触发构建
+    # 手动触发构建（仅用于测试）
 
 env:
   GRADLE_OPTS: "-Dfile.encoding=UTF-8"
