@@ -163,6 +163,7 @@ jobs:
           build/libs/cloudsim-benchmark-*.jar
           release/cloudsim-benchmark-*-windows.zip
           release/cloudsim-benchmark-*-source.zip
+        fail_on_unmatched_files: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
