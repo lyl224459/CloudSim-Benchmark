@@ -57,9 +57,28 @@ CloudSim-Benchmark 是一个专业的云任务调度算法对比实验平台，�
 
 - ✅ 算法自由选择（支持命令行和代码配置）
 - ✅ 多次运行取平均值（支持统计分析和标准差计算）
+- ✅ 批量任务数实验（支持批处理和实时调度两种模式）
 - ✅ 结果自动保存（时间戳命名，避免覆盖）
 - ✅ 完整的日志系统（跨平台日志库）
 - ✅ CSV 结果导出（便于后续分析）
+
+### 批量任务数实验功能
+
+项目提供了两个专门的批量任务数实验运行器：
+
+- **`BatchCloudletCountRunner`** (`src/main/kotlin/datacenter/BatchCloudletCountRunner.kt`)
+  - 批处理模式批量任务数实验运行器
+  - 支持按不同任务数批量执行批处理调度实验
+  - 每个任务数可运行多次并计算统计值
+
+- **`RealtimeCloudletCountRunner`** (`src/main/kotlin/datacenter/RealtimeCloudletCountRunner.kt`)
+  - 实时调度模式批量任务数实验运行器
+  - 支持按不同任务数批量执行实时调度实验
+  - 包含实时调度特有指标（平均等待时间、平均响应时间）
+
+对应的运行脚本：
+- **`run-batch-multi.bat`** - Windows 批处理模式批量任务数实验脚本
+- **`run-realtime-multi.bat`** - Windows 实时调度模式批量任务数实验脚本
 
 ## 🚀 快速开始
 
@@ -302,6 +321,16 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 
 批量任务数实验模式可以按照不同的任务数批量执行实验，每个任务数可以运行多次并取平均值。这对于研究算法在不同规模任务下的性能表现非常有用。
 
+批量任务数实验功能由两个专门的运行器类实现：
+- **`BatchCloudletCountRunner`**: 批处理模式批量任务数实验运行器，位于 `src/main/kotlin/datacenter/BatchCloudletCountRunner.kt`
+- **`RealtimeCloudletCountRunner`**: 实时调度模式批量任务数实验运行器，位于 `src/main/kotlin/datacenter/RealtimeCloudletCountRunner.kt`
+
+这两个运行器类封装了批量任务数实验的完整流程，包括：
+- 按不同任务数循环执行实验
+- 每个任务数多次运行并计算统计值（平均值、标准差、最小值、最大值）
+- 自动汇总所有任务数的结果
+- 导出 CSV 文件和打印汇总表格
+
 #### 批处理模式批量任务数实验 (`batch-multi`)
 
 批处理模式批量任务数实验使用批处理调度算法，所有任务一次性提交。
@@ -347,6 +376,21 @@ CSV 文件包含以下列：
 - `population` - 优化算法的种群大小
 - `maxIter` - 优化算法的最大迭代次数
 - `algorithms` - 要运行的算法列表（空列表 = 所有算法）
+
+**运行脚本**：
+
+Windows 用户可以使用专门的脚本 `run-batch-multi.bat`：
+
+```bash
+# 基本用法
+run-batch-multi.bat 50,100,200,500
+
+# 指定算法
+run-batch-multi.bat 50,100,200 PSO,WOA
+
+# 指定算法和随机种子
+run-batch-multi.bat 50,100,200 PSO,WOA 42
+```
 
 #### 实时调度模式批量任务数实验 (`realtime-multi`)
 
