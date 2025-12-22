@@ -174,10 +174,89 @@ tasks.register<JavaExec>("runRealtime") {
 }
 
 /**
+ * 批量任务数实验任务
+ * 用法: 
+ *   gradle runBatchMulti                                    # 默认任务数 (50,100,200,500)
+ *   gradle runBatchMulti -PcloudletCounts=50,100,200,500,1000  # 指定任务数
+ *   gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA  # 指定任务数和算法
+ *   gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA -Pseed=42  # 完整参数
+ */
+tasks.register<JavaExec>("runBatchMulti") {
+    group = "application"
+    description = "运行批量任务数实验"
+    mainClass.set("MainKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    dependsOn("classes", "processResources")
+    
+    // 获取参数（通过 -P 传递）
+    val cloudletCounts = project.findProperty("cloudletCounts") as String? ?: "50,100,200,500"
+    val algorithms = project.findProperty("algorithms") as String?
+    val seed = project.findProperty("seed") as String?
+    
+    // 构建参数列表（与命令行格式一致）
+    val argsList = mutableListOf<String>("batch-multi", cloudletCounts)
+    if (algorithms != null && algorithms.isNotEmpty()) {
+        argsList.add(algorithms)
+    }
+    if (seed != null && seed.isNotEmpty()) {
+        argsList.add(seed)
+    }
+    
+    args = argsList
+    
+    jvmArgs = listOf(
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "-Dfile.encoding=UTF-8",
+        "-Dconsole.encoding=UTF-8"
+    )
+    systemProperty("file.encoding", "UTF-8")
+}
+
+// 实时调度模式批量任务数实验任务
+tasks.register<JavaExec>("runRealtimeMulti") {
+    group = "application"
+    description = "运行实时调度模式批量任务数实验"
+    mainClass.set("MainKt")
+    classpath = sourceSets["main"].runtimeClasspath
+    dependsOn("classes", "processResources")
+
+    val cloudletCounts = project.findProperty("cloudletCounts") as String?
+    val algorithms = project.findProperty("algorithms") as String?
+    val seed = project.findProperty("seed") as String?
+
+    val argsList = mutableListOf<String>("realtime-multi")
+    if (cloudletCounts != null && cloudletCounts.isNotEmpty()) {
+        argsList.add(cloudletCounts)
+    } else {
+        // Default cloudlet counts if not provided
+        argsList.add("50,100,200,500")
+    }
+    if (algorithms != null && algorithms.isNotEmpty()) {
+        argsList.add(algorithms)
+    }
+    if (seed != null && seed.isNotEmpty()) {
+        argsList.add(seed)
+    }
+
+    args = argsList
+
+    jvmArgs = listOf(
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "-Dfile.encoding=UTF-8",
+        "-Dconsole.encoding=UTF-8"
+    )
+    systemProperty("file.encoding", "UTF-8")
+}
+
+/**
  * 通用运行任务（支持自定义模式和所有参数）
  * 用法: 
  *   gradle runExp -Pmode=batch -Palgorithms=PSO,WOA -Pseed=42
+ *   gradle runExp -Pmode=batch-multi -Palgorithms=PSO,WOA
  *   gradle runExp -Pmode=realtime -Palgorithms=PSO_REALTIME,WOA_REALTIME
+ *   gradle runExp -Pmode=realtime-multi -Palgorithms=PSO_REALTIME,WOA_REALTIME
  */
 tasks.register<JavaExec>("runExp") {
     group = "application"

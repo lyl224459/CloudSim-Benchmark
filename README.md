@@ -106,15 +106,31 @@ run-batch.bat PSO,WOA 42
 # 批处理模式 - 运行 10 次取平均值
 run-batch.bat PSO,WOA 42 10
 
+# 批量任务数实验模式 - 测试多个任务数
+run-batch-multi.bat 50,100,200,500
+
+# 批量任务数实验模式 - 指定算法
+run-batch-multi.bat 50,100,200 PSO,WOA
+
 # 实时调度模式
 run-realtime.bat
 
 # 实时调度模式 - 指定算法和随机种子
 run-realtime.bat PSO_REALTIME,WOA_REALTIME 123
 
+# 实时调度模式批量任务数实验 - 测试多个任务数
+run-realtime-multi.bat 50,100,200,500
+
+# 实时调度模式批量任务数实验 - 指定算法
+run-realtime-multi.bat 50,100,200 PSO_REALTIME,WOA_REALTIME
+
 # 通用脚本
 run.bat batch PSO,WOA 42
+run.bat batch-multi 50,100,200,500
+run.bat batch-multi 50,100,200 PSO,WOA
 run.bat realtime PSO_REALTIME,WOA_REALTIME 123
+run.bat realtime-multi 50,100,200,500
+run.bat realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME
 
 # 构建并运行（自动构建 JAR）
 build-and-run.bat batch PSO,WOA 42
@@ -127,8 +143,16 @@ chmod +x run.sh
 # 批处理模式
 ./run.sh batch PSO,WOA 42
 
+# 批量任务数实验模式
+./run.sh batch-multi 50,100,200,500
+./run.sh batch-multi 50,100,200 PSO,WOA
+
 # 实时调度模式
 ./run.sh realtime PSO_REALTIME,WOA_REALTIME 123
+
+# 实时调度模式批量任务数实验
+./run.sh realtime-multi 50,100,200,500
+./run.sh realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME
 ```
 
 #### 方式二：使用 Gradle 任务运行
@@ -153,9 +177,35 @@ gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME
 # 实时调度模式 - 指定算法和随机种子
 gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME -Pseed=123
 
+# 批处理模式批量任务数实验 - 默认任务数 (50,100,200,500)
+gradle runBatchMulti
+
+# 批处理模式批量任务数实验 - 指定任务数
+gradle runBatchMulti -PcloudletCounts=50,100,200,500,1000
+
+# 批处理模式批量任务数实验 - 指定任务数和算法
+gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA
+
+# 批处理模式批量任务数实验 - 完整参数
+gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA -Pseed=42
+
+# 实时调度模式批量任务数实验 - 默认任务数 (50,100,200,500)
+gradle runRealtimeMulti
+
+# 实时调度模式批量任务数实验 - 指定任务数
+gradle runRealtimeMulti -PcloudletCounts=50,100,200,500,1000
+
+# 实时调度模式批量任务数实验 - 指定任务数和算法
+gradle runRealtimeMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO_REALTIME,WOA_REALTIME
+
+# 实时调度模式批量任务数实验 - 完整参数
+gradle runRealtimeMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO_REALTIME,WOA_REALTIME -Pseed=42
+
 # 通用任务（自定义模式）
 gradle runExp -Pmode=batch -Palgorithms=PSO,WOA -Pseed=42
+gradle runExp -Pmode=batch-multi -Palgorithms=PSO,WOA
 gradle runExp -Pmode=realtime -Palgorithms=PSO_REALTIME,WOA_REALTIME
+gradle runExp -Pmode=realtime-multi -Palgorithms=PSO_REALTIME,WOA_REALTIME
 ```
 
 **注意**: 
@@ -175,6 +225,15 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA
 # 批处理模式 - 指定随机种子
 java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA 42
 
+# 批量任务数实验 - 测试多个任务数
+java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500
+
+# 批量任务数实验 - 指定算法
+java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA
+
+# 批量任务数实验 - 指定算法和随机种子
+java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA 42
+
 # 实时调度模式
 java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime
 
@@ -187,18 +246,20 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 ### 命令行参数
 
 ```
-用法: java -jar cloudsim-benchmark-1.0.0-all.jar [batch|realtime] [algorithms] [randomSeed]
+用法: java -jar cloudsim-benchmark-1.0.0-all.jar [batch|realtime|batch-multi|realtime-multi] [algorithms] [randomSeed]
 
 模式:
-  batch      - 批处理调度模式（所有任务一次性提交）
-  realtime   - 实时调度模式（任务动态到达，默认）
+  batch         - 批处理调度模式（所有任务一次性提交）
+  batch-multi   - 批处理模式批量任务数实验（按不同任务数批量执行）
+  realtime      - 实时调度模式（任务动态到达，默认）
+  realtime-multi - 实时调度模式批量任务数实验（按不同任务数批量执行）
 
 参数:
-  algorithms - 要运行的算法列表（可选，默认: 所有算法）
-              批处理模式: RANDOM, PSO, WOA, GWO, HHO
-              实时模式: MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME
-              多个算法用逗号分隔，例如: PSO,WOA
-  randomSeed - 随机数种子（可选，默认: 0）
+  algorithms   - 要运行的算法列表（可选，默认: 所有算法）
+                批处理模式: RANDOM, PSO, WOA, GWO, HHO
+                实时模式: MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME
+                多个算法用逗号分隔，例如: PSO,WOA
+  randomSeed   - 随机数种子（可选，默认: 0）
 
 示例:
   # 运行所有算法
@@ -209,6 +270,12 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 
   # 运行指定算法并使用自定义随机种子
   java -jar cloudsim-benchmark-1.0.0-all.jar batch PSO,WOA 42
+
+  # 批量任务数实验（测试 50, 100, 200, 500 个任务）
+  java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500
+
+  # 批量任务数实验，指定算法
+  java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA
 
   # 实时模式，只运行 PSO 和 WOA
   java -jar cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_REALTIME
@@ -230,6 +297,107 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 - `RANDOM` - 随机调度
 - `PSO_REALTIME` - PSO实时调度
 - `WOA_REALTIME` - WOA实时调度
+
+### 批量任务数实验
+
+批量任务数实验模式可以按照不同的任务数批量执行实验，每个任务数可以运行多次并取平均值。这对于研究算法在不同规模任务下的性能表现非常有用。
+
+#### 批处理模式批量任务数实验 (`batch-multi`)
+
+批处理模式批量任务数实验使用批处理调度算法，所有任务一次性提交。
+
+**使用方法**：
+
+```bash
+# 基本用法：测试多个任务数
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500
+
+# 指定算法
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA
+
+# 指定算法和随机种子
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA 42
+```
+
+**功能特性**：
+
+- ✅ **多任务数批量执行**：支持一次测试多个不同的任务数
+- ✅ **多次运行取平均值**：每个任务数会运行 `config.batch.runs` 次并计算平均值和标准差
+- ✅ **自动汇总结果**：所有任务数的结果会汇总到一个 CSV 文件中
+- ✅ **详细统计表格**：打印每个指标在不同任务数下的对比表格
+
+**输出结果**：
+
+结果文件格式：`results/batch_cloudlet_count_comparison_YYYYMMDD_HHmmss.csv`
+
+CSV 文件包含以下列：
+- `CloudletCount` - 任务数
+- `Algorithm` - 算法名称
+- `Makespan_Mean`, `Makespan_StdDev` - Makespan 的平均值和标准差
+- `LoadBalance_Mean`, `LoadBalance_StdDev` - 负载均衡的平均值和标准差
+- `Cost_Mean`, `Cost_StdDev` - 成本的平均值和标准差
+- `TotalTime_Mean`, `TotalTime_StdDev` - 总时间的平均值和标准差
+- `Fitness_Mean`, `Fitness_StdDev` - 适应度的平均值和标准差
+- `Runs` - 运行次数
+
+**配置说明**：
+
+批量任务数实验的配置继承自 `config.batch`：
+- `runs` - 每个任务数的运行次数（默认: 1）
+- `population` - 优化算法的种群大小
+- `maxIter` - 优化算法的最大迭代次数
+- `algorithms` - 要运行的算法列表（空列表 = 所有算法）
+
+#### 实时调度模式批量任务数实验 (`realtime-multi`)
+
+实时调度模式批量任务数实验使用实时调度算法，任务动态到达，支持增量调度和实时响应。
+
+**使用方法**：
+
+```bash
+# 基本用法：测试多个任务数
+java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200,500
+
+# 指定算法
+java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME
+
+# 指定算法和随机种子
+java -jar cloudsim-benchmark-1.0.0-all.jar realtime-multi 50,100,200 PSO_REALTIME,WOA_REALTIME 42
+```
+
+**功能特性**：
+
+- ✅ **多任务数批量执行**：支持一次测试多个不同的任务数
+- ✅ **多次运行取平均值**：每个任务数会运行 `config.realtime.runs` 次并计算平均值和标准差
+- ✅ **实时调度指标**：包含平均等待时间和平均响应时间等实时调度特有指标
+- ✅ **自动汇总结果**：所有任务数的结果会汇总到一个 CSV 文件中
+- ✅ **详细统计表格**：打印每个指标在不同任务数下的对比表格
+
+**输出结果**：
+
+结果文件格式：`results/realtime_cloudlet_count_comparison_YYYYMMDD_HHmmss.csv`
+
+CSV 文件包含以下列：
+- `CloudletCount` - 任务数
+- `Algorithm` - 算法名称
+- `Makespan_Mean`, `Makespan_StdDev` - Makespan 的平均值和标准差
+- `LoadBalance_Mean`, `LoadBalance_StdDev` - 负载均衡的平均值和标准差
+- `Cost_Mean`, `Cost_StdDev` - 成本的平均值和标准差
+- `TotalTime_Mean`, `TotalTime_StdDev` - 总时间的平均值和标准差
+- `Fitness_Mean`, `Fitness_StdDev` - 适应度的平均值和标准差
+- `AvgWaitingTime_Mean`, `AvgWaitingTime_StdDev` - 平均等待时间的平均值和标准差
+- `AvgResponseTime_Mean`, `AvgResponseTime_StdDev` - 平均响应时间的平均值和标准差
+- `Runs` - 运行次数
+
+**配置说明**：
+
+实时调度模式批量任务数实验的配置继承自 `config.realtime`：
+- `runs` - 每个任务数的运行次数（默认: 1）
+- `simulationDuration` - 仿真持续时间（秒）
+- `arrivalRate` - 平均每秒到达的任务数
+- `population` - 优化算法的种群大小（来自 `config.optimizer`）
+- `maxIter` - 优化算法的最大迭代次数（来自 `config.optimizer`）
+- `algorithms` - 要运行的算法列表（空列表 = 所有算法）
 
 ### 多次运行取平均值
 
@@ -386,10 +554,13 @@ GAMMA = 1.0 / 3    // LoadBalance（负载均衡）权重
 ### 结果文件命名规则
 
 - **批处理模式**: `results/batch_comparison_YYYYMMDD_HHmmss.csv`
+- **批处理模式批量任务数实验**: `results/batch_cloudlet_count_comparison_YYYYMMDD_HHmmss.csv`
 - **实时调度模式**: `results/realtime_comparison_YYYYMMDD_HHmmss.csv`
+- **实时调度模式批量任务数实验**: `results/realtime_cloudlet_count_comparison_YYYYMMDD_HHmmss.csv`
 
 例如：
 - `results/batch_comparison_20241222_143025.csv`
+- `results/batch_cloudlet_count_comparison_20241222_143156.csv`
 - `results/realtime_comparison_20241222_143156.csv`
 
 ### 结果文件内容
@@ -469,6 +640,7 @@ cloudsim-benchmark/
 ├── build.gradle.kts              # Gradle构建配置
 ├── run.bat                       # Windows通用运行脚本
 ├── run-batch.bat                 # Windows批处理模式脚本
+├── run-batch-multi.bat           # Windows批量任务数实验脚本
 ├── run-realtime.bat              # Windows实时模式脚本
 ├── build-and-run.bat             # Windows构建并运行脚本
 ├── run.sh                        # Linux/macOS运行脚本

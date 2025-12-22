@@ -168,6 +168,7 @@ class ComparisonRunner(
         Logger.info("种群大小: {}", population)
         Logger.info("最大迭代次数: {}", maxIter)
         Logger.info("随机数种子: {}", randomSeed)
+        Logger.info("运行次数: {}", runs)
         Logger.info("${"=".repeat(60)}")
         
         val results = mutableListOf<AlgorithmResult>()
@@ -183,31 +184,79 @@ class ComparisonRunner(
         
         // 根据配置运行选定的算法
         for (algorithmType in algorithmsToRun) {
-            when (algorithmType) {
-                config.BatchAlgorithmType.RANDOM -> {
-                    results.add(runAlgorithm("Random") { cloudlets, vms ->
-                        RandomScheduler(cloudlets, vms, random)
-                    })
+            if (runs > 1) {
+                // 多次运行，计算统计值
+                val runResults = mutableListOf<AlgorithmResult>()
+                for (run in 1..runs) {
+                    Logger.info("\n--- 第 {}/{} 次运行 ---", run, runs)
+                    val result = when (algorithmType) {
+                        config.BatchAlgorithmType.RANDOM -> {
+                            runAlgorithm("Random") { cloudlets, vms ->
+                                RandomScheduler(cloudlets, vms, Random(randomSeed + run))
+                            }
+                        }
+                        config.BatchAlgorithmType.PSO -> {
+                            runAlgorithm("PSO") { cloudlets, vms ->
+                                PSOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            }
+                        }
+                        config.BatchAlgorithmType.WOA -> {
+                            runAlgorithm("WOA") { cloudlets, vms ->
+                                WOAScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            }
+                        }
+                        config.BatchAlgorithmType.GWO -> {
+                            runAlgorithm("GWO") { cloudlets, vms ->
+                                GWOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            }
+                        }
+                        config.BatchAlgorithmType.HHO -> {
+                            runAlgorithm("HHO") { cloudlets, vms ->
+                                HHOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            }
+                        }
+                    }
+                    runResults.add(result)
                 }
-                config.BatchAlgorithmType.PSO -> {
-                    results.add(runAlgorithm("PSO") { cloudlets, vms ->
-                        PSOScheduler(cloudlets, vms, population, maxIter, random)
-                    })
-                }
-                config.BatchAlgorithmType.WOA -> {
-                    results.add(runAlgorithm("WOA") { cloudlets, vms ->
-                        WOAScheduler(cloudlets, vms, population, maxIter, random)
-                    })
-                }
-                config.BatchAlgorithmType.GWO -> {
-                    results.add(runAlgorithm("GWO") { cloudlets, vms ->
-                        GWOScheduler(cloudlets, vms, population, maxIter, random)
-                    })
-                }
-                config.BatchAlgorithmType.HHO -> {
-                    results.add(runAlgorithm("HHO") { cloudlets, vms ->
-                        HHOScheduler(cloudlets, vms, population, maxIter, random)
-                    })
+                
+                // 计算平均值（用于显示）
+                val avgResult = AlgorithmResult(
+                    algorithmName = runResults[0].algorithmName,
+                    makespan = runResults.map { it.makespan }.average(),
+                    loadBalance = runResults.map { it.loadBalance }.average(),
+                    cost = runResults.map { it.cost }.average(),
+                    totalTime = runResults.map { it.totalTime }.average(),
+                    fitness = runResults.map { it.fitness }.average()
+                )
+                results.add(avgResult)
+            } else {
+                // 单次运行
+                when (algorithmType) {
+                    config.BatchAlgorithmType.RANDOM -> {
+                        results.add(runAlgorithm("Random") { cloudlets, vms ->
+                            RandomScheduler(cloudlets, vms, random)
+                        })
+                    }
+                    config.BatchAlgorithmType.PSO -> {
+                        results.add(runAlgorithm("PSO") { cloudlets, vms ->
+                            PSOScheduler(cloudlets, vms, population, maxIter, random)
+                        })
+                    }
+                    config.BatchAlgorithmType.WOA -> {
+                        results.add(runAlgorithm("WOA") { cloudlets, vms ->
+                            WOAScheduler(cloudlets, vms, population, maxIter, random)
+                        })
+                    }
+                    config.BatchAlgorithmType.GWO -> {
+                        results.add(runAlgorithm("GWO") { cloudlets, vms ->
+                            GWOScheduler(cloudlets, vms, population, maxIter, random)
+                        })
+                    }
+                    config.BatchAlgorithmType.HHO -> {
+                        results.add(runAlgorithm("HHO") { cloudlets, vms ->
+                            HHOScheduler(cloudlets, vms, population, maxIter, random)
+                        })
+                    }
                 }
             }
         }
@@ -216,6 +265,120 @@ class ComparisonRunner(
         printComparisonResults(results)
         
         return results
+    }
+    
+    /**
+     * 运行所有算法并返回统计结果（用于批量实验）
+     */
+    fun runComparisonWithStatistics(): List<AlgorithmStatistics> {
+        Logger.info("\n${"=".repeat(60)}")
+        Logger.info("开始算法对比实验（统计模式）")
+        Logger.info("任务数量: {}", cloudletCount)
+        Logger.info("种群大小: {}", population)
+        Logger.info("最大迭代次数: {}", maxIter)
+        Logger.info("随机数种子: {}", randomSeed)
+        Logger.info("运行次数: {}", runs)
+        Logger.info("${"=".repeat(60)}")
+        
+        val statistics = mutableListOf<AlgorithmStatistics>()
+        
+        // 确定要运行的算法列表（如果配置为空，则运行所有算法）
+        val algorithmsToRun = if (algorithms.isEmpty()) {
+            config.BatchAlgorithmType.entries
+        } else {
+            algorithms
+        }
+        
+        Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
+        
+        // 根据配置运行选定的算法
+        for (algorithmType in algorithmsToRun) {
+            val runResults = mutableListOf<AlgorithmResult>()
+            
+            // 运行多次
+            for (run in 1..runs) {
+                Logger.info("\n--- {} 算法，第 {}/{} 次运行 ---", algorithmType.name, run, runs)
+                val result = when (algorithmType) {
+                    config.BatchAlgorithmType.RANDOM -> {
+                        runAlgorithm("Random") { cloudlets, vms ->
+                            RandomScheduler(cloudlets, vms, Random(randomSeed + run))
+                        }
+                    }
+                    config.BatchAlgorithmType.PSO -> {
+                        runAlgorithm("PSO") { cloudlets, vms ->
+                            PSOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                        }
+                    }
+                    config.BatchAlgorithmType.WOA -> {
+                        runAlgorithm("WOA") { cloudlets, vms ->
+                            WOAScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                        }
+                    }
+                    config.BatchAlgorithmType.GWO -> {
+                        runAlgorithm("GWO") { cloudlets, vms ->
+                            GWOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                        }
+                    }
+                    config.BatchAlgorithmType.HHO -> {
+                        runAlgorithm("HHO") { cloudlets, vms ->
+                            HHOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                        }
+                    }
+                }
+                runResults.add(result)
+            }
+            
+            // 计算统计值
+            val makespanStats = DescriptiveStatistics()
+            val loadBalanceStats = DescriptiveStatistics()
+            val costStats = DescriptiveStatistics()
+            val totalTimeStats = DescriptiveStatistics()
+            val fitnessStats = DescriptiveStatistics()
+            
+            for (result in runResults) {
+                makespanStats.addValue(result.makespan)
+                loadBalanceStats.addValue(result.loadBalance)
+                costStats.addValue(result.cost)
+                totalTimeStats.addValue(result.totalTime)
+                fitnessStats.addValue(result.fitness)
+            }
+            
+            statistics.add(AlgorithmStatistics(
+                algorithmName = runResults[0].algorithmName,
+                makespan = StatisticalValue(
+                    mean = makespanStats.mean,
+                    stdDev = makespanStats.standardDeviation,
+                    min = makespanStats.min,
+                    max = makespanStats.max
+                ),
+                loadBalance = StatisticalValue(
+                    mean = loadBalanceStats.mean,
+                    stdDev = loadBalanceStats.standardDeviation,
+                    min = loadBalanceStats.min,
+                    max = loadBalanceStats.max
+                ),
+                cost = StatisticalValue(
+                    mean = costStats.mean,
+                    stdDev = costStats.standardDeviation,
+                    min = costStats.min,
+                    max = costStats.max
+                ),
+                totalTime = StatisticalValue(
+                    mean = totalTimeStats.mean,
+                    stdDev = totalTimeStats.standardDeviation,
+                    min = totalTimeStats.min,
+                    max = totalTimeStats.max
+                ),
+                fitness = StatisticalValue(
+                    mean = fitnessStats.mean,
+                    stdDev = fitnessStats.standardDeviation,
+                    min = fitnessStats.min,
+                    max = fitnessStats.max
+                )
+            ))
+        }
+        
+        return statistics
     }
     
     /**

@@ -49,5 +49,19 @@ object ResultsManager {
     fun generateRealtimeResultFileName(): File {
         return generateFileName("realtime_comparison")
     }
+    
+    /**
+     * 生成批量任务数实验结果文件名（批处理模式）
+     */
+    fun generateBatchCloudletCountResultFileName(): File {
+        return generateFileName("batch_cloudlet_count_comparison")
+    }
+    
+    /**
+     * 生成批量任务数实验结果文件名（实时调度模式）
+     */
+    fun generateRealtimeCloudletCountResultFileName(): File {
+        return generateFileName("realtime_cloudlet_count_comparison")
+    }
 }
 

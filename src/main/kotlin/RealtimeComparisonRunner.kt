@@ -310,6 +310,110 @@ class RealtimeComparisonRunner(
     }
     
     /**
+     * 运行所有实时调度算法并对比，返回统计结果（平均值和标准差）
+     */
+    fun runComparisonWithStatistics(): List<RealtimeAlgorithmStatistics> {
+        Logger.info("\n${"=".repeat(60)}")
+        Logger.info("开始实时调度算法对比实验 ({} 次运行)", runs)
+        Logger.info("任务数量: {}", cloudletCount)
+        Logger.info("仿真持续时间: {} 秒", simulationDuration)
+        Logger.info("到达率: {} 任务/秒", arrivalRate)
+        Logger.info("初始随机数种子: {}", randomSeed)
+        Logger.info("${"=".repeat(60)}")
+
+        val algorithmsToRun = if (algorithms.isEmpty()) {
+            config.RealtimeAlgorithmType.entries
+        } else {
+            algorithms
+        }
+
+        Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
+
+        val statistics = mutableListOf<RealtimeAlgorithmStatistics>()
+
+        // 对每个算法进行多次运行
+        for (algorithmType in algorithmsToRun) {
+            val algorithmName = when (algorithmType) {
+                config.RealtimeAlgorithmType.MIN_LOAD -> "MinLoad"
+                config.RealtimeAlgorithmType.RANDOM -> "Random"
+                config.RealtimeAlgorithmType.PSO_REALTIME -> "PSO-Realtime"
+                config.RealtimeAlgorithmType.WOA_REALTIME -> "WOA-Realtime"
+            }
+
+            Logger.info("\n--- 算法: {} ---", algorithmName)
+            val runResults = mutableListOf<RealtimeAlgorithmResult>()
+
+            for (i in 0 until runs) {
+                Logger.info("  运行第 {}/{} 次...", i + 1, runs)
+                // 每次运行使用不同的随机种子
+                val currentRandomSeed = randomSeed + i
+                val currentRandom = Random(currentRandomSeed)
+
+                val result = when (algorithmType) {
+                    config.RealtimeAlgorithmType.MIN_LOAD -> {
+                        runRealtimeAlgorithm("MinLoad") { vms ->
+                            RealtimeMinLoadScheduler(vms)
+                        }
+                    }
+                    config.RealtimeAlgorithmType.RANDOM -> {
+                        runRealtimeAlgorithm("Random") { vms ->
+                            RealtimeRandomScheduler(vms, currentRandom)
+                        }
+                    }
+                    config.RealtimeAlgorithmType.PSO_REALTIME -> {
+                        runRealtimeAlgorithm("PSO-Realtime") { vms ->
+                            RealtimePSOScheduler(vms, population, maxIter, currentRandom)
+                        }
+                    }
+                    config.RealtimeAlgorithmType.WOA_REALTIME -> {
+                        runRealtimeAlgorithm("WOA-Realtime") { vms ->
+                            RealtimeWOAScheduler(vms, population, maxIter, currentRandom)
+                        }
+                    }
+                }
+                runResults.add(result)
+            }
+
+            // 计算统计值
+            val stats = calculateRealtimeStatistics(algorithmName, runResults)
+            statistics.add(stats)
+        }
+
+        printRealtimeStatisticsResults(statistics)
+        exportStatisticsToCSV(statistics)
+
+        return statistics
+    }
+    
+    /**
+     * 导出统计结果到 CSV 文件
+     */
+    private fun exportStatisticsToCSV(statistics: List<RealtimeAlgorithmStatistics>) {
+        val csvFile = ResultsManager.generateRealtimeResultFileName()
+        csvFile.bufferedWriter().use { writer ->
+            // 写入表头
+            writer.write("Algorithm,Makespan_Mean,Makespan_StdDev,LoadBalance_Mean,LoadBalance_StdDev," +
+                    "Cost_Mean,Cost_StdDev,TotalTime_Mean,TotalTime_StdDev,Fitness_Mean,Fitness_StdDev," +
+                    "AvgWaitingTime_Mean,AvgWaitingTime_StdDev,AvgResponseTime_Mean,AvgResponseTime_StdDev,Runs\n")
+
+            // 写入数据
+            for (stat in statistics) {
+                writer.write("${stat.algorithmName}," +
+                        "${stat.makespan.mean},${stat.makespan.stdDev}," +
+                        "${stat.loadBalance.mean},${stat.loadBalance.stdDev}," +
+                        "${stat.cost.mean},${stat.cost.stdDev}," +
+                        "${stat.totalTime.mean},${stat.totalTime.stdDev}," +
+                        "${stat.fitness.mean},${stat.fitness.stdDev}," +
+                        "${stat.averageWaitingTime.mean},${stat.averageWaitingTime.stdDev}," +
+                        "${stat.averageResponseTime.mean},${stat.averageResponseTime.stdDev}," +
+                        "${runs}\n")
+            }
+        }
+        Logger.info("结果已导出到: {}", csvFile.absolutePath)
+        Logger.info("注: 导出值为 {} 次运行的平均值和标准差", runs)
+    }
+
+    /**
      * 计算多次运行的统计值
      */
     private fun calculateRealtimeStatistics(
