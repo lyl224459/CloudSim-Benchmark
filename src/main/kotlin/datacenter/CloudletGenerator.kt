@@ -10,7 +10,7 @@ import java.util.*
  * 支持多种生成策略
  */
 class CloudletGenerator(
-    private val random: Random = Random(0),
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
     private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE
 ) {
     private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random)

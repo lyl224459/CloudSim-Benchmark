@@ -11,7 +11,7 @@ import java.util.*
 class RandomScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
-    private val random: Random = Random(0L)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
 ) : Scheduler(cloudletList, vmList) {
     
     override fun allocate(): IntArray {

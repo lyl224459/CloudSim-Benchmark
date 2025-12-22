@@ -126,7 +126,7 @@ class GWOScheduler(
     vmList: List<Vm>,
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val random: Random = Random(0L)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
 ) : Scheduler(cloudletList, vmList) {
     
     private val gwo: GWO

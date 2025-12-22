@@ -99,6 +99,9 @@ object DatacenterConfig {
     
     // 默认任务数量
     const val DEFAULT_CLOUDLET_N = 1000
+    
+    // 默认随机数种子
+    const val DEFAULT_RANDOM_SEED = 0L
 }
 
 /**
