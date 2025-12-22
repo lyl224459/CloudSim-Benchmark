@@ -149,9 +149,9 @@ class RealtimeComparisonRunner(
                 }
                 
                 val vmId = cloudlet.vm.id.toInt()
-                // CloudSim Plus 8.1.0 API: 使用 actualCpuTime 属性
-                val actualCPUTime = cloudlet.actualCpuTime
-                executeTimeOfVM[vmId] += actualCPUTime.toDouble()
+                // CloudSim Plus 8.5.5 API: 使用 getTotalExecutionTime() 方法
+                val actualCPUTime = cloudlet.getTotalExecutionTime()
+                executeTimeOfVM[vmId] += actualCPUTime
                 
                 // 计算成本
                 val vm = cloudlet.vm
@@ -165,8 +165,8 @@ class RealtimeComparisonRunner(
                 
                 // 计算等待时间和响应时间
                 val arrivalTime = cloudlet.submissionDelay
-                // CloudSim Plus 8.1.0 API: 使用 execStartTime 属性
-                val startTime = cloudlet.execStartTime
+                // CloudSim Plus 8.5.5 API: 使用 getStartTime() 方法
+                val startTime = cloudlet.getStartTime()
                 val waitingTime = if (startTime > 0) startTime - arrivalTime else 0.0
                 val responseTime = finishTime - arrivalTime
                 

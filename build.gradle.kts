@@ -25,7 +25,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
-    implementation("org.cloudsimplus:cloudsimplus:8.1.0")
+    implementation("org.cloudsimplus:cloudsimplus:8.5.5")
     implementation("org.apache.commons:commons-math3:3.6.1")
     
     // 日志库：kotlin-logging (Kotlin友好的日志API)
