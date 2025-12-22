@@ -341,11 +341,14 @@ java -jar build/libs/cloudsim-benchmark-1.0.0-all.jar realtime PSO_REALTIME,WOA_
 # 基本用法：测试多个任务数
 java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500
 
-# 指定算法
-java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA
+# 指定运行次数（每个任务数运行10次并计算平均值）
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10
 
-# 指定算法和随机种子
-java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200 PSO,WOA 42
+# 指定运行次数和算法
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10 PSO,WOA
+
+# 指定运行次数、算法和随机种子
+java -jar cloudsim-benchmark-1.0.0-all.jar batch-multi 50,100,200,500 10 PSO,WOA 42
 ```
 
 **功能特性**：
@@ -385,11 +388,14 @@ Windows 用户可以使用专门的脚本 `run-batch-multi.bat`：
 # 基本用法
 run-batch-multi.bat 50,100,200,500
 
-# 指定算法
-run-batch-multi.bat 50,100,200 PSO,WOA
+# 指定运行次数（每个任务数运行10次）
+run-batch-multi.bat 50,100,200,500 10
 
-# 指定算法和随机种子
-run-batch-multi.bat 50,100,200 PSO,WOA 42
+# 指定运行次数和算法
+run-batch-multi.bat 50,100,200,500 10 PSO,WOA
+
+# 指定运行次数、算法和随机种子
+run-batch-multi.bat 50,100,200,500 10 PSO,WOA 42
 ```
 
 #### 实时调度模式批量任务数实验 (`realtime-multi`)
