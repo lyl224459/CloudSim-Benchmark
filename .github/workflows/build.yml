@@ -39,19 +39,38 @@ jobs:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
       
     - name: Create source archive
-      shell: bash
+      shell: pwsh
       run: |
-        zip -r source.zip \
-          src/ \
-          build.gradle.kts \
-          gradle/ \
-          gradlew \
-          gradlew.bat \
-          settings.gradle.kts \
-          README.md \
-          LICENSE \
-          .gitignore \
-          -x "*.class" "build/*" ".gradle/*" "*.iml" ".idea/*" "results/*"
+        $files = @(
+          'src',
+          'build.gradle.kts',
+          'gradle',
+          'gradlew',
+          'gradlew.bat',
+          'settings.gradle.kts',
+          'README.md',
+          'LICENSE',
+          '.gitignore'
+        )
+        $exclude = @('build', '.gradle', '.idea', 'results')
+        $tempDir = 'source-temp'
+        New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+        foreach ($file in $files) {
+          if (Test-Path $file) {
+            Copy-Item -Path $file -Destination $tempDir -Recurse -Force
+          }
+        }
+        # 删除排除的目录和文件
+        foreach ($ex in $exclude) {
+          $exPath = Join-Path $tempDir $ex
+          if (Test-Path $exPath) {
+            Remove-Item -Path $exPath -Recurse -Force
+          }
+        }
+        # 删除 .class 和 .iml 文件
+        Get-ChildItem -Path $tempDir -Recurse -Include *.class,*.iml | Remove-Item -Force
+        Compress-Archive -Path "$tempDir\*" -DestinationPath "source.zip" -Force
+        Remove-Item -Path $tempDir -Recurse -Force
     
     - name: Upload JAR artifact
       uses: actions/upload-artifact@v4

@@ -66,28 +66,45 @@ jobs:
         echo "Gradle version: $VERSION"
         
     - name: Create release archives
-      shell: bash
+      shell: pwsh
       run: |
-        mkdir -p release
+        New-Item -ItemType Directory -Force -Path release | Out-Null
         # 复制 JAR 文件
-        cp build/libs/cloudsim-benchmark-*.jar release/
+        Copy-Item -Path build/libs/cloudsim-benchmark-*.jar -Destination release/
         # 创建 Windows ZIP 压缩包（包含 JAR）
-        cd release
-        zip -r cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip *.jar
-        cd ..
+        Compress-Archive -Path release\*.jar -DestinationPath "release\cloudsim-benchmark-${{ steps.version.outputs.version }}-windows.zip" -Force
         # 创建源码压缩包
-        zip -r release/cloudsim-benchmark-${{ steps.version.outputs.version }}-source.zip \
-          src/ \
-          build.gradle.kts \
-          gradle/ \
-          gradlew \
-          gradlew.bat \
-          settings.gradle.kts \
-          README.md \
-          LICENSE \
-          .gitignore \
-          -x "*.class" "build/*" ".gradle/*" "*.iml" ".idea/*" "results/*"
-        ls -lh release/
+        $files = @(
+          'src',
+          'build.gradle.kts',
+          'gradle',
+          'gradlew',
+          'gradlew.bat',
+          'settings.gradle.kts',
+          'README.md',
+          'LICENSE',
+          '.gitignore'
+        )
+        $exclude = @('build', '.gradle', '.idea', 'results')
+        $tempDir = 'source-temp'
+        New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+        foreach ($file in $files) {
+          if (Test-Path $file) {
+            Copy-Item -Path $file -Destination $tempDir -Recurse -Force
+          }
+        }
+        # 删除排除的目录和文件
+        foreach ($ex in $exclude) {
+          $exPath = Join-Path $tempDir $ex
+          if (Test-Path $exPath) {
+            Remove-Item -Path $exPath -Recurse -Force
+          }
+        }
+        # 删除 .class 和 .iml 文件
+        Get-ChildItem -Path $tempDir -Recurse -Include *.class,*.iml | Remove-Item -Force
+        Compress-Archive -Path "$tempDir\*" -DestinationPath "release\cloudsim-benchmark-${{ steps.version.outputs.version }}-source.zip" -Force
+        Remove-Item -Path $tempDir -Recurse -Force
+        Get-ChildItem -Path release | Format-Table Name, Length
         
     - name: Generate release notes
       id: release-notes
