@@ -399,6 +399,21 @@ CSV 文件包含以下列：
 - `maxIter` - 优化算法的最大迭代次数（来自 `config.optimizer`）
 - `algorithms` - 要运行的算法列表（空列表 = 所有算法）
 
+**运行脚本**：
+
+Windows 用户可以使用专门的脚本 `run-realtime-multi.bat`：
+
+```bash
+# 基本用法
+run-realtime-multi.bat 50,100,200,500
+
+# 指定算法
+run-realtime-multi.bat 50,100,200 PSO_REALTIME,WOA_REALTIME
+
+# 指定算法和随机种子
+run-realtime-multi.bat 50,100,200 PSO_REALTIME,WOA_REALTIME 42
+```
+
 ### 多次运行取平均值
 
 为了获得更可靠的实验结果，可以配置多次运行并计算平均值和标准差：
@@ -612,6 +627,8 @@ cloudsim-benchmark/
 │   ├── datacenter/
 │   │   ├── ComparisonRunner.kt  # 批处理对比运行器
 │   │   ├── RealtimeComparisonRunner.kt  # 实时调度对比运行器
+│   │   ├── BatchCloudletCountRunner.kt  # 批处理模式批量任务数实验运行器
+│   │   ├── RealtimeCloudletCountRunner.kt  # 实时调度模式批量任务数实验运行器
 │   │   ├── DatacenterCreator.kt  # 数据中心创建器
 │   │   ├── CloudletGenerator.kt  # 云任务生成器（统一接口）
 │   │   ├── RealtimeCloudletGenerator.kt  # 实时任务生成器
@@ -640,8 +657,9 @@ cloudsim-benchmark/
 ├── build.gradle.kts              # Gradle构建配置
 ├── run.bat                       # Windows通用运行脚本
 ├── run-batch.bat                 # Windows批处理模式脚本
-├── run-batch-multi.bat           # Windows批量任务数实验脚本
-├── run-realtime.bat              # Windows实时模式脚本
+├── run-batch-multi.bat           # Windows批处理模式批量任务数实验脚本
+├── run-realtime.bat              # Windows实时调度模式脚本
+├── run-realtime-multi.bat       # Windows实时调度模式批量任务数实验脚本
 ├── build-and-run.bat             # Windows构建并运行脚本
 ├── run.sh                        # Linux/macOS运行脚本
 ├── LICENSE                       # MIT许可证
