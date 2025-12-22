@@ -40,20 +40,16 @@ jobs:
     # Windows 环境，不需要设置执行权限
       
     - name: Build with Gradle
-      run: |
-        if [ "${{ runner.os }}" == "Windows" ]; then
-          gradlew.bat clean build --no-daemon
-        else
-          ./gradlew clean build --no-daemon
-        fi
+      run: gradlew.bat clean build --no-daemon --stacktrace
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+      continue-on-error: false
         
     - name: Build fat JAR
-      run: |
-        if [ "${{ runner.os }}" == "Windows" ]; then
-          gradlew.bat fatJar --no-daemon
-        else
-          ./gradlew fatJar --no-daemon
-        fi
+      run: gradlew.bat fatJar --no-daemon --stacktrace
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+      continue-on-error: false
         
     - name: Upload JAR artifact
       uses: actions/upload-artifact@v4
