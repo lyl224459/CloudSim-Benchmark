@@ -37,16 +37,7 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-gradle-
           
-    - name: Setup Gradle Wrapper (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        if (-not (Test-Path "gradlew.bat")) {
-          Write-Host "Gradle wrapper not found"
-        }
-        
-    - name: Grant execute permission for gradlew (Unix)
-      if: runner.os != 'Windows'
-      run: chmod +x gradlew
+    # Windows 环境，不需要设置执行权限
       
     - name: Build with Gradle
       run: |
