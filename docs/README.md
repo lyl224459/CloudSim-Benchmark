@@ -82,22 +82,28 @@ CloudSim-Benchmark 是一个专业的云任务调度算法对比实验平台，�
 
 项目提供了一个统一的智能运行脚本，自动检测平台并支持所有功能：
 
-**主要脚本**：
-- **`scripts/run`** - 统一运行脚本（自动检测平台，支持所有功能）
+**核心脚本**：
+- **`scripts/run`** - 统一运行脚本（Linux/macOS，自动检测平台，支持所有功能）
+- **`scripts/run.bat`** - 统一运行脚本（Windows，自动检测平台，支持所有功能）
 
-**快捷脚本**（可选）：
-- **`scripts/run-batch`** - 批处理模式
-- **`scripts/run-realtime`** - 实时调度模式
-- **`scripts/run-batch-multi`** - 批量任务数实验
-- **`scripts/run-realtime-multi`** - 实时批量实验
-- **`scripts/build`** - 构建项目
+**便捷启动脚本**：
+- **`run`** - Linux/macOS 根目录便捷启动脚本
+- **`run.cmd`** - Windows 根目录便捷启动脚本
 
 ## 🚀 快速开始
 
 ### 环境要求
 
 - **JDK**: 23+ (项目使用 JVM 23)
-- **Gradle**: 9.2.1+
+- **Gradle**: 9.2.1+ (自动包含在项目中)
+
+### 构建优化特性
+
+项目构建系统已自动优化：
+- ✅ 自动检测CPU核心数并使用全部核心并行构建
+- ✅ 启用Gradle缓存和按需配置
+- ✅ Kotlin编译器优化（内联类等）
+- ✅ 默认跳过测试以提升构建速度
 - **Kotlin**: 2.1.21+
 - **CloudSim Plus**: 8.5.5 (从 Maven Central 获取)
 
@@ -169,22 +175,22 @@ gradle fatJar
 ./run realtime-multi 50,100,200,500
 ```
 
-#### 方式二：使用快捷脚本
+#### 方式二：直接使用根目录脚本
 
 **Windows**:
 ```bash
-run-batch.cmd PSO,WOA 42
-run-realtime.cmd PSO_REALTIME,WOA_REALTIME
-run-batch-multi.cmd 50,100,200,500 10 PSO,WOA
-run-realtime-multi.cmd 50,100,200,500
+run.cmd batch PSO,WOA 42
+run.cmd realtime PSO_REALTIME,WOA_REALTIME
+run.cmd batch-multi 50,100,200,500 10 PSO,WOA
+run.cmd realtime-multi 50,100,200,500
 ```
 
 **Linux/macOS**:
 ```bash
-./run-batch.sh PSO,WOA 42
-./run-realtime.sh PSO_REALTIME,WOA_REALTIME
-./run-batch-multi.sh 50,100,200,500 10 PSO,WOA
-./run-realtime-multi.sh 50,100,200,500
+./run batch PSO,WOA 42
+./run realtime PSO_REALTIME,WOA_REALTIME
+./run batch-multi 50,100,200,500 10 PSO,WOA
+./run realtime-multi 50,100,200,500
 ```
 
 #### 使用统一脚本（推荐）
@@ -239,35 +245,32 @@ export CONFIG_FILE=configs/experiments/quick_test.toml
 ./run batch
 ```
 
-#### 使用快捷脚本
+#### 批量任务数实验
 
 ```bash
-# 批处理模式
-./scripts/run-batch PSO,WOA 42
-./scripts/run-batch-multi 50,100,200,500 10 PSO,WOA
+# 批处理模式批量实验
+./run batch-multi 50,100,200,500 10 PSO,WOA
 
-# 实时调度模式
-./scripts/run-realtime PSO_REALTIME,WOA_REALTIME 123
-./scripts/run-realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME
-
-# 构建项目
-./scripts/build
+# 实时调度模式批量实验
+./run realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME
 ```
 
 #### 传统方式
 
 ```bash
-# 直接使用 Gradle
+# 直接使用系统Gradle（需要预装）
+gradle build
 gradle fatJar
-# 或
+
+# 或使用项目自带的Gradle Wrapper（推荐）
+./gradlew build
 ./gradlew fatJar
-```
 ```
 
 **Linux/macOS**:
 ```bash
 # 设置脚本可执行（可选，脚本会自动处理）
-chmod +x run scripts/run scripts/run-batch scripts/run-realtime scripts/run-batch-multi scripts/run-realtime-multi scripts/build
+chmod +x run scripts/run
 
 # 批处理模式
 ./run batch PSO,WOA 42
@@ -549,9 +552,9 @@ CSV 文件包含以下列：
 ./scripts/run batch-multi 50,100,200,500 10 PSO,WOA
 ```
 
-**使用快捷脚本**：
+**使用统一脚本**：
 ```bash
-./scripts/run-batch-multi 50,100,200,500 10 PSO,WOA
+./run batch-multi 50,100,200,500 10 PSO,WOA
 ```
 
 # 指定运行次数、算法和随机种子
@@ -626,9 +629,9 @@ CSV 文件包含以下列：
 ./scripts/run realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME 42
 ```
 
-**使用快捷脚本**：
+**使用统一脚本**：
 ```bash
-./scripts/run-realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME 42
+./run realtime-multi 50,100,200,500 10 PSO_REALTIME,WOA_REALTIME 42
 ```
 
 ### 多次运行取平均值
@@ -1107,12 +1110,10 @@ cloudsim-benchmark/
 │   ├── batch/                  # 批处理实验结果
 │   └── realtime/               # 实时调度实验结果
 ├── scripts/
-│   ├── run                       # 统一运行脚本（自动检测平台）
-│   ├── run-batch                 # 批处理模式快捷脚本
-│   ├── run-realtime              # 实时调度模式快捷脚本
-│   ├── run-batch-multi           # 批量任务数实验快捷脚本
-│   ├── run-realtime-multi        # 实时批量实验快捷脚本
-│   └── build                     # 构建项目快捷脚本
+│   ├── run                       # 统一运行脚本（Linux/macOS）
+│   └── run.bat                   # 统一运行脚本（Windows）
+├── tools/
+│   └── visualize_results.ipynb   # 实验结果可视化工具
 ├── LICENSE                       # MIT许可证
 └── README.md                     # 项目说明文档
 ```

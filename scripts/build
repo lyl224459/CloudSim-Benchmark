@@ -1,3 +1,0 @@
-#!/bin/bash
-# 构建项目快捷脚本
-exec "$(dirname "$0")/run" build "$@"

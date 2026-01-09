@@ -18,21 +18,8 @@ runs = 3
 generatorType = "LOG_NORMAL"
 
 # ========== 批处理专用设置 ==========
-[batch.scheduling]
-# 调度策略
-strategy = "parallel"  # parallel 或 sequential
-
-# 资源分配策略
-resourceAllocation = "best_fit"  # best_fit, first_fit, worst_fit
-
-# 负载均衡权重
-loadBalanceWeight = 0.4
-
-# 成本权重
-costWeight = 0.3
-
-# 时间权重
-timeWeight = 0.3
+# 注意：当前版本主要配置通过代码定义
+# 未来版本将支持更多TOML配置项
 
 # ========== Google Trace 配置 ==========
 [batch.googleTrace]
