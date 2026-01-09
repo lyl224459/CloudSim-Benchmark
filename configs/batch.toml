@@ -1,0 +1,60 @@
+# CloudSim-Benchmark 批处理模式配置
+
+# ========== 批处理实验参数 ==========
+[batch]
+# 任务数量
+cloudletCount = 100
+
+# 算法种群大小（将被algorithms.toml中的设置覆盖）
+population = 30
+
+# 最大迭代次数（将被algorithms.toml中的设置覆盖）
+maxIter = 50
+
+# 实验运行次数（用于计算平均值）
+runs = 3
+
+# 任务生成器类型
+generatorType = "LOG_NORMAL"
+
+# ========== 批处理专用设置 ==========
+[batch.scheduling]
+# 调度策略
+strategy = "parallel"  # parallel 或 sequential
+
+# 资源分配策略
+resourceAllocation = "best_fit"  # best_fit, first_fit, worst_fit
+
+# 负载均衡权重
+loadBalanceWeight = 0.4
+
+# 成本权重
+costWeight = 0.3
+
+# 时间权重
+timeWeight = 0.3
+
+# ========== Google Trace 配置 ==========
+[batch.googleTrace]
+# Google Trace 数据文件路径
+filePath = "data/google_trace/task_events.csv"
+# 最大读取任务数（避免内存溢出）
+maxTasks = 1000
+# 时间窗口开始时间（Unix时间戳）
+timeWindowStart = 0
+# 时间窗口结束时间（Unix时间戳，最大值表示不限制）
+timeWindowEnd = 9223372036854775807
+
+# ========== 批处理实验预设 ==========
+[batch.presets]
+# 小规模测试
+small = { cloudletCount = 50, runs = 1 }
+
+# 中等规模测试
+medium = { cloudletCount = 100, runs = 3 }
+
+# 大规模测试
+large = { cloudletCount = 500, runs = 5 }
+
+# 超大规模测试
+xlarge = { cloudletCount = 1000, runs = 10 }

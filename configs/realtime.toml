@@ -1,0 +1,61 @@
+# CloudSim-Benchmark 实时调度模式配置
+
+# ========== 实时调度实验参数 ==========
+[realtime]
+# 任务数量
+cloudletCount = 200
+
+# 仿真持续时间（秒）
+simulationDuration = 500.0
+
+# 任务到达率（每秒到达的任务数）
+arrivalRate = 5.0
+
+# 算法种群大小（将被algorithms.toml中的设置覆盖）
+population = 20
+
+# 最大迭代次数（将被algorithms.toml中的设置覆盖）
+maxIter = 20
+
+# 实验运行次数（用于计算平均值）
+runs = 3
+
+# 任务生成器类型
+generatorType = "LOG_NORMAL"
+
+# ========== 实时调度专用设置 ==========
+[realtime.scheduling]
+# 调度策略
+strategy = "dynamic"  # dynamic 或 static
+
+# 队列大小限制
+maxQueueSize = 100
+
+# 任务超时时间（秒）
+taskTimeout = 300.0
+
+# 资源预留策略
+resourceReservation = "none"  # none, partial, full
+
+# ========== 到达模式 ==========
+[realtime.arrival]
+# 到达分布类型
+distribution = "poisson"  # poisson, uniform, burst
+
+# 突发到达参数（当distribution=burst时使用）
+burstIntensity = 2.0
+burstDuration = 50.0
+
+# ========== 实时调度实验预设 ==========
+[realtime.presets]
+# 短时测试
+short = { simulationDuration = 100.0, arrivalRate = 2.0, runs = 1 }
+
+# 中等测试
+medium = { simulationDuration = 500.0, arrivalRate = 5.0, runs = 3 }
+
+# 长时测试
+long = { simulationDuration = 1000.0, arrivalRate = 10.0, runs = 5 }
+
+# 高负载测试
+high_load = { simulationDuration = 300.0, arrivalRate = 15.0, runs = 5 }

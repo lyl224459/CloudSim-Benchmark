@@ -45,7 +45,8 @@ class ComparisonRunner(
     private val randomSeed: Long = 0L,
     private val algorithms: List<config.BatchAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
-    private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE
+    private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
+    private val googleTraceConfig: config.GoogleTraceConfig? = null
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
@@ -77,7 +78,7 @@ class ComparisonRunner(
         broker.submitVmList(vmList)
         
         // 创建云任务列表
-        val cloudletGenerator = CloudletGenerator(random)
+        val cloudletGenerator = CloudletGenerator(random, generatorType, googleTraceConfig)
         val cloudletList = cloudletGenerator.createCloudlets(0, cloudletCount)
         broker.submitCloudletList(cloudletList)
         

@@ -1,158 +1,30 @@
-# ============================================
-# Gradle 构建文件
-# ============================================
-.gradle/
+# Build outputs
 build/
-!gradle/wrapper/gradle-wrapper.jar
-!gradle/wrapper/gradle-wrapper.properties
-.gradletasknamecache
+.gradle/
+gradle/wrapper/gradle-wrapper.jar
 
-# ============================================
-# IDE 配置文件
-# ============================================
-# IntelliJ IDEA
+# IDE files
 .idea/
 *.iml
-*.iws
-*.ipr
-out/
-
-# Eclipse
-.classpath
-.project
-.settings/
-bin/
-.metadata
-
-# NetBeans
-nbproject/
-nbbuild/
-dist/
-nbdist/
-.nb-gradle/
-
-# VS Code
 .vscode/
-*.code-workspace
+.cursor/
 
-# 其他编辑器
-*.swp
-*.swo
-*~
+# OS files
 .DS_Store
-
-# ============================================
-# 日志文件
-# ============================================
-logs/
-*.log
-*.log.*
-
-# ============================================
-# 实验结果文件
-# ============================================
-results/
-*.csv
-results_*.csv
-results_comparison.csv
-results_realtime_comparison.csv
-
-# 可视化结果
-figures/
-*.png
-*.jpg
-*.jpeg
-
-# ============================================
-# 操作系统文件
-# ============================================
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-# Windows
 Thumbs.db
-Thumbs.db:encryptable
-ehthumbs.db
-ehthumbs_vista.db
-Desktop.ini
-$RECYCLE.BIN/
-*.lnk
 
-# Linux
-*~
-.directory
-.Trash-*
+# Logs and results
+logs/
+runs/
+*.log
 
-# ============================================
-# 临时文件和缓存
-# ============================================
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary files
 *.tmp
 *.temp
 *.bak
-*.backup
-*.swp
-*.swo
-*.cache
-.cache/
 
-# ============================================
-# 压缩文件（构建产物和下载文件）
-# ============================================
-*.zip
-*.tar
-*.tar.gz
-*.tgz
-*.rar
-*.7z
-*.gz
-# 注意：如果需要保留 cloudsimplus 或 Cloudlet-Scheduler-mydev 中的压缩文件，
-# 可以添加例外规则，例如：!cloudsimplus/**/*.zip
-
-# ============================================
-# Maven 本地仓库（如果使用）
-# ============================================
-.m2/
-.mvn/
-
-# ============================================
-# 测试覆盖率报告
-# ============================================
-.nyc_output/
-coverage/
-*.lcov
-
-# ============================================
-# Jupyter Notebook 文件
-# ============================================
-*.ipynb
-.ipynb_checkpoints/
-
-# ============================================
-# 其他
-# ============================================
-# 本地配置文件（如果存在）
-local.properties
-local.gradle.properties
-
-# 依赖锁定文件（如果使用）
-gradle.lockfile
-
-# Kotlin 编译器缓存
-.kotlin/
-
-# 打包文件（构建产物）
-*.jar
-!gradle/wrapper/gradle-wrapper.jar
-# 但保留 cloudsimplus 和 Cloudlet-Scheduler-mydev 中的 JAR（参考代码）
-!cloudsimplus/**/*.jar
-!Cloudlet-Scheduler-mydev/**/*.jar
-
-# 分发文件
-dist/
-distributions/
-
-# 脚本生成的文件
-build/scripts/
+# Data files (uncomment if you want to ignore large data files)
+# data/google_trace/*.csv

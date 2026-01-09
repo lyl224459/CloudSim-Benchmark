@@ -1,0 +1,205 @@
+#!/bin/bash
+# CloudSim-Benchmark 统一运行脚本
+# 自动检测平台，支持所有功能
+#
+# 用法: ./run [mode] [options...]
+#
+# 模式:
+#   batch          - 批处理调度模式
+#   realtime       - 实时调度模式 (默认)
+#   batch-multi    - 批量任务数实验 (批处理)
+#   realtime-multi - 批量任务数实验 (实时)
+#   build          - 构建项目
+#   help           - 显示帮助
+#
+# 示例:
+#   ./run batch PSO,WOA 42
+#   ./run realtime PSO_REALTIME,WOA_REALTIME
+#   ./run batch-multi 50,100,200,500 10 PSO,WOA
+#   ./run build
+
+# 获取脚本所在目录的父目录（项目根目录）
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# 切换到项目目录
+cd "$PROJECT_DIR" || exit 1
+
+# 检测操作系统
+detect_os() {
+    case "$(uname -s)" in
+        Linux*)     echo "linux" ;;
+        Darwin*)    echo "macos" ;;
+        CYGWIN*|MINGW*|MSYS*) echo "windows" ;;
+        *)          echo "unknown" ;;
+    esac
+}
+
+OS=$(detect_os)
+
+# 设置平台特定的变量
+if [ "$OS" = "windows" ]; then
+    GRADLE_CMD="./gradlew.bat"
+    JAR_PATH="build\\libs\\cloudsim-benchmark-1.0.0-all.jar"
+    JAVA_CMD="java.exe"
+else
+    GRADLE_CMD="./gradlew"
+    JAR_PATH="build/libs/cloudsim-benchmark-1.0.0-all.jar"
+    JAVA_CMD="java"
+fi
+
+# 设置编码
+export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8"
+# 设置终端语言环境
+export LANG="zh_CN.UTF-8"
+export LC_ALL="zh_CN.UTF-8"
+
+# 显示帮助信息
+show_help() {
+    cat << EOF
+CloudSim-Benchmark 统一运行脚本
+
+自动检测平台: $(echo "$OS" | tr '[:lower:]' '[:upper:]')
+
+用法: ./run [mode] [options...]
+
+模式:
+  batch          批处理调度模式
+  realtime       实时调度模式 (默认)
+  batch-multi    批量任务数实验 (批处理)
+  realtime-multi 批量任务数实验 (实时)
+  build          构建项目
+  help           显示此帮助
+
+示例:
+  ./run batch PSO,WOA 42
+  ./run realtime PSO_REALTIME,WOA_REALTIME
+  ./run batch-multi 50,100,200,500 10 PSO,WOA
+  ./run build
+
+快捷方式 (创建符号链接):
+  ln -s ./run ./run-batch      # 批处理模式
+  ln -s ./run ./run-realtime   # 实时调度模式
+  ln -s ./run ./run-batch-multi    # 批量实验
+  ln -s ./run ./run-realtime-multi # 实时批量实验
+  ln -s ./run ./build          # 构建项目
+
+更多信息请查看 README.md
+EOF
+}
+
+# 构建项目
+build_project() {
+    echo "========================================"
+    echo "构建 CloudSim-Benchmark"
+    echo "========================================"
+    echo "平台: $(echo "$OS" | tr '[:lower:]' '[:upper:]')"
+    echo "时间: $(date)"
+    echo ""
+
+    echo "[构建] 执行 Gradle 构建..."
+    if [ "$OS" = "windows" ]; then
+        ./gradlew.bat fatJar --no-daemon
+    else
+        ./gradlew fatJar --no-daemon
+    fi
+
+    if [ $? -ne 0 ]; then
+        echo "[错误] 构建失败！"
+        exit 1
+    fi
+
+    echo "[构建] 成功完成！"
+}
+
+# 检查JAR文件是否存在
+check_jar() {
+    if [ ! -f "$JAR_PATH" ]; then
+        echo "[警告] 找不到 JAR 文件，正在自动构建..."
+        build_project
+    fi
+}
+
+# 运行程序
+run_program() {
+    local mode="$1"
+    shift
+
+    echo "========================================"
+    echo "CloudSim-Benchmark 实验平台"
+    echo "========================================"
+    echo "平台: $(echo "$OS" | tr '[:lower:]' '[:upper:]')"
+    echo "时间: $(date)"
+    echo "模式: $mode"
+    echo ""
+
+    # 构建参数
+    local args="$mode"
+    if [ $# -gt 0 ]; then
+        args="$args $@"
+    fi
+
+    echo "[运行] 启动实验..."
+    echo "[运行] 命令: $JAVA_CMD -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED -jar $JAR_PATH $args"
+    echo ""
+
+    $JAVA_CMD -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 \
+              --add-opens java.base/java.lang=ALL-UNNAMED \
+              --add-opens java.base/java.util=ALL-UNNAMED \
+              -jar "$JAR_PATH" $args
+
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo ""
+        echo "[错误] 程序执行失败，退出代码: $exit_code"
+        exit $exit_code
+    fi
+
+    echo ""
+    echo "========================================"
+    echo "实验完成！结果已保存到 runs/ 文件夹"
+    echo "========================================"
+}
+
+# 处理快捷方式
+handle_shortcut() {
+    local script_name="$(basename "$0")"
+    case "$script_name" in
+        run-batch)      set -- "batch" "$@" ;;
+        run-realtime)   set -- "realtime" "$@" ;;
+        run-batch-multi) set -- "batch-multi" "$@" ;;
+        run-realtime-multi) set -- "realtime-multi" "$@" ;;
+        build)          set -- "build" "$@" ;;
+    esac
+}
+
+# 主逻辑
+main() {
+    # 处理快捷方式
+    handle_shortcut
+
+    # 检查参数
+    case "${1:-help}" in
+        help|--help|-h)
+            show_help
+            exit 0
+            ;;
+        build)
+            build_project
+            exit 0
+            ;;
+        batch|realtime|batch-multi|realtime-multi)
+            check_jar
+            run_program "$@"
+            ;;
+        *)
+            echo "[错误] 未知模式: $1"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+# 执行主逻辑
+main "$@"

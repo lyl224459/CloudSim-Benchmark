@@ -51,7 +51,8 @@ class RealtimeComparisonRunner(
     private val randomSeed: Long = 0L,
     private val algorithms: List<config.RealtimeAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
-    private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE
+    private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
+    private val googleTraceConfig: config.GoogleTraceConfig? = null
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
@@ -86,7 +87,7 @@ class RealtimeComparisonRunner(
         broker.submitVmList(vmList)
         
         // 生成实时任务（带到达时间）
-        val cloudletGenerator = RealtimeCloudletGenerator(random, arrivalRate, generatorType)
+        val cloudletGenerator = RealtimeCloudletGenerator(random, arrivalRate, generatorType, googleTraceConfig)
         val cloudletList = cloudletGenerator.createRealtimeCloudlets(0, cloudletCount, simulationDuration)
         
         // 提交任务（按到达时间）

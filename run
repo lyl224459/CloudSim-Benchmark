@@ -1,0 +1,4 @@
+#!/bin/bash
+# CloudSim-Benchmark 运行脚本包装器
+# 从项目根目录调用 scripts/run
+exec "$(dirname "$0")/scripts/run" "$@"

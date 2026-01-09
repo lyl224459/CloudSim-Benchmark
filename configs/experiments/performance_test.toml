@@ -1,0 +1,25 @@
+# 性能测试实验配置
+# 用于评估算法性能，运行时间中等
+
+[random]
+seed = 98765
+
+[batch]
+cloudletCount = 200
+population = 50
+maxIter = 200
+runs = 10
+
+[realtime]
+cloudletCount = 500
+simulationDuration = 1000.0
+arrivalRate = 10.0
+population = 30
+maxIter = 50
+runs = 5
+
+[output]
+resultsDir = "runs/performance_test"
+
+[experiment]
+nameFormat = "perf_{mode}_{timestamp}_{algorithms}"

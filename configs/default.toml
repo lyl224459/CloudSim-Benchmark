@@ -1,0 +1,44 @@
+# CloudSim-Benchmark 默认配置
+# 会被其他配置文件覆盖
+
+# ========== 通用配置 ==========
+[random]
+# 随机数种子 (0表示使用系统时间)
+seed = 42
+
+# ========== 优化算法通用配置 ==========
+[optimizer]
+# 默认种群大小
+population = 20
+# 默认最大迭代次数
+maxIter = 20
+
+# ========== 输出配置 ==========
+[output]
+# 结果目录
+resultsDir = "runs"
+
+# CSV输出
+csv = { enabled = true, delimiter = "," }
+
+# 日志输出
+logging = { level = "INFO", file = true, console = true }
+
+# ========== 系统配置 ==========
+[system]
+# JVM参数
+jvm = { maxHeap = "2048m", encoding = "UTF-8" }
+
+# 线程配置
+threads = { maxWorkers = 4, ioTimeout = 30 }
+
+# ========== 实验管理 ==========
+[experiment]
+# 自动创建实验目录
+autoCreateDirs = true
+
+# 实验命名格式
+nameFormat = "{mode}_{timestamp}_{algorithms}"
+
+# 最大并行实验数
+maxConcurrent = 2

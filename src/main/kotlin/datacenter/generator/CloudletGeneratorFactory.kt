@@ -1,6 +1,7 @@
 package datacenter.generator
 
 import config.CloudletGeneratorType
+import config.GoogleTraceConfig
 import java.util.*
 
 /**
@@ -12,7 +13,8 @@ object CloudletGeneratorFactory {
      */
     fun createGenerator(
         type: CloudletGeneratorType,
-        random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+        random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
+        googleTraceConfig: GoogleTraceConfig? = null
     ): CloudletGeneratorStrategy {
         return when (type) {
             CloudletGeneratorType.LOG_NORMAL -> LogNormalCloudletGenerator()
@@ -21,6 +23,13 @@ object CloudletGeneratorFactory {
                 meanOutputSize = 100.0,
                 varianceOutputSize = 20.0
             )
+            CloudletGeneratorType.GOOGLE_TRACE -> {
+                if (googleTraceConfig != null) {
+                    GoogleTraceCloudletGenerator(googleTraceConfig)
+                } else {
+                    GoogleTraceCloudletGenerator()
+                }
+            }
         }
     }
 }

@@ -1,6 +1,7 @@
 package datacenter
 
 import config.CloudletGenConfig
+import config.GoogleTraceConfig
 import datacenter.generator.CloudletGeneratorFactory
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.cloudlets.CloudletSimple
@@ -14,9 +15,10 @@ import java.util.*
 class RealtimeCloudletGenerator(
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
     private val arrivalRate: Double = 10.0,  // 平均每秒到达的任务数（泊松分布）
-    private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE
+    private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE,
+    private val googleTraceConfig: GoogleTraceConfig? = null
 ) {
-    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random)
+    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random, googleTraceConfig)
     
     /**
      * 创建实时云任务列表（带到达时间）

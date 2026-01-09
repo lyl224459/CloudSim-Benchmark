@@ -1,6 +1,7 @@
 package datacenter
 
 import config.CloudletGenConfig
+import config.GoogleTraceConfig
 import datacenter.generator.CloudletGeneratorFactory
 import org.cloudsimplus.cloudlets.Cloudlet
 import java.util.*
@@ -11,9 +12,10 @@ import java.util.*
  */
 class CloudletGenerator(
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
-    private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE
+    private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE,
+    private val googleTraceConfig: GoogleTraceConfig? = null
 ) {
-    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random)
+    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random, googleTraceConfig)
     
     /**
      * 创建云任务列表

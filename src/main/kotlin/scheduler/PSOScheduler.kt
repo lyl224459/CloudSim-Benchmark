@@ -8,7 +8,8 @@ import util.Logger
 import java.util.*
 
 /**
- * 粒子群优化算法 (Particle Swarm Optimization)
+ * 粒子群优化算法 (Particle Swarm Optimization) - 优化版本
+ * 使用一维数组存储所有粒子数据，提高内存访问效率
  */
 internal class PSO(
     private val optFunction: ObjectiveFunction,
@@ -19,14 +20,15 @@ internal class PSO(
     private val maxIter: Int,
     private val random: Random
 ) {
-    
-    private val positions = Array(population) { DoubleArray(dim) }
-    private val velocities = Array(population) { DoubleArray(dim) }
-    private val pBest = Array(population) { DoubleArray(dim) }
+
+    // 使用一维数组存储所有数据，提高内存局部性
+    private val positions = DoubleArray(population * dim)
+    private val velocities = DoubleArray(population * dim)
+    private val pBest = DoubleArray(population * dim)
     private val pBestScore = DoubleArray(population) { Double.POSITIVE_INFINITY }
     private val gBest = DoubleArray(dim)
     private var gBestScore = Double.POSITIVE_INFINITY
-    
+
     companion object {
         private const val W_MAX = 0.9
         private const val W_MIN = 0.2
@@ -41,80 +43,139 @@ internal class PSO(
     private fun initPopulation() {
         for (i in 0 until population) {
             for (j in 0 until dim) {
-                positions[i][j] = lb + (ub - lb) * random.nextDouble()
-                velocities[i][j] = random.nextDouble()
+                val index = i * dim + j
+                positions[index] = lb + (ub - lb) * random.nextDouble()
+                velocities[index] = random.nextDouble()
+                pBest[index] = positions[index]  // 初始化个体最优位置
             }
             adjustPositions(i)
         }
     }
+
+    // 获取粒子i的第j维位置
+    private fun getPosition(particle: Int, dimension: Int): Double {
+        return positions[particle * dim + dimension]
+    }
+
+    // 设置粒子i的第j维位置
+    private fun setPosition(particle: Int, dimension: Int, value: Double) {
+        positions[particle * dim + dimension] = value
+    }
+
+    // 获取粒子i的第j维速度
+    private fun getVelocity(particle: Int, dimension: Int): Double {
+        return velocities[particle * dim + dimension]
+    }
+
+    // 设置粒子i的第j维速度
+    private fun setVelocity(particle: Int, dimension: Int, value: Double) {
+        velocities[particle * dim + dimension] = value
+    }
+
+    // 获取粒子i的第j维个体最优位置
+    private fun getPBest(particle: Int, dimension: Int): Double {
+        return pBest[particle * dim + dimension]
+    }
+
+    // 设置粒子i的第j维个体最优位置
+    private fun setPBest(particle: Int, dimension: Int, value: Double) {
+        pBest[particle * dim + dimension] = value
+    }
     
     private fun adjustPositions(agentIndex: Int) {
         for (j in 0 until dim) {
-            positions[agentIndex][j] = positions[agentIndex][j].round()
+            val index = agentIndex * dim + j
+            positions[index] = positions[index].round()
             when {
-                positions[agentIndex][j] < lb -> positions[agentIndex][j] = lb
-                positions[agentIndex][j] > ub -> positions[agentIndex][j] = ub
+                positions[index] < lb -> positions[index] = lb
+                positions[index] > ub -> positions[index] = ub
             }
         }
     }
     
-    private fun evaluate(sol: DoubleArray): Double {
-        val params = sol.map { it.round().toInt() }.toIntArray()
+    private fun evaluate(particle: Int): Double {
+        // 直接使用一维数组，避免创建临时数组
+        val params = IntArray(dim)
+        val baseIndex = particle * dim
+        for (j in 0 until dim) {
+            params[j] = positions[baseIndex + j].round().toInt()
+        }
+        return optFunction.calculate(params)
+    }
+
+    // 评估指定位置的适应度值
+    private fun evaluatePosition(position: DoubleArray): Double {
+        val params = IntArray(dim)
+        for (j in 0 until dim) {
+            params[j] = position[j].round().toInt()
+        }
         return optFunction.calculate(params)
     }
     
     fun execute(): IntArray {
+        val vMax = (ub - lb) * 0.2  // 速度最大值是固定的
+
         for (t in 0 until maxIter) {
-            val w = W_MAX - t * (W_MAX - W_MIN) / maxIter
-            val vMax = DoubleArray(dim) { (ub - lb) * 0.2 }
-            
+            val w = W_MAX - t * (W_MAX - W_MIN) / maxIter.toDouble()
+
             // 评估并更新最优解
             for (i in 0 until population) {
                 // 边界处理
                 for (j in 0 until dim) {
+                    val posIndex = i * dim + j
                     when {
-                        positions[i][j] > ub -> positions[i][j] = ub
-                        positions[i][j] < lb -> positions[i][j] = lb
+                        positions[posIndex] > ub -> positions[posIndex] = ub
+                        positions[posIndex] < lb -> positions[posIndex] = lb
                     }
                 }
-                
-                val fitness = evaluate(positions[i])
-                
+
+                val fitness = evaluate(i)
+
                 // 更新个体最优
                 if (fitness < pBestScore[i]) {
                     pBestScore[i] = fitness
-                    positions[i].copyInto(pBest[i])
+                    // 复制当前粒子位置到个体最优
+                    val baseIndex = i * dim
+                    for (j in 0 until dim) {
+                        pBest[baseIndex + j] = positions[baseIndex + j]
+                    }
                 }
-                
+
                 // 更新全局最优
                 if (fitness < gBestScore) {
                     gBestScore = fitness
-                    positions[i].copyInto(gBest)
+                    // 复制当前粒子位置到全局最优
+                    val baseIndex = i * dim
+                    for (j in 0 until dim) {
+                        gBest[j] = positions[baseIndex + j]
+                    }
                 }
             }
-            
+
             // 更新速度和位置
             for (i in 0 until population) {
+                val baseIndex = i * dim
                 for (j in 0 until dim) {
+                    val index = baseIndex + j
                     val r1 = random.nextDouble()
                     val r2 = random.nextDouble()
-                    
-                    velocities[i][j] = w * velocities[i][j] +
-                            C1 * r1 * (pBest[i][j] - positions[i][j]) +
-                            C2 * r2 * (gBest[j] - positions[i][j])
-                    
+
+                    velocities[index] = w * velocities[index] +
+                            C1 * r1 * (pBest[index] - positions[index]) +
+                            C2 * r2 * (gBest[j] - positions[index])
+
                     // 速度钳制
                     when {
-                        velocities[i][j] > vMax[j] -> velocities[i][j] = vMax[j]
-                        velocities[i][j] < -vMax[j] -> velocities[i][j] = -vMax[j]
+                        velocities[index] > vMax -> velocities[index] = vMax
+                        velocities[index] < -vMax -> velocities[index] = -vMax
                     }
-                    
-                    positions[i][j] += velocities[i][j]
+
+                    positions[index] += velocities[index]
                 }
                 adjustPositions(i)
             }
         }
-        
+
         return gBest.map { it.round().toInt() }.toIntArray()
     }
 }

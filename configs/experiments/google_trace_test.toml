@@ -1,0 +1,39 @@
+# Google Trace 数据集测试配置
+# 使用真实的Google数据中心工作负载数据进行实验
+
+[random]
+seed = 123456
+
+[batch]
+cloudletCount = 500
+population = 50
+maxIter = 100
+runs = 3
+generatorType = "GOOGLE_TRACE"
+
+# Google Trace 配置
+[batch.googleTrace]
+filePath = "data/google_trace/task_events.csv"
+maxTasks = 2000
+timeWindowStart = 0
+timeWindowEnd = 3600  # 限制为前1小时的数据
+
+[realtime]
+cloudletCount = 1000
+simulationDuration = 1800.0  # 30分钟仿真
+arrivalRate = 10.0
+runs = 3
+generatorType = "GOOGLE_TRACE"
+
+# Google Trace 配置
+[realtime.googleTrace]
+filePath = "data/google_trace/task_events.csv"
+maxTasks = 2000
+timeWindowStart = 0
+timeWindowEnd = 1800
+
+[output]
+resultsDir = "runs/google_trace_test"
+
+[experiment]
+nameFormat = "google_trace_{mode}_{timestamp}_{algorithms}"

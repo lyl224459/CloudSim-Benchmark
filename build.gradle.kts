@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.1.21"
+    kotlin("plugin.serialization") version "2.1.21"
     application
 }
 
@@ -27,14 +28,19 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 dependencies {
     implementation("org.cloudsimplus:cloudsimplus:8.5.5")
     implementation("org.apache.commons:commons-math3:3.6.1")
-    
+
     // 日志库：kotlin-logging (Kotlin友好的日志API)
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
-    
+
     // 日志实现：slf4j + logback
     implementation("org.slf4j:slf4j-api:2.0.9")
     implementation("ch.qos.logback:logback-classic:1.4.14")
-    
+
+    // TOML配置文件解析库
+    implementation("com.akuleshov7:ktoml-core:0.5.0")
+    implementation("com.akuleshov7:ktoml-file:0.5.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+
     testImplementation(kotlin("test"))
 }
 
@@ -44,6 +50,14 @@ tasks.test {
 
 application {
     mainClass.set("MainKt")
+}
+
+// 复制配置文件到构建目录
+tasks.processResources {
+    from("cloudsim-benchmark.properties") {
+        include("*.properties")
+        into("config")
+    }
 }
 
 tasks.named<JavaExec>("run") {

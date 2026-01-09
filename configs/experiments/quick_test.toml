@@ -1,0 +1,22 @@
+# 快速测试实验配置
+# 用于快速验证功能，运行时间短
+
+[random]
+seed = 12345
+
+[batch]
+cloudletCount = 20
+population = 10
+maxIter = 10
+runs = 1
+
+[realtime]
+cloudletCount = 50
+simulationDuration = 50.0
+arrivalRate = 1.0
+population = 5
+maxIter = 5
+runs = 1
+
+[output]
+resultsDir = "runs/quick_test"

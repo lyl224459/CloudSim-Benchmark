@@ -1,0 +1,26 @@
+# 可扩展性测试实验配置
+# 用于测试不同规模下的算法表现
+
+[random]
+seed = 54321
+
+[batch.presets]
+# 测试不同任务规模
+scale_50 = { cloudletCount = 50, runs = 3 }
+scale_100 = { cloudletCount = 100, runs = 3 }
+scale_200 = { cloudletCount = 200, runs = 3 }
+scale_500 = { cloudletCount = 500, runs = 5 }
+scale_1000 = { cloudletCount = 1000, runs = 5 }
+
+[realtime.presets]
+# 测试不同负载水平
+load_low = { simulationDuration = 300.0, arrivalRate = 2.0, runs = 3 }
+load_medium = { simulationDuration = 300.0, arrivalRate = 5.0, runs = 3 }
+load_high = { simulationDuration = 300.0, arrivalRate = 10.0, runs = 3 }
+load_extreme = { simulationDuration = 300.0, arrivalRate = 20.0, runs = 5 }
+
+[output]
+resultsDir = "runs/scalability_test"
+
+[experiment]
+nameFormat = "scale_{mode}_{timestamp}_{scale}_{algorithms}"

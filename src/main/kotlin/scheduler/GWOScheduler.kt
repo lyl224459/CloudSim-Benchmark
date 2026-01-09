@@ -8,7 +8,8 @@ import util.Logger
 import java.util.*
 
 /**
- * 灰狼优化算法 (Grey Wolf Optimizer)
+ * 灰狼优化算法 (Grey Wolf Optimizer) - 优化版本
+ * 使用一维数组存储所有狼的位置，提高内存访问效率
  */
 private class GWO(
     private val optFunction: ObjectiveFunction,
@@ -19,7 +20,8 @@ private class GWO(
     private val maxIter: Int,
     private val random: Random
 ) {
-    private val positions = Array(population) { DoubleArray(dim) }
+    // 使用一维数组存储所有狼的位置，提高内存局部性
+    private val positions = DoubleArray(population * dim)
     
     private val alphaPos = DoubleArray(dim)
     private var alphaScore = Double.POSITIVE_INFINITY
@@ -36,26 +38,42 @@ private class GWO(
     
     private fun initializePositions() {
         for (i in 0 until population) {
+            val baseIndex = i * dim
             for (j in 0 until dim) {
-                positions[i][j] = lb + (ub - lb) * random.nextDouble()
+                positions[baseIndex + j] = lb + (ub - lb) * random.nextDouble()
             }
             adjustAndEvaluate(i)
         }
     }
+
+    // 获取狼i的第j维位置
+    private fun getPosition(wolf: Int, dimension: Int): Double {
+        return positions[wolf * dim + dimension]
+    }
+
+    // 设置狼i的第j维位置
+    private fun setPosition(wolf: Int, dimension: Int, value: Double) {
+        positions[wolf * dim + dimension] = value
+    }
     
     private fun adjustAndEvaluate(agentIndex: Int) {
         // 离散化为整数
+        val baseIndex = agentIndex * dim
         for (j in 0 until dim) {
-            positions[agentIndex][j] = positions[agentIndex][j].round()
+            val index = baseIndex + j
+            positions[index] = positions[index].round()
             when {
-                positions[agentIndex][j] < lb -> positions[agentIndex][j] = lb
-                positions[agentIndex][j] > ub -> positions[agentIndex][j] = ub
+                positions[index] < lb -> positions[index] = lb
+                positions[index] > ub -> positions[index] = ub
             }
         }
-        
-        val params = positions[agentIndex].map { it.toInt() }.toIntArray()
+
+        val params = IntArray(dim)
+        for (j in 0 until dim) {
+            params[j] = positions[baseIndex + j].toInt()
+        }
         val fitness = optFunction.calculate(params)
-        
+
         // 更新 Alpha, Beta, Delta
         when {
             fitness < alphaScore -> {
@@ -64,56 +82,67 @@ private class GWO(
                 betaScore = alphaScore
                 alphaPos.copyInto(betaPos)
                 alphaScore = fitness
-                positions[agentIndex].copyInto(alphaPos)
+                // 复制当前狼位置到alpha位置
+                for (j in 0 until dim) {
+                    alphaPos[j] = positions[baseIndex + j]
+                }
             }
             fitness < betaScore -> {
                 deltaScore = betaScore
                 betaPos.copyInto(deltaPos)
                 betaScore = fitness
-                positions[agentIndex].copyInto(betaPos)
+                // 复制当前狼位置到beta位置
+                for (j in 0 until dim) {
+                    betaPos[j] = positions[baseIndex + j]
+                }
             }
             fitness < deltaScore -> {
                 deltaScore = fitness
-                positions[agentIndex].copyInto(deltaPos)
+                // 复制当前狼位置到delta位置
+                for (j in 0 until dim) {
+                    deltaPos[j] = positions[baseIndex + j]
+                }
             }
         }
     }
     
     fun execute(): IntArray {
         for (t in 0 until maxIter) {
-            val a = 2.0 - t * (2.0 / maxIter) // a 从 2 线性递减到 0
-            
+            val a = 2.0 - t * (2.0 / maxIter.toDouble()) // a 从 2 线性递减到 0
+
             for (i in 0 until population) {
+                val baseIndex = i * dim
                 for (j in 0 until dim) {
+                    val index = baseIndex + j
                     val r1 = random.nextDouble()
                     val r2 = random.nextDouble()
-                    
+
                     val A1 = 2.0 * a * r1 - a
                     val C1 = 2.0 * r2
-                    val D_alpha = Math.abs(C1 * alphaPos[j] - positions[i][j])
+                    val D_alpha = Math.abs(C1 * alphaPos[j] - positions[index])
                     val X1 = alphaPos[j] - A1 * D_alpha
-                    
+
                     val r1_beta = random.nextDouble()
                     val r2_beta = random.nextDouble()
                     val A2 = 2.0 * a * r1_beta - a
                     val C2 = 2.0 * r2_beta
-                    val D_beta = Math.abs(C2 * betaPos[j] - positions[i][j])
+                    val D_beta = Math.abs(C2 * betaPos[j] - positions[index])
                     val X2 = betaPos[j] - A2 * D_beta
-                    
+
                     val r1_delta = random.nextDouble()
                     val r2_delta = random.nextDouble()
                     val A3 = 2.0 * a * r1_delta - a
                     val C3 = 2.0 * r2_delta
-                    val D_delta = Math.abs(C3 * deltaPos[j] - positions[i][j])
+                    val D_delta = Math.abs(C3 * deltaPos[j] - positions[index])
                     val X3 = deltaPos[j] - A3 * D_delta
-                    
-                    positions[i][j] = (X1 + X2 + X3) / 3.0
+
+                    positions[index] = (X1 + X2 + X3) / 3.0
                 }
-                
+
                 adjustAndEvaluate(i)
             }
         }
-        
+
         return alphaPos.map { it.round().toInt() }.toIntArray()
     }
 }
