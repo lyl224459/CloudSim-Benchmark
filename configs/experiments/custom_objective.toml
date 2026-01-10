@@ -11,8 +11,10 @@ maxIter = 80
 runs = 2
 
 # 任务生成器配置
-[batch.generator]
-type = "UNIFORM"  # 使用均匀分布生成器
+# 注意：使用 generatorType 字段（向后兼容格式）
+generatorType = "UNIFORM"  # 使用均匀分布生成器
+# [batch.generator] 格式暂不支持
+# type = "UNIFORM"
 # UNIFORM生成器的参数
 # minLength = 500
 # maxLength = 2000
@@ -31,8 +33,10 @@ arrivalRate = 8.0
 runs = 2
 
 # 实时调度也使用相同配置
-[realtime.generator]
-type = "UNIFORM"
+# 注意：使用 generatorType 字段（向后兼容格式）
+generatorType = "UNIFORM"
+# [realtime.generator] 格式暂不支持
+# type = "UNIFORM"
 
 [realtime.objective]
 cost = 0.3

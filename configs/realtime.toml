@@ -11,11 +11,12 @@ simulationDuration = 500.0
 # 任务到达率（每秒到达的任务数）
 arrivalRate = 5.0
 
+# 注意：population 和 maxIter 应在 [optimizer] 配置中设置
 # 算法种群大小（将被algorithms.toml中的设置覆盖）
-population = 20
+# population = 20
 
 # 最大迭代次数（将被algorithms.toml中的设置覆盖）
-maxIter = 20
+# maxIter = 20
 
 # 实验运行次数（用于计算平均值）
 runs = 3
@@ -24,38 +25,41 @@ runs = 3
 generatorType = "LOG_NORMAL"
 
 # ========== 实时调度专用设置 ==========
-[realtime.scheduling]
-# 调度策略
-strategy = "dynamic"  # dynamic 或 static
-
-# 队列大小限制
-maxQueueSize = 100
-
-# 任务超时时间（秒）
-taskTimeout = 300.0
-
-# 资源预留策略
-resourceReservation = "none"  # none, partial, full
+# 注意：以下配置暂未实现，将在未来版本中支持
+# [realtime.scheduling]
+# # 调度策略
+# strategy = "dynamic"  # dynamic 或 static
+#
+# # 队列大小限制
+# maxQueueSize = 100
+#
+# # 任务超时时间（秒）
+# taskTimeout = 300.0
+#
+# # 资源预留策略
+# resourceReservation = "none"  # none, partial, full
 
 # ========== 到达模式 ==========
-[realtime.arrival]
-# 到达分布类型
-distribution = "poisson"  # poisson, uniform, burst
-
-# 突发到达参数（当distribution=burst时使用）
-burstIntensity = 2.0
-burstDuration = 50.0
+# 注意：以下配置暂未实现，将在未来版本中支持
+# [realtime.arrival]
+# # 到达分布类型
+# distribution = "poisson"  # poisson, uniform, burst
+#
+# # 突发到达参数（当distribution=burst时使用）
+# burstIntensity = 2.0
+# burstDuration = 50.0
 
 # ========== 实时调度实验预设 ==========
-[realtime.presets]
-# 短时测试
-short = { simulationDuration = 100.0, arrivalRate = 2.0, runs = 1 }
-
-# 中等测试
-medium = { simulationDuration = 500.0, arrivalRate = 5.0, runs = 3 }
-
-# 长时测试
-long = { simulationDuration = 1000.0, arrivalRate = 10.0, runs = 5 }
-
-# 高负载测试
-high_load = { simulationDuration = 300.0, arrivalRate = 15.0, runs = 5 }
+# 注意：presets 功能暂未实现，将在未来版本中支持
+# [realtime.presets]
+# # 短时测试
+# short = { simulationDuration = 100.0, arrivalRate = 2.0, runs = 1 }
+#
+# # 中等测试
+# medium = { simulationDuration = 500.0, arrivalRate = 5.0, runs = 3 }
+#
+# # 长时测试
+# long = { simulationDuration = 1000.0, arrivalRate = 10.0, runs = 5 }
+#
+# # 高负载测试
+# high_load = { simulationDuration = 300.0, arrivalRate = 15.0, runs = 5 }

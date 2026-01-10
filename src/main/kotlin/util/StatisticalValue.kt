@@ -54,23 +54,12 @@ data class StatisticalValue(
          * @throws IllegalArgumentException 当数组为空或只有一个元素时
          */
         fun calculateStdDev(values: DoubleArray): Double {
-            require(values.size >= 2) { "计算标准差需要至少2个数据点" }
+            if (values.isEmpty()) throw IllegalArgumentException("数组不能为空")
+            if (values.size < 2) return 0.0
             validateArray(values, "计算标准差")
 
-            return calculateStdDevOptimized(values)
-        }
-
-        /**
-         * 高性能标准差计算（使用ND4J向量化操作）
-         */
-        private fun calculateStdDevOptimized(values: DoubleArray): Double {
-            // 使用ND4J进行向量化计算
             val array = Nd4j.create(values)
-            val mean = array.meanNumber().toDouble()
-            val diff = array.sub(mean)
-            val squaredDiff = diff.mul(diff)
-            val variance = squaredDiff.meanNumber().toDouble()
-            return sqrt(variance)
+            return array.std(true).getDouble(0) // true for sample standard deviation (divide by n-1)
         }
 
         /**
@@ -120,9 +109,7 @@ data class StatisticalValue(
             // 批量计算所有统计值
             val mean = array.meanNumber().toDouble()
             val stdDev = if (values.size >= 2) {
-                val diff = array.sub(mean)
-                val squaredDiff = diff.mul(diff)
-                sqrt(squaredDiff.meanNumber().toDouble())
+                array.std(true).getDouble(0)
             } else 0.0
             val min = array.minNumber().toDouble()
             val max = array.maxNumber().toDouble()

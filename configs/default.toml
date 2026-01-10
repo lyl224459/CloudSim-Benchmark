@@ -18,19 +18,25 @@ maxIter = 20
 # 结果目录
 resultsDir = "runs"
 
-# CSV输出
-csv = { enabled = true, delimiter = "," }
+# CSV输出配置（在output下）
+[output.csv]
+enabled = true
+delimiter = ","
 
-# 日志输出
-logging = { level = "INFO", file = true, console = true }
+# 日志输出配置（在output下）
+[output.logging]
+level = "INFO"
+file = true
+console = true
 
 # ========== 系统配置 ==========
-[system]
-# JVM参数
-jvm = { maxHeap = "2048m", encoding = "UTF-8" }
-
-# 线程配置
-threads = { maxWorkers = 4, ioTimeout = 30 }
+# 注意：system 配置暂未实现，将在未来版本中支持
+# [system]
+# # JVM参数
+# jvm = { maxHeap = "2048m", encoding = "UTF-8" }
+#
+# # 线程配置
+# threads = { maxWorkers = 4, ioTimeout = 30 }
 
 # ========== 实验管理 ==========
 [experiment]

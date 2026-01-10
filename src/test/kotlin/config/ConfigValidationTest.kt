@@ -5,7 +5,6 @@ import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
-import java.io.File
 
 /**
  * 配置验证测试
@@ -39,12 +38,15 @@ class ConfigValidationTest {
         )
 
         // When - Then
-        assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("批处理任务数必须大于0")
-            .hasMessageContaining("批处理种群大小必须大于0")
-            .hasMessageContaining("批处理最大迭代次数必须大于0")
-            .hasMessageContaining("批处理运行次数必须大于0")
+        try {
+            ExperimentConfig.validate(invalidConfig)
+            fail("Expected ConfigValidationException")
+        } catch (e: ConfigValidationException) {
+            assertThat(e.errors.any { it.message.contains("批处理任务数必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("批处理种群大小必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("批处理最大迭代次数必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("批处理运行次数必须大于0") }).isTrue()
+        }
     }
 
     @Test
@@ -60,12 +62,15 @@ class ConfigValidationTest {
         )
 
         // When - Then
-        assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("实时调度任务数必须大于0")
-            .hasMessageContaining("仿真持续时间必须大于0")
-            .hasMessageContaining("到达率必须大于0")
-            .hasMessageContaining("实时调度运行次数必须大于0")
+        try {
+            ExperimentConfig.validate(invalidConfig)
+            fail("Expected ConfigValidationException")
+        } catch (e: ConfigValidationException) {
+            assertThat(e.errors.any { it.message.contains("实时调度任务数必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("仿真持续时间必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("到达率必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("实时调度运行次数必须大于0") }).isTrue()
+        }
     }
 
     @Test
@@ -79,10 +84,13 @@ class ConfigValidationTest {
         )
 
         // When - Then
-        assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("优化算法种群大小必须大于0")
-            .hasMessageContaining("优化算法最大迭代次数必须大于0")
+        try {
+            ExperimentConfig.validate(invalidConfig)
+            fail("Expected ConfigValidationException")
+        } catch (e: ConfigValidationException) {
+            assertThat(e.errors.any { it.message.contains("优化算法种群大小必须大于0") }).isTrue()
+            assertThat(e.errors.any { it.message.contains("优化算法最大迭代次数必须大于0") }).isTrue()
+        }
     }
 
     @ParameterizedTest
@@ -129,21 +137,22 @@ class ConfigValidationTest {
     @Test
     fun `should parse generator types correctly`() {
         // Given - When - Then
-        assertThat(parseGeneratorType("LOG_NORMAL")).isEqualTo(CloudletGeneratorType.LOG_NORMAL)
-        assertThat(parseGeneratorType("UNIFORM")).isEqualTo(CloudletGeneratorType.UNIFORM)
-        assertThat(parseGeneratorType("GOOGLE_TRACE")).isEqualTo(CloudletGeneratorType.GOOGLE_TRACE)
+        assertThat(ExperimentConfig.parseGeneratorType("LOG_NORMAL")).isEqualTo(CloudletGeneratorType.LOG_NORMAL)
+        assertThat(ExperimentConfig.parseGeneratorType("UNIFORM")).isEqualTo(CloudletGeneratorType.UNIFORM)
+        assertThat(ExperimentConfig.parseGeneratorType("GOOGLE_TRACE")).isEqualTo(CloudletGeneratorType.GOOGLE_TRACE)
 
         // Case insensitive
-        assertThat(parseGeneratorType("log_normal")).isEqualTo(CloudletGeneratorType.LOG_NORMAL)
-        assertThat(parseGeneratorType("uniform")).isEqualTo(CloudletGeneratorType.UNIFORM)
+        assertThat(ExperimentConfig.parseGeneratorType("log_normal")).isEqualTo(CloudletGeneratorType.LOG_NORMAL)
+        assertThat(ExperimentConfig.parseGeneratorType("uniform")).isEqualTo(CloudletGeneratorType.UNIFORM)
     }
 
     @Test
     fun `should handle invalid generator type gracefully`() {
-        // Given - When - Then
-        assertThatThrownBy { parseGeneratorType("INVALID_TYPE") }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("不支持的任务生成器类型")
+        // Given - When
+        val type = ExperimentConfig.parseGeneratorType("INVALID_TYPE")
+        
+        // Then
+        assertThat(type).isEqualTo(CloudletGeneratorType.LOG_NORMAL)
     }
 
     @Test

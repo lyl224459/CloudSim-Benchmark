@@ -175,6 +175,27 @@ data class ExperimentConfig(
         }
 
         /**
+         * 提供默认配置（供测试/外部调用）
+         */
+        fun createDefault(): ExperimentConfig = ExperimentConfig()
+
+        /**
+         * 对外公开的配置验证入口（供测试/外部调用）
+         * @throws ConfigValidationException 当配置无效时
+         */
+        fun validate(config: ExperimentConfig) = validateConfig(config)
+
+        /**
+         * 解析生成器类型字符串（对外公开，方便测试/调用）
+         */
+        fun parseGeneratorType(type: String): CloudletGeneratorType = try {
+            CloudletGeneratorType.valueOf(type.uppercase())
+        } catch (e: IllegalArgumentException) {
+            Logger.warn("未知的生成器类型: {}, 使用默认值 LOG_NORMAL", type)
+            CloudletGeneratorType.LOG_NORMAL
+        }
+
+        /**
          * 内部加载方法（不验证）
          */
         private fun loadInternal(args: Array<String> = emptyArray()): ExperimentConfig {
@@ -526,17 +547,7 @@ data class ExperimentConfig(
             return applyProperties(baseConfig, properties)
         }
 
-        /**
-         * 解析生成器类型字符串
-         */
-        private fun parseGeneratorType(type: String): CloudletGeneratorType {
-            return try {
-                CloudletGeneratorType.valueOf(type.uppercase())
-            } catch (e: IllegalArgumentException) {
-                Logger.warn("未知的生成器类型: {}, 使用默认值 LOG_NORMAL", type)
-                CloudletGeneratorType.LOG_NORMAL
-            }
-        }
+        // 已公开 parseGeneratorType，内部调用复用
 
         /**
          * 从环境变量加载配置

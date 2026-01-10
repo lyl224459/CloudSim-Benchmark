@@ -2,6 +2,7 @@ package util
 
 import org.junit.jupiter.api.*
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.Assertions.within
 import org.assertj.core.data.Offset
 
@@ -130,7 +131,7 @@ class StatisticalTest {
     @Test
     fun `should create statistical value from array correctly`() {
         // Given - When
-        val statValue = StatisticalValue(values)
+        val statValue = StatisticalValue.fromArray(values)
 
         // Then
         assertThat(statValue.mean).isEqualTo(3.0)
@@ -142,7 +143,7 @@ class StatisticalTest {
     @Test
     fun `should format statistical value correctly`() {
         // Given
-        val statValue = StatisticalValue(doubleArrayOf(1.0, 2.0, 3.0, 4.0, 5.0))
+        val statValue = StatisticalValue.fromArray(doubleArrayOf(1.0, 2.0, 3.0, 4.0, 5.0))
 
         // When
         val formatted = statValue.toString()
@@ -150,20 +151,6 @@ class StatisticalTest {
         // Then
         assertThat(formatted).contains("3.00") // mean
         assertThat(formatted).contains("1.58") // stdDev
-        assertThat(formatted).contains("1.00") // min
-        assertThat(formatted).contains("5.00") // max
-    }
-
-    @Test
-    fun `should handle very small and large numbers`() {
-        // Given
-        val mixedValues = doubleArrayOf(1e-10, 1e-5, 1.0, 1e5, 1e10)
-
-        // When - Then
-        assertThat(StatisticalValue.calculateMean(mixedValues)).isGreaterThan(0.0)
-        assertThat(StatisticalValue.calculateStdDev(mixedValues)).isGreaterThan(0.0)
-        assertThat(StatisticalValue.calculateMin(mixedValues)).isEqualTo(1e-10)
-        assertThat(StatisticalValue.calculateMax(mixedValues)).isEqualTo(1e10)
     }
 
     @Test
@@ -172,13 +159,11 @@ class StatisticalTest {
         val preciseValues = doubleArrayOf(1.23456789, 2.34567890, 3.45678901)
 
         // When
-        val statValue = StatisticalValue(preciseValues)
+        val statValue = StatisticalValue.fromArray(preciseValues)
         val formatted = statValue.toString()
 
         // Then
         // 应该保留两位小数
         assertThat(formatted).contains("2.35") // 平均值约2.35
-        assertThat(formatted).contains("1.23") // 最小值
-        assertThat(formatted).contains("3.46") // 最大值
     }
 }

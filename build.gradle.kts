@@ -9,21 +9,15 @@ version = "1.0.0"
 
 description = "CloudSim-Benchmark: 云任务调度算法对比实验平台"
 
-// 动态检测CPU核心数并优化构建配置
+// 动态检测CPU核心数并优化构建提示
 val cpuCores = Runtime.getRuntime().availableProcessors()
-
-// 自动使用全部CPU核心作为工作线程数
 val workerThreads = cpuCores
-
-// 设置合理的上限，避免过度并行（通常2倍CPU核心数已足够）
 val maxReasonableThreads = cpuCores * 2
 val finalWorkerThreads = minOf(workerThreads, maxReasonableThreads)
 
-// 通过系统属性设置工作线程数
-System.setProperty("org.gradle.workers.max", finalWorkerThreads.toString())
+logger.lifecycle("🔧 构建优化 - CPU核心数: $cpuCores, 建议工作线程数: $finalWorkerThreads")
+logger.lifecycle("⚡ 并行构建: 已启用 | 构建缓存: 已启用 | 增量编译: 已启用")
 
-logger.lifecycle("🔧 构建优化已启用 - CPU核心数: $cpuCores, 工作线程数: $finalWorkerThreads")
-logger.lifecycle("⚡ 并行构建: 已启用 | 构建缓存: 已启用 | GC优化: 已启用")
 
 repositories {
     mavenCentral()
@@ -45,7 +39,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
         // 添加编译参数优化
         freeCompilerArgs.addAll(listOf(
-            "-Xinline-classes"
+            "-Xinline-classes",
+            "-Xbackend-threads=$cpuCores",
+            "-Xlambdas=indy"
         ))
     }
 }
@@ -102,8 +98,9 @@ tasks.test {
     // 测试JVM参数优化
     jvmArgs(
         "-Xmx2g",
-        "-XX:+UseParallelGC",
-        "-XX:MaxGCPauseMillis=200"
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational",
+        "-XX:MaxGCPauseMillis=50"
     )
 
     // 测试报告配置
@@ -119,8 +116,6 @@ tasks.test {
 
     // 测试超时设置
     systemProperty("junit.jupiter.execution.timeout.default", "60s")
-
-    notCompatibleWithConfigurationCache("Test task uses project properties")
 }
 
 // 创建测试覆盖率任务
@@ -146,12 +141,14 @@ tasks.processResources {
 
 tasks.named<JavaExec>("run") {
     classpath = sourceSets["main"].runtimeClasspath
-    // 添加模块系统相关参数和编码设置
+    // 添加模块系统相关参数、编码设置和 ZGC 优化
     jvmArgs = listOf(
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8"
+        "-Dconsole.encoding=UTF-8",
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational"
     )
     // 设置标准输出编码
     systemProperty("file.encoding", "UTF-8")
@@ -176,7 +173,10 @@ tasks.register<Jar>("fatJar") {
                 val name = jar.name.lowercase()
                 !name.contains("kotlin-test") &&
                 !name.contains("junit") &&
-                !name.contains("mockito")
+                !name.contains("mockito") &&
+                !name.contains("assertj") &&
+                !name.contains("byte-buddy") &&
+                !name.contains("objenesis")
             }
             .map { zipTree(it) }
     })
@@ -191,10 +191,12 @@ tasks.register<Jar>("fatJar") {
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
 }
 
-// 优化ZIP任务性能
+// 优化压缩任务性能与体积
 tasks.withType<Zip> {
-    // 使用STORE而不是DEFLATE以提升速度（对于JAR文件）
     isZip64 = true
+    // 采用高效压缩算法
+    entryCompression = ZipEntryCompression.DEFLATED
+    isPreserveFileTimestamps = false // 移除时间戳以提升构建缓存命中率
 }
 
 // 优化复制任务
@@ -318,7 +320,9 @@ tasks.register<JavaExec>("runBatch") {
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8"
+        "-Dconsole.encoding=UTF-8",
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -356,7 +360,9 @@ tasks.register<JavaExec>("runRealtime") {
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8"
+        "-Dconsole.encoding=UTF-8",
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -396,7 +402,9 @@ tasks.register<JavaExec>("runBatchMulti") {
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8"
+        "-Dconsole.encoding=UTF-8",
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -539,7 +547,9 @@ tasks.register<JavaExec>("runExp") {
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8"
+        "-Dconsole.encoding=UTF-8",
+        "-XX:+UseZGC",
+        "-XX:+ZGenerational"
     )
     systemProperty("file.encoding", "UTF-8")
 }

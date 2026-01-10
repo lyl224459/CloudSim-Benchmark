@@ -1,6 +1,7 @@
 # Build outputs
 build/
 .gradle/
+bin/
 gradle/wrapper/gradle-wrapper.jar
 
 # IDE files

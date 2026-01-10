@@ -9,8 +9,10 @@ maxIter = 50
 runs = 1
 
 # 测试UNIFORM生成器
-[batch.generator]
-type = "UNIFORM"
+# 注意：使用 generatorType 字段（向后兼容格式）
+generatorType = "UNIFORM"
+# [batch.generator] 格式暂不支持
+# type = "UNIFORM"
 
 # 测试自定义目标函数权重（强调时间和负载均衡）
 [batch.objective]

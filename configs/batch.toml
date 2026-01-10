@@ -19,8 +19,9 @@ generatorType = "LOG_NORMAL"
 
 # ========== 批处理专用设置 ==========
 # 任务生成器配置
-[batch.generator]
-type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
+# 注意：使用 generatorType 字段（向后兼容格式）
+# [batch.generator] 格式暂不支持，将在未来版本中支持
+# type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
 # 生成器参数（可选，根据类型不同）
 # 对于LOG_NORMAL:
 # meanLength = 1000.0
@@ -45,15 +46,16 @@ timeWindowStart = 0
 timeWindowEnd = 9223372036854775807
 
 # ========== 批处理实验预设 ==========
-[batch.presets]
-# 小规模测试
-small = { cloudletCount = 50, runs = 1 }
-
-# 中等规模测试
-medium = { cloudletCount = 100, runs = 3 }
-
-# 大规模测试
-large = { cloudletCount = 500, runs = 5 }
-
-# 超大规模测试
-xlarge = { cloudletCount = 1000, runs = 10 }
+# 注意：presets 功能暂未实现，将在未来版本中支持
+# [batch.presets]
+# # 小规模测试
+# small = { cloudletCount = 50, runs = 1 }
+#
+# # 中等规模测试
+# medium = { cloudletCount = 100, runs = 3 }
+#
+# # 大规模测试
+# large = { cloudletCount = 500, runs = 5 }
+#
+# # 超大规模测试
+# xlarge = { cloudletCount = 1000, runs = 10 }

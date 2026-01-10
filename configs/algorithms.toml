@@ -2,46 +2,49 @@
 # 定义可用的算法及其参数
 
 # ========== 批处理算法配置 ==========
-[batch.algorithms]
-# 随机算法（基准）
-RANDOM = { enabled = true, description = "随机调度算法（基准）" }
-
-# 粒子群优化
-PSO = { enabled = true, description = "粒子群优化算法", population = 30, maxIter = 100 }
-
-# 鲸鱼优化算法
-WOA = { enabled = true, description = "鲸鱼优化算法", population = 30, maxIter = 100 }
-
-# 灰狼优化算法
-GWO = { enabled = true, description = "灰狼优化算法", population = 30, maxIter = 100 }
-
-# 哈里斯鹰优化算法
-HHO = { enabled = true, description = "哈里斯鹰优化算法", population = 30, maxIter = 100 }
+# 注意：算法配置暂未完全实现，将在未来版本中支持
+# [batch.algorithms]
+# # 随机算法（基准）
+# RANDOM = { enabled = true, description = "随机调度算法（基准）" }
+#
+# # 粒子群优化
+# PSO = { enabled = true, description = "粒子群优化算法", population = 30, maxIter = 100 }
+#
+# # 鲸鱼优化算法
+# WOA = { enabled = true, description = "鲸鱼优化算法", population = 30, maxIter = 100 }
+#
+# # 灰狼优化算法
+# GWO = { enabled = true, description = "灰狼优化算法", population = 30, maxIter = 100 }
+#
+# # 哈里斯鹰优化算法
+# HHO = { enabled = true, description = "哈里斯鹰优化算法", population = 30, maxIter = 100 }
 
 # ========== 实时调度算法配置 ==========
-[realtime.algorithms]
-# 最小负载调度
-MIN_LOAD = { enabled = true, description = "最小负载调度算法（基准）" }
-
-# 随机调度
-RANDOM = { enabled = true, description = "随机调度算法（基准）" }
-
-# 实时PSO
-PSO_REALTIME = { enabled = true, description = "实时粒子群优化", population = 20, maxIter = 20 }
-
-# 实时WOA
-WOA_REALTIME = { enabled = true, description = "实时鲸鱼优化", population = 20, maxIter = 20 }
+# 注意：算法配置暂未完全实现，将在未来版本中支持
+# [realtime.algorithms]
+# # 最小负载调度
+# MIN_LOAD = { enabled = true, description = "最小负载调度算法（基准）" }
+#
+# # 随机调度
+# RANDOM = { enabled = true, description = "随机调度算法（基准）" }
+#
+# # 实时PSO
+# PSO_REALTIME = { enabled = true, description = "实时粒子群优化", population = 20, maxIter = 20 }
+#
+# # 实时WOA
+# WOA_REALTIME = { enabled = true, description = "实时鲸鱼优化", population = 20, maxIter = 20 }
 
 # ========== 算法组合预设 ==========
-[presets]
-# 快速测试 - 只用基础算法
-quick_test = ["RANDOM", "PSO", "WOA"]
-
-# 完整测试 - 所有算法
-full_test = ["RANDOM", "PSO", "WOA", "GWO", "HHO"]
-
-# 实时测试
-realtime_test = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
-
-# 性能测试 - 最优算法
-performance_test = ["PSO", "WOA", "GWO"]
+# 注意：预设功能暂未完全实现，将在未来版本中支持
+# [presets]
+# # 快速测试 - 只用基础算法
+# quick_test = ["RANDOM", "PSO", "WOA"]
+#
+# # 完整测试 - 所有算法
+# full_test = ["RANDOM", "PSO", "WOA", "GWO", "HHO"]
+#
+# # 实时测试
+# realtime_test = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+#
+# # 性能测试 - 最优算法
+# performance_test = ["PSO", "WOA", "GWO"]

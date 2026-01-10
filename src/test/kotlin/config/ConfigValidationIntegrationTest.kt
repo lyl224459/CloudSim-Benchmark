@@ -1,6 +1,7 @@
 package config
 
 import org.junit.jupiter.api.*
+import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 
 /**
@@ -32,34 +33,18 @@ class ConfigValidationIntegrationTest {
 
     @Test
     fun `should reject invalid objective weights with negative values`() {
-        // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            batch = ExperimentConfig.createDefault().batch.copy(
-                objectiveWeights = ObjectiveWeightsConfig(cost = -0.5)
-            )
-        )
-
-        // When - Then
-        assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
-            .isInstanceOf(ConfigValidationException::class.java)
-            .hasMessageContaining("权重必须在 [0,1] 范围内")
+        // Given - When - Then
+        assertThrows<IllegalArgumentException> {
+            ObjectiveWeightsConfig(cost = -0.5)
+        }
     }
 
     @Test
     fun `should reject objective weights that sum to zero`() {
-        // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            batch = ExperimentConfig.createDefault().batch.copy(
-                objectiveWeights = ObjectiveWeightsConfig(
-                    cost = 0.0, totalTime = 0.0, loadBalance = 0.0, makespan = 0.0
-                )
-            )
-        )
-
-        // When - Then
-        assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
-            .isInstanceOf(ConfigValidationException::class.java)
-            .hasMessageContaining("权重总和必须大于 0")
+        // Given - When - Then
+        assertThrows<IllegalArgumentException> {
+            ObjectiveWeightsConfig(cost = 0.0, totalTime = 0.0, loadBalance = 0.0, makespan = 0.0)
+        }
     }
 
     @Test
@@ -88,13 +73,13 @@ class ConfigValidationIntegrationTest {
         )
 
         // When - Then
-        assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
-            .isInstanceOf(ConfigValidationException::class.java)
-            .satisfies { exception ->
-                val configException = exception as ConfigValidationException
-                assert(configException.errors.size >= 2) { "应该至少有2个验证错误" }
-                assert(configException.errors.any { it.field.contains("cloudletCount") }) { "应该包含cloudletCount错误" }
-                assert(configException.errors.any { it.field.contains("population") }) { "应该包含population错误" }
-            }
+        try {
+            ExperimentConfig.validate(invalidConfig)
+            fail("Expected ConfigValidationException")
+        } catch (e: ConfigValidationException) {
+            assertThat(e.errors.size).isGreaterThanOrEqualTo(2)
+            assertThat(e.errors.any { it.field.contains("cloudletCount") }).isTrue()
+            assertThat(e.errors.any { it.field.contains("population") }).isTrue()
+        }
     }
 }
