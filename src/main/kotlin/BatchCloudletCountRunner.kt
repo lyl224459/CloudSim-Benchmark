@@ -49,7 +49,12 @@ class BatchCloudletCountRunner(
     /**
      * 任务生成器类型
      */
-    private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE
+    private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
+
+    /**
+     * 实验目录
+     */
+    private val experimentDir: java.io.File? = null
 ) {
     private val dft = DecimalFormat("###.##")
     
@@ -65,6 +70,19 @@ class BatchCloudletCountRunner(
         Logger.info("种群大小: {}, 最大迭代: {}", population, maxIter)
         Logger.info("随机数种子: {}", randomSeed)
         Logger.info("${"=".repeat(80)}\n")
+
+        // 保存实验信息
+        experimentDir?.let { dir ->
+            ResultsManager.saveExperimentInfo(dir, mapOf(
+                "运行模式" to "批处理批量任务数 (Batch Multi)",
+                "任务数列表" to cloudletCounts.joinToString(", "),
+                "每个任务数运行次数" to runs,
+                "种群大小" to population,
+                "最大迭代次数" to maxIter,
+                "随机数种子" to randomSeed,
+                "任务生成器" to generatorType.name
+            ))
+        }
         
         // 存储所有任务数的结果
         val allResults = mutableMapOf<Int, List<AlgorithmStatistics>>()
@@ -115,7 +133,11 @@ class BatchCloudletCountRunner(
      * 导出批量实验结果到 CSV
      */
     private fun exportBatchResults(results: Map<Int, List<AlgorithmStatistics>>) {
-        val csvFile = ResultsManager.generateBatchCloudletCountResultFileName()
+        val csvFile = if (experimentDir != null) {
+            File(experimentDir, "batch_cloudlet_count_summary.csv")
+        } else {
+            ResultsManager.generateBatchCloudletCountResultFileName()
+        }
         
         csvFile.bufferedWriter().use { writer ->
             // 写入表头
@@ -144,6 +166,25 @@ class BatchCloudletCountRunner(
         
         Logger.info("\n批量实验结果已导出到: {}", csvFile.absolutePath)
         
+        // 如果有 experimentDir，还可以保存更详细的汇总
+        experimentDir?.let { dir ->
+            val summaryHeaders = listOf("CloudletCount", "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness")
+            val summaryData = results.flatMap { (count, stats) ->
+                stats.map { stat ->
+                    mapOf(
+                        "CloudletCount" to count,
+                        "Algorithm" to stat.algorithmName,
+                        "AvgMakespan" to stat.makespan.mean,
+                        "AvgLoadBalance" to stat.loadBalance.mean,
+                        "AvgCost" to stat.cost.mean,
+                        "AvgTotalTime" to stat.totalTime.mean,
+                        "AvgFitness" to stat.fitness.mean
+                    )
+                }
+            }
+            ResultsManager.saveSummaryResults(dir, summaryData, summaryHeaders)
+        }
+
         // 打印汇总表格
         printSummaryTable(results)
     }

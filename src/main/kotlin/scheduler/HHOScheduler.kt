@@ -7,6 +7,7 @@ import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
 import java.util.*
+import kotlin.math.min
 
 /**
  * 哈里斯鹰优化算法 (Harris Hawks Optimization) - 优化版本
@@ -23,7 +24,7 @@ private class HHO(
 ) {
     // 使用一维数组存储所有鹰的位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
-    private val rabbitLocation = DoubleArray(dim)
+    private val rabbitLocation = DoubleArray(dim) { (lb + ub) / 2 } // 初始化为中间值
     private var rabbitEnergy = Double.POSITIVE_INFINITY
     
     init {
@@ -105,7 +106,12 @@ private class HHO(
         )
         val u = DoubleArray(d) { random.nextGaussian() * sigma }
         val v = DoubleArray(d) { random.nextGaussian() }
-        return DoubleArray(d) { u[it] / Math.pow(Math.abs(v[it]), 1.0 / beta) }
+        val levy = DoubleArray(d) { 
+            val step = u[it] / Math.pow(Math.abs(v[it]) + 1e-10, 1.0 / beta)
+            // 限制步长范围，避免过大的跳跃
+            step.coerceIn(-10.0, 10.0)
+        }
+        return levy
     }
     
     fun execute(): IntArray {
@@ -121,62 +127,68 @@ private class HHO(
                 val r3 = random.nextDouble()
                 val r4 = random.nextDouble()
                 val baseIndex = i * dim
+                
+                // 保存旧位置用于回滚
+                val oldPositions = DoubleArray(dim) { j -> positions[baseIndex + j] }
 
                 for (j in 0 until dim) {
                     val index = baseIndex + j
                     when {
                         Math.abs(E) >= 1 -> {
-                            // 探索阶段
+                            // 探索阶段（修复：使用正确的位置更新公式）
                             if (q >= 0.5) {
-                                positions[index] = rabbitLocation[j] - positions[index] - r1 * (ub - lb) * random.nextDouble()
+                                // 基于随机鹰的位置
+                                val randomHawk = random.nextInt(population)
+                                val randomHawkPos = getPosition(randomHawk, j)
+                                positions[index] = randomHawkPos - r1 * Math.abs(randomHawkPos - positions[index])
                             } else {
-                                positions[index] = (rabbitLocation[j] - positions[index]) + r2 * (ub - lb) * random.nextDouble()
+                                // 基于兔子位置
+                                positions[index] = rabbitLocation[j] - r2 * Math.abs(rabbitLocation[j] - 2 * r3 * positions[index])
                             }
                         }
                         Math.abs(E) < 1 -> {
-                            // 开发阶段
+                            // 开发阶段（修复：使用正确的围捕公式）
                             if (r >= 0.5 && Math.abs(E) >= 0.5) {
                                 // 软包围
-                                positions[index] = (rabbitLocation[j] - positions[index]) - E * Math.abs(rabbitLocation[j] - positions[index])
+                                val deltaX = rabbitLocation[j] - positions[index]
+                                positions[index] = deltaX - E * Math.abs(deltaX)
                             } else if (r >= 0.5 && Math.abs(E) < 0.5) {
                                 // 硬包围
-                                positions[index] = rabbitLocation[j] - E * Math.abs(rabbitLocation[j] - positions[index])
+                                val deltaX = rabbitLocation[j] - positions[index]
+                                positions[index] = rabbitLocation[j] - E * Math.abs(deltaX)
                             } else if (r < 0.5 && Math.abs(E) >= 0.5) {
-                                // 渐进式快速俯冲软包围
-                                val Y = rabbitLocation[j] - E * Math.abs(rabbitLocation[j] - positions[index])
-                                val levyStep = levyFlight(dim)
-                                val Z = Y + r3 * levyStep[j] * (ub - lb)
-                                positions[index] = Y  // 先更新为 Y
-                                adjustPositions(i)
-                                val fitnessY = evaluate(i)
-                                positions[index] = Z  // 再更新为 Z
-                                adjustPositions(i)
-                                val fitnessZ = evaluate(i)
-                                positions[index] = if (fitnessY < fitnessZ) Y else Z
+                                // 渐进式快速俯冲软包围（延迟评估）
+                                val deltaX = rabbitLocation[j] - positions[index]
+                                positions[index] = deltaX - E * Math.abs(deltaX)
                             } else {
-                                // 渐进式快速俯冲硬包围
-                                val Y = rabbitLocation[j] - E * Math.abs(rabbitLocation[j] - positions[index])
-                                val levyStep = levyFlight(dim)
-                                val Z = Y + r4 * levyStep[j] * (ub - lb)
-                                positions[index] = Y  // 先更新为 Y
-                                adjustPositions(i)
-                                val fitnessY = evaluate(i)
-                                positions[index] = Z  // 再更新为 Z
-                                adjustPositions(i)
-                                val fitnessZ = evaluate(i)
-                                positions[index] = if (fitnessY < fitnessZ) Y else Z
+                                // 渐进式快速俯冲硬包围（延迟评估）
+                                val deltaX = rabbitLocation[j] - positions[index]
+                                positions[index] = rabbitLocation[j] - E * Math.abs(deltaX)
                             }
                         }
                     }
                 }
 
+                // 整体调整位置（避免逐维度调整导致的问题）
                 adjustPositions(i)
+                
+                // 评估新位置，如果变差则恢复
+                val newFitness = evaluate(i)
+                if (newFitness.isNaN() || newFitness.isInfinite()) {
+                    // 恢复旧位置
+                    for (j in 0 until dim) {
+                        positions[baseIndex + j] = oldPositions[j]
+                    }
+                }
             }
 
             updateRabbit()
         }
 
-        return rabbitLocation.map { it.round().toInt() }.toIntArray()
+        // 确保返回的解在有效范围内
+        val result = rabbitLocation.map { it.round().toInt().coerceIn(lb.toInt(), ub.toInt()) }.toIntArray()
+        Logger.debug("HHO 最终解: {}", result.take(min(10, dim)))
+        return result
     }
 }
 

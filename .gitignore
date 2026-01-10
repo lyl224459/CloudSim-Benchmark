@@ -27,5 +27,7 @@ runs/
 *.temp
 *.bak
 
+TODO.md
+
 # Data files (uncomment if you want to ignore large data files)
 # data/google_trace/*.csv

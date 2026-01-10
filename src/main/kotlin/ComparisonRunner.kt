@@ -50,7 +50,8 @@ class ComparisonRunner(
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
     private val googleTraceConfig: config.GoogleTraceConfig? = null,
-    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig()
+    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
+    private val experimentDir: java.io.File? = null
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
@@ -182,6 +183,19 @@ class ComparisonRunner(
         Logger.info("运行次数: {}", runs)
         Logger.info("${"=".repeat(60)}")
 
+        // 保存实验信息
+        experimentDir?.let { dir ->
+            ResultsManager.saveExperimentInfo(dir, mapOf(
+                "运行模式" to "批处理 (Batch)",
+                "任务数量" to cloudletCount,
+                "种群大小" to population,
+                "最大迭代次数" to maxIter,
+                "随机数种子" to randomSeed,
+                "运行次数" to runs,
+                "任务生成器" to generatorType.name
+            ))
+        }
+
         // 确定要运行的算法列表（如果配置为空，则运行所有算法）
         val algorithmsToRun = if (algorithms.isEmpty()) {
             config.BatchAlgorithmType.entries
@@ -231,6 +245,24 @@ class ComparisonRunner(
             Logger.info("所有算法并行执行完成")
             printComparisonResults(results.sortedBy { it.algorithmName })
             exportToCSV(results.sortedBy { it.algorithmName })
+
+            // 保存汇总结果
+            experimentDir?.let { dir ->
+                val summaryData = results.sortedBy { it.algorithmName }.map { r ->
+                    mapOf(
+                        "Algorithm" to r.algorithmName,
+                        "AvgMakespan" to r.makespan,
+                        "AvgLoadBalance" to r.loadBalance,
+                        "AvgCost" to r.cost,
+                        "AvgTotalTime" to r.totalTime,
+                        "AvgFitness" to r.fitness
+                    )
+                }
+                ResultsManager.saveSummaryResults(
+                    dir, summaryData,
+                    listOf("Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness")
+                )
+            }
         }
 
         Logger.info("算法对比实验完成，总耗时: {}ms", executionTime)
@@ -299,6 +331,11 @@ class ComparisonRunner(
                     config.BatchAlgorithmType.RL -> {
                         runAlgorithm("RL") { cloudlets, vms ->
                             RLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
+                        }
+                    }
+                    config.BatchAlgorithmType.IMPROVED_RL -> {
+                        runAlgorithm("Improved-RL") { cloudlets, vms ->
+                            ImprovedRLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
                         }
                     }
                 }
@@ -488,7 +525,7 @@ class ComparisonRunner(
      */
     private suspend fun executeSingleRunAsync(algorithmType: config.BatchAlgorithmType, run: Int): AlgorithmResult =
         withContext(Dispatchers.Default) {
-            when (algorithmType) {
+            val result = when (algorithmType) {
                 config.BatchAlgorithmType.RANDOM -> {
                     runAlgorithm("Random") { cloudlets, vms ->
                         RandomScheduler(cloudlets, vms, objectiveWeights, Random(randomSeed + run))
@@ -519,7 +556,27 @@ class ComparisonRunner(
                         RLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
                     }
                 }
+                config.BatchAlgorithmType.IMPROVED_RL -> {
+                    runAlgorithm("Improved-RL") { cloudlets, vms ->
+                        ImprovedRLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
+                    }
+                }
             }
+
+            // 保存单次试验结果
+            experimentDir?.let { dir ->
+                ResultsManager.saveAlgorithmTrialResult(
+                    dir, result.algorithmName, run,
+                    mapOf(
+                        "Makespan" to result.makespan,
+                        "LoadBalance" to result.loadBalance,
+                        "Cost" to result.cost,
+                        "TotalTime" to result.totalTime,
+                        "Fitness" to result.fitness
+                    )
+                )
+            }
+            result
         }
 }
 

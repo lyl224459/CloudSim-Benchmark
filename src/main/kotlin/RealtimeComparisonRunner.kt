@@ -56,7 +56,8 @@ class RealtimeComparisonRunner(
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
     private val googleTraceConfig: config.GoogleTraceConfig? = null,
-    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig()
+    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
+    private val experimentDir: java.io.File? = null
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
@@ -211,6 +212,19 @@ class RealtimeComparisonRunner(
         Logger.info("随机数种子: {}", randomSeed)
         Logger.info("${"=".repeat(60)}")
 
+        // 保存实验信息
+        experimentDir?.let { dir ->
+            ResultsManager.saveExperimentInfo(dir, mapOf(
+                "运行模式" to "实时调度 (Realtime)",
+                "任务数量" to cloudletCount,
+                "仿真持续时间" to simulationDuration,
+                "到达率" to arrivalRate,
+                "随机数种子" to randomSeed,
+                "运行次数" to runs,
+                "任务生成器" to generatorType.name
+            ))
+        }
+
         // 确定要运行的算法列表（如果配置为空，则运行所有算法）
         val algorithmsToRun = if (algorithms.isEmpty()) {
             config.RealtimeAlgorithmType.entries
@@ -262,6 +276,26 @@ class RealtimeComparisonRunner(
             Logger.info("所有实时算法并行执行完成")
             printRealtimeComparisonResults(results.sortedBy { it.algorithmName })
             exportRealtimeToCSV(results.sortedBy { it.algorithmName })
+
+            // 保存汇总结果
+            experimentDir?.let { dir ->
+                val summaryData = results.sortedBy { it.algorithmName }.map { r ->
+                    mapOf(
+                        "Algorithm" to r.algorithmName,
+                        "AvgMakespan" to r.makespan,
+                        "AvgLoadBalance" to r.loadBalance,
+                        "AvgCost" to r.cost,
+                        "AvgTotalTime" to r.totalTime,
+                        "AvgFitness" to r.fitness,
+                        "AvgWaitingTime" to r.averageWaitingTime,
+                        "AvgResponseTime" to r.averageResponseTime
+                    )
+                }
+                ResultsManager.saveSummaryResults(
+                    dir, summaryData,
+                    listOf("Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness", "AvgWaitingTime", "AvgResponseTime")
+                )
+            }
         }
 
         Logger.info("实时调度算法对比实验完成，总耗时: {}ms", executionTime)
@@ -310,7 +344,7 @@ class RealtimeComparisonRunner(
      */
     private suspend fun executeRealtimeSingleRunAsync(algorithmType: config.RealtimeAlgorithmType, run: Int): RealtimeAlgorithmResult =
         withContext(Dispatchers.Default) {
-            when (algorithmType) {
+            val result = when (algorithmType) {
                 config.RealtimeAlgorithmType.MIN_LOAD -> {
                     runRealtimeAlgorithm("MinLoad") { vms ->
                         RealtimeMinLoadScheduler(vms)
@@ -332,6 +366,23 @@ class RealtimeComparisonRunner(
                     }
                 }
             }
+
+            // 保存单次试验结果
+            experimentDir?.let { dir ->
+                ResultsManager.saveAlgorithmTrialResult(
+                    dir, result.algorithmName, run,
+                    mapOf(
+                        "Makespan" to result.makespan,
+                        "LoadBalance" to result.loadBalance,
+                        "Cost" to result.cost,
+                        "TotalTime" to result.totalTime,
+                        "Fitness" to result.fitness,
+                        "WaitingTime" to result.averageWaitingTime,
+                        "ResponseTime" to result.averageResponseTime
+                    )
+                )
+            }
+            result
         }
 
     /**

@@ -189,13 +189,42 @@ tasks.register<Jar>("fatJar") {
 
     // 排除不必要的文件以减少大小
     exclude("META-INF/*.SF", "META-INF/*.DSA", "META-INF/*.RSA")
+    
+    // 确保在 CI/发布环境中使用压缩（继承自 tasks.withType<Zip> 的配置）
+    doFirst {
+        val ciEnv = System.getenv("CI")
+        val isCI = ciEnv != null && (ciEnv == "true" || ciEnv == "1")
+        val forceCompress = project.hasProperty("compress") && project.property("compress") == "true"
+        val skipCompress = project.hasProperty("skipCompress") || project.hasProperty("fast")
+        
+        if ((isCI || forceCompress) && !skipCompress) {
+            entryCompression = ZipEntryCompression.DEFLATED
+            logger.lifecycle("📦 发布模式：fatJar 启用压缩（减小体积）")
+        } else {
+            entryCompression = ZipEntryCompression.STORED
+            logger.lifecycle("⚡ 开发模式：fatJar 禁用压缩（提升构建速度）")
+        }
+    }
 }
 
-// 优化压缩任务性能与体积
+// 优化 Zip 任务性能 - 根据环境自动选择压缩策略
 tasks.withType<Zip> {
     isZip64 = true
-    // 采用高效压缩算法
-    entryCompression = ZipEntryCompression.DEFLATED
+    
+    // CI 环境（GitHub Actions/GitLab CI）使用压缩，本地开发不压缩以提升速度
+    val ciEnv = System.getenv("CI")
+    val isCI = ciEnv != null && (ciEnv == "true" || ciEnv == "1")
+    val forceCompress = project.hasProperty("compress") && project.property("compress") == "true"
+    val skipCompress = project.hasProperty("skipCompress") || project.hasProperty("fast")
+    
+    entryCompression = if ((isCI || forceCompress) && !skipCompress) {
+        logger.lifecycle("📦 发布模式：启用 JAR 压缩（减小体积）")
+        ZipEntryCompression.DEFLATED
+    } else {
+        logger.lifecycle("⚡ 开发模式：禁用 JAR 压缩（提升构建速度）")
+        ZipEntryCompression.STORED
+    }
+    
     isPreserveFileTimestamps = false // 移除时间戳以提升构建缓存命中率
 }
 
@@ -273,15 +302,17 @@ tasks.register<CreateStartScripts>("createRunScript") {
     
     doLast {
         val windowsScript = file("$outputDir/${applicationName}.bat")
-        val content = windowsScript.readText()
-        windowsScript.writeText(
-            "@echo off\n" +
-            "chcp 65001 >nul\n" +
-            content.replace(
-                "set DEFAULT_JVM_OPTS=",
-                "set DEFAULT_JVM_OPTS=-Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 "
+        if (windowsScript.exists()) {
+            val content = windowsScript.readText()
+            windowsScript.writeText(
+                "@echo off\n" +
+                "chcp 65001 >nul\n" +
+                content.replace(
+                    "set DEFAULT_JVM_OPTS=",
+                    "set DEFAULT_JVM_OPTS=-Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 "
+                )
             )
-        )
+        }
     }
 }
 

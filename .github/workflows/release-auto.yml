@@ -37,11 +37,13 @@ jobs:
       run: .\gradlew.bat clean build --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"  # 确保构建时识别为 CI 环境
         
-    - name: Build fat JAR
-      run: .\gradlew.bat fatJar --no-daemon --stacktrace
+    - name: Build fat JAR (Compressed for Release)
+      run: .\gradlew.bat fatJar --no-daemon --stacktrace -Pcompress=true
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"  # CI 环境标识，配合 -Pcompress=true 确保启用压缩
         
     - name: Get version from tag or input
       id: version

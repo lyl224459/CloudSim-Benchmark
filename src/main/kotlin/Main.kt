@@ -169,7 +169,8 @@ fun main(args: Array<String>) = runBlocking {
                 runs = config.batch.runs,
                 generatorType = config.batch.generatorType,
                 googleTraceConfig = config.batch.googleTraceConfig,
-                objectiveWeights = config.batch.objectiveWeights
+                objectiveWeights = config.batch.objectiveWeights,
+                experimentDir = experimentDir
             )
             runner.runComparison()
             Logger.info("批处理实验完成！")
@@ -215,7 +216,8 @@ fun main(args: Array<String>) = runBlocking {
                 runs = config.realtime.runs,
                 generatorType = config.realtime.generatorType,
                 googleTraceConfig = config.realtime.googleTraceConfig,
-                objectiveWeights = config.realtime.objectiveWeights
+                objectiveWeights = config.realtime.objectiveWeights,
+                experimentDir = experimentDir
             )
             runner.runComparison()
             Logger.info("实时调度实验完成！")
@@ -334,7 +336,8 @@ private fun runBatchCloudletCountExperiment(cloudletCounts: List<Int>, config: E
         randomSeed = config.randomSeed,
         algorithms = config.batch.algorithms,
         runs = config.batch.runs,
-        generatorType = config.batch.generatorType
+        generatorType = config.batch.generatorType,
+        experimentDir = experimentDir
     )
     runner.runExperiment()
 }
@@ -352,7 +355,8 @@ private fun runRealtimeCloudletCountExperiment(cloudletCounts: List<Int>, config
         randomSeed = config.randomSeed,
         algorithms = config.realtime.algorithms,
         runs = config.realtime.runs,
-        generatorType = config.realtime.generatorType
+        generatorType = config.realtime.generatorType,
+        experimentDir = experimentDir
     )
     runner.runBatchExperiment()
 }

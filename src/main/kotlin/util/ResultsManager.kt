@@ -107,7 +107,62 @@ object ResultsManager {
      * 在实验目录中生成结果文件名
      */
     fun generateResultFileName(experimentDir: File, fileName: String, suffix: String = ".csv"): File {
-        return File(experimentDir, fileName + suffix)
+        return File(experimentDir, if (fileName.endsWith(suffix)) fileName else fileName + suffix)
+    }
+
+    /**
+     * 保存实验信息到文本文件
+     */
+    fun saveExperimentInfo(experimentDir: File, info: Map<String, Any>) {
+        val infoFile = File(experimentDir, "experiment_info.txt")
+        infoFile.bufferedWriter().use { writer ->
+            writer.write("=== CloudSim-Benchmark 实验信息 ===\n")
+            writer.write("生成时间: ${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\n\n")
+            info.forEach { (key, value) ->
+                writer.write("$key: $value\n")
+            }
+        }
+    }
+
+    /**
+     * 保存单次试验结果到对应算法的 CSV 文件
+     */
+    fun saveAlgorithmTrialResult(
+        experimentDir: File,
+        algorithmName: String,
+        trial: Int,
+        metrics: Map<String, Double>
+    ) {
+        val fileName = algorithmName.replace(" ", "_") + ".csv"
+        val file = File(experimentDir, fileName)
+        val isNew = !file.exists()
+
+        java.io.FileOutputStream(file, true).bufferedWriter().use { writer ->
+            if (isNew) {
+                writer.write("Trial," + metrics.keys.joinToString(",") + "\n")
+            }
+            writer.write("$trial," + metrics.values.joinToString(",") { String.format("%.6f", it) } + "\n")
+        }
+    }
+
+    /**
+     * 保存所有算法的平均汇总结果
+     */
+    fun saveSummaryResults(
+        experimentDir: File,
+        summaryData: List<Map<String, Any>>,
+        headers: List<String>
+    ) {
+        val summaryFile = File(experimentDir, "summary_avg.csv")
+        summaryFile.bufferedWriter().use { writer ->
+            writer.write(headers.joinToString(",") + "\n")
+            for (row in summaryData) {
+                writer.write(headers.joinToString(",") { header ->
+                    val value = row[header]
+                    if (value is Double) String.format("%.6f", value) else value.toString()
+                } + "\n")
+            }
+        }
     }
 
     /**

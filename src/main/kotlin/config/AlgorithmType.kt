@@ -9,7 +9,8 @@ enum class BatchAlgorithmType {
     WOA,     // 鲸鱼优化
     GWO,     // 灰狼优化
     HHO,     // 哈里斯鹰优化
-    RL       // 强化学习调度
+    RL,      // 强化学习调度
+    IMPROVED_RL // 改进版强化学习调度
 }
 
 /**
