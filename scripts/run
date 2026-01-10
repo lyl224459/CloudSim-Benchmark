@@ -9,6 +9,7 @@
 #   realtime       - 实时调度模式 (默认)
 #   batch-multi    - 批量任务数实验 (批处理)
 #   realtime-multi - 批量任务数实验 (实时)
+#   coroutine-demo - 协程优化功能演示
 #   build          - 构建项目
 #   help           - 显示帮助
 #

@@ -66,7 +66,27 @@ dependencies {
     implementation("com.akuleshov7:ktoml-file:0.5.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
+    // Kotlin协程
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+
+    // 高性能计算库
+    implementation("org.nd4j:nd4j-native-platform:1.0.0-M2.1")  // ND4J - 高性能数值计算
+    implementation("it.unimi.dsi:fastutil:8.5.12")            // Fastutil - 高性能集合
+    implementation("org.eclipse.collections:eclipse-collections:11.1.0")  // Eclipse Collections - 高级集合操作
+
     testImplementation(kotlin("test"))
+
+    // JUnit 5 测试框架
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.1")
+
+    // Mockito for mocking
+    testImplementation("org.mockito:mockito-core:5.7.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+
+    // AssertJ for fluent assertions
+    testImplementation("org.assertj:assertj-core:3.24.2")
 }
 
 tasks.test {
@@ -77,6 +97,37 @@ tasks.test {
     onlyIf {
         System.getProperty("runTests") != null ||
         project.hasProperty("runTests")
+    }
+
+    // 测试JVM参数优化
+    jvmArgs(
+        "-Xmx2g",
+        "-XX:+UseParallelGC",
+        "-XX:MaxGCPauseMillis=200"
+    )
+
+    // 测试报告配置
+    reports {
+        html.required.set(true)
+        junitXml.required.set(true)
+    }
+
+    // JUnit 5 配置
+    systemProperty("junit.jupiter.execution.parallel.enabled", "true")
+    systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
+    systemProperty("junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
+
+    // 测试超时设置
+    systemProperty("junit.jupiter.execution.timeout.default", "60s")
+
+    notCompatibleWithConfigurationCache("Test task uses project properties")
+}
+
+// 创建测试覆盖率任务
+tasks.register("testWithCoverage") {
+    dependsOn("test")
+    doLast {
+        logger.lifecycle("🧪 测试完成 - 查看 reports/tests/test/index.html 获取详细报告")
     }
 }
 

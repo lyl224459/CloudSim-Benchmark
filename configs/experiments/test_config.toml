@@ -1,0 +1,23 @@
+# 测试配置文件 - 验证新功能
+[random]
+seed = 42
+
+[batch]
+cloudletCount = 30  # 较小的任务数用于快速测试
+population = 20
+maxIter = 50
+runs = 1
+
+# 测试UNIFORM生成器
+[batch.generator]
+type = "UNIFORM"
+
+# 测试自定义目标函数权重（强调时间和负载均衡）
+[batch.objective]
+cost = 0.2         # 降低成本权重
+totalTime = 0.5    # 提高总时间权重
+loadBalance = 0.3  # 保持负载均衡权重
+makespan = 0.0     # 不使用Makespan
+
+[output]
+resultsDir = "runs/test_results"
