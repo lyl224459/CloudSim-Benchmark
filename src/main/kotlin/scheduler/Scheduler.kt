@@ -10,13 +10,14 @@ import util.Logger
  */
 abstract class Scheduler(
     protected val cloudletList: List<Cloudlet>,
-    protected val vmList: List<Vm>
+    protected val vmList: List<Vm>,
+    protected val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig()
 ) {
     protected val cloudletNum = cloudletList.size
     protected val vmNum = vmList.size
-    
-    protected val objectiveFunction: ObjectiveFunction = 
-        datacenter.SchedulerObjectiveFunction(cloudletList, vmList)
+
+    protected val objectiveFunction: ObjectiveFunction =
+        datacenter.SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
     
     /**
      * 分配任务到虚拟机

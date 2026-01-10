@@ -103,7 +103,7 @@ class RealtimePSOScheduler(
         // 如果有等待任务，使用PSO进行批量调度
         if (waitingCloudlets.isNotEmpty()) {
             val allCloudlets = waitingCloudlets + newCloudlet
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, vmList)
+            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, vmList, config.ObjectiveWeightsConfig())
             val pso = PSO(objFunc, population, 0.0, (vmNum - 1).toDouble(), 
                 allCloudlets.size, maxIter, random)
             val allocation = pso.execute()
@@ -132,7 +132,7 @@ class RealtimeWOAScheduler(
     ): Int {
         if (waitingCloudlets.isNotEmpty()) {
             val allCloudlets = waitingCloudlets + newCloudlet
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, vmList)
+            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, vmList, config.ObjectiveWeightsConfig())
             val woa = WOA(objFunc, population, 0.0, (vmNum - 1).toDouble(), 
                 allCloudlets.size, maxIter, random)
             val allocation = woa.execute()

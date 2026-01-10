@@ -161,7 +161,8 @@ fun main(args: Array<String>) {
                 algorithms = config.batch.algorithms,
                 runs = config.batch.runs,
                 generatorType = config.batch.generatorType,
-                googleTraceConfig = config.batch.googleTraceConfig
+                googleTraceConfig = config.batch.googleTraceConfig,
+                objectiveWeights = config.batch.objectiveWeights
             )
             runner.runComparison()
             Logger.info("批处理实验完成！")
@@ -206,7 +207,8 @@ fun main(args: Array<String>) {
                 algorithms = config.realtime.algorithms,
                 runs = config.realtime.runs,
                 generatorType = config.realtime.generatorType,
-                googleTraceConfig = config.realtime.googleTraceConfig
+                googleTraceConfig = config.realtime.googleTraceConfig,
+                objectiveWeights = config.realtime.objectiveWeights
             )
             runner.runComparison()
             Logger.info("实时调度实验完成！")

@@ -46,7 +46,8 @@ class ComparisonRunner(
     private val algorithms: List<config.BatchAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
-    private val googleTraceConfig: config.GoogleTraceConfig? = null
+    private val googleTraceConfig: config.GoogleTraceConfig? = null,
+    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig()
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
@@ -101,7 +102,7 @@ class ComparisonRunner(
         val cloudletToVm = IntArray(cloudletList.size) { i ->
             finishedCloudlets.find { it.id == cloudletList[i].id }?.vm?.id?.toInt() ?: 0
         }
-        val objFunc = SchedulerObjectiveFunction(cloudletList, vmList)
+        val objFunc = SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
         val totalTime = objFunc.estimateTotalTime(cloudletToVm)
         val fitness = objFunc.calculate(cloudletToVm)
         
@@ -194,27 +195,27 @@ class ComparisonRunner(
                     val result = when (algorithmType) {
                         config.BatchAlgorithmType.RANDOM -> {
                             runAlgorithm("Random") { cloudlets, vms ->
-                                RandomScheduler(cloudlets, vms, Random(randomSeed + run))
+                                RandomScheduler(cloudlets, vms, objectiveWeights, Random(randomSeed + run))
                             }
                         }
                         config.BatchAlgorithmType.PSO -> {
                             runAlgorithm("PSO") { cloudlets, vms ->
-                                PSOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                                PSOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                             }
                         }
                         config.BatchAlgorithmType.WOA -> {
                             runAlgorithm("WOA") { cloudlets, vms ->
-                                WOAScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                                WOAScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                             }
                         }
                         config.BatchAlgorithmType.GWO -> {
                             runAlgorithm("GWO") { cloudlets, vms ->
-                                GWOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                                GWOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                             }
                         }
                         config.BatchAlgorithmType.HHO -> {
                             runAlgorithm("HHO") { cloudlets, vms ->
-                                HHOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                                HHOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                             }
                         }
                     }
@@ -236,27 +237,27 @@ class ComparisonRunner(
                 when (algorithmType) {
                     config.BatchAlgorithmType.RANDOM -> {
                         results.add(runAlgorithm("Random") { cloudlets, vms ->
-                            RandomScheduler(cloudlets, vms, random)
+                            RandomScheduler(cloudlets, vms, objectiveWeights, random)
                         })
                     }
                     config.BatchAlgorithmType.PSO -> {
                         results.add(runAlgorithm("PSO") { cloudlets, vms ->
-                            PSOScheduler(cloudlets, vms, population, maxIter, random)
+                            PSOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, random)
                         })
                     }
                     config.BatchAlgorithmType.WOA -> {
                         results.add(runAlgorithm("WOA") { cloudlets, vms ->
-                            WOAScheduler(cloudlets, vms, population, maxIter, random)
+                            WOAScheduler(cloudlets, vms, objectiveWeights, population, maxIter, random)
                         })
                     }
                     config.BatchAlgorithmType.GWO -> {
                         results.add(runAlgorithm("GWO") { cloudlets, vms ->
-                            GWOScheduler(cloudlets, vms, population, maxIter, random)
+                            GWOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, random)
                         })
                     }
                     config.BatchAlgorithmType.HHO -> {
                         results.add(runAlgorithm("HHO") { cloudlets, vms ->
-                            HHOScheduler(cloudlets, vms, population, maxIter, random)
+                            HHOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, random)
                         })
                     }
                 }
@@ -303,27 +304,27 @@ class ComparisonRunner(
                 val result = when (algorithmType) {
                     config.BatchAlgorithmType.RANDOM -> {
                         runAlgorithm("Random") { cloudlets, vms ->
-                            RandomScheduler(cloudlets, vms, Random(randomSeed + run))
+                            RandomScheduler(cloudlets, vms, objectiveWeights, Random(randomSeed + run))
                         }
                     }
                     config.BatchAlgorithmType.PSO -> {
                         runAlgorithm("PSO") { cloudlets, vms ->
-                            PSOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            PSOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                         }
                     }
                     config.BatchAlgorithmType.WOA -> {
                         runAlgorithm("WOA") { cloudlets, vms ->
-                            WOAScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            WOAScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                         }
                     }
                     config.BatchAlgorithmType.GWO -> {
                         runAlgorithm("GWO") { cloudlets, vms ->
-                            GWOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            GWOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                         }
                     }
                     config.BatchAlgorithmType.HHO -> {
                         runAlgorithm("HHO") { cloudlets, vms ->
-                            HHOScheduler(cloudlets, vms, population, maxIter, Random(randomSeed + run))
+                            HHOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
                         }
                     }
                 }

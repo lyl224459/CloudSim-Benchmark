@@ -21,14 +21,15 @@ interface ObjectiveFunction {
  */
 class SchedulerObjectiveFunction(
     private val cloudletList: List<Cloudlet>,
-    private val vmList: List<Vm>
+    private val vmList: List<Vm>,
+    private val weights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig()
 ) : ObjectiveFunction {
-    
+
     companion object {
-        // 使用统一配置
-        private val ALPHA = config.ObjectiveConfig.ALPHA
-        private val BETA = config.ObjectiveConfig.BETA
-        private val GAMMA = config.ObjectiveConfig.GAMMA
+        // 默认权重（向后兼容）
+        private val DEFAULT_ALPHA = config.ObjectiveConfig.ALPHA
+        private val DEFAULT_BETA = config.ObjectiveConfig.BETA
+        private val DEFAULT_GAMMA = config.ObjectiveConfig.GAMMA
     }
     
     private val cloudletNum = cloudletList.size
@@ -164,15 +165,15 @@ class SchedulerObjectiveFunction(
     
     /**
      * 计算适应度值
-     * 适应度值是成本、总时间和负载均衡的加权和
+     * 适应度值是成本、总时间、负载均衡和Makespan的加权和
      */
     override fun calculate(params: IntArray): Double {
-        val costRatio = (estimateCost(params) - estimateMinCost()) / 
+        val costRatio = (estimateCost(params) - estimateMinCost()) /
                        (estimateMaxCost() - estimateMinCost())
-        
-        val timeRatio = (estimateTotalTime(params) - estimateMinTotalTime()) / 
+
+        val timeRatio = (estimateTotalTime(params) - estimateMinTotalTime()) /
                        (estimateMaxTotalTime() - estimateMinTotalTime())
-        
+
         val maxLB = estimateMaxLB()
         val minLB = estimateMinLB()
         val lbRatio = if (maxLB > minLB) {
@@ -180,8 +181,41 @@ class SchedulerObjectiveFunction(
         } else {
             0.0
         }
-        
-        return ALPHA * costRatio + BETA * timeRatio + GAMMA * lbRatio
+
+        // 计算Makespan比例（可选）
+        val makespanRatio = if (weights.makespan > 0.0) {
+            val makespan = estimateMakespan(params)
+            val minMakespan = estimateMinMakespan()
+            val maxMakespan = estimateMaxMakespan()
+            if (maxMakespan > minMakespan) {
+                (makespan - minMakespan) / (maxMakespan - minMakespan)
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        }
+
+        return weights.cost * costRatio +
+               weights.totalTime * timeRatio +
+               weights.loadBalance * lbRatio +
+               weights.makespan * makespanRatio
+    }
+
+    /**
+     * 估算最小Makespan
+     */
+    private fun estimateMinMakespan(): Double {
+        val cloudletToVm = IntArray(cloudletNum) { vmNum - 1 } // 分配给最快的VM
+        return estimateMakespan(cloudletToVm)
+    }
+
+    /**
+     * 估算最大Makespan
+     */
+    private fun estimateMaxMakespan(): Double {
+        val cloudletToVm = IntArray(cloudletNum) { 0 } // 分配给最慢的VM
+        return estimateMakespan(cloudletToVm)
     }
 }
 

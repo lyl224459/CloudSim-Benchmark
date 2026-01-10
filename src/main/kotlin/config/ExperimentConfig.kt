@@ -71,6 +71,9 @@ data class TomlBatchConfig(
     val population: Int = 30,
     val maxIter: Int = 50,
     val runs: Int = 1,
+    val generator: GeneratorConfig = GeneratorConfig.LOG_NORMAL,
+    val objective: ObjectiveWeightsConfig = ObjectiveWeightsConfig(),
+    // 向后兼容
     val generatorType: String = "LOG_NORMAL",
     val googleTrace: GoogleTraceConfig? = null
 )
@@ -81,6 +84,9 @@ data class TomlRealtimeConfig(
     val simulationDuration: Double = 500.0,
     val arrivalRate: Double = 5.0,
     val runs: Int = 1,
+    val generator: GeneratorConfig = GeneratorConfig.LOG_NORMAL,
+    val objective: ObjectiveWeightsConfig = ObjectiveWeightsConfig(),
+    // 向后兼容
     val generatorType: String = "LOG_NORMAL",
     val googleTrace: GoogleTraceConfig? = null
 )
@@ -92,6 +98,18 @@ data class GoogleTraceConfig(
     val timeWindowStart: Long = 0L,
     val timeWindowEnd: Long = Long.MAX_VALUE
 )
+
+@Serializable
+data class GeneratorConfig(
+    val type: String = "LOG_NORMAL"  // 生成器类型
+) {
+    // 预定义参数配置
+    companion object {
+        val LOG_NORMAL = GeneratorConfig(type = "LOG_NORMAL")
+        val UNIFORM = GeneratorConfig(type = "UNIFORM")
+        val GOOGLE_TRACE = GeneratorConfig(type = "GOOGLE_TRACE")
+    }
+}
 
 @Serializable
 data class TomlOptimizerConfig(
@@ -287,13 +305,24 @@ data class ExperimentConfig(
         private fun mergeBatchConfig(base: BatchConfig, toml: TomlBatchConfig?): BatchConfig {
             if (toml == null) return base
 
+            // 解析生成器配置（新格式优先）
+            val generatorType = if (toml.generator.type != "LOG_NORMAL") {
+                parseGeneratorType(toml.generator.type)
+            } else {
+                parseGeneratorType(toml.generatorType) // 向后兼容
+            }
+
+            // 解析目标函数权重
+            val objectiveWeights = toml.objective
+
             return base.copy(
                 cloudletCount = toml.cloudletCount,
                 population = toml.population ?: base.population,
                 maxIter = toml.maxIter ?: base.maxIter,
                 runs = toml.runs,
-                generatorType = parseGeneratorType(toml.generatorType),
-                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig
+                generatorType = generatorType,
+                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
+                objectiveWeights = objectiveWeights
             )
         }
 
@@ -303,13 +332,24 @@ data class ExperimentConfig(
                private fun mergeRealtimeConfig(base: RealtimeConfig, toml: TomlRealtimeConfig?): RealtimeConfig {
             if (toml == null) return base
 
+            // 解析生成器配置（新格式优先）
+            val generatorType = if (toml.generator.type != "LOG_NORMAL") {
+                parseGeneratorType(toml.generator.type)
+            } else {
+                parseGeneratorType(toml.generatorType) // 向后兼容
+            }
+
+            // 解析目标函数权重
+            val objectiveWeights = toml.objective
+
             return base.copy(
                 cloudletCount = toml.cloudletCount,
                 simulationDuration = toml.simulationDuration,
                 arrivalRate = toml.arrivalRate,
                 runs = toml.runs,
-                generatorType = parseGeneratorType(toml.generatorType),
-                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig
+                generatorType = generatorType,
+                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
+                objectiveWeights = objectiveWeights
             )
         }
 
@@ -447,7 +487,12 @@ data class BatchConfig(
     /**
      * Google Trace 配置（当generatorType为GOOGLE_TRACE时使用）
      */
-    val googleTraceConfig: GoogleTraceConfig? = null
+    val googleTraceConfig: GoogleTraceConfig? = null,
+    /**
+     * 目标函数权重配置
+     * 允许自由组合成本、时间、负载均衡等目标
+     */
+    val objectiveWeights: ObjectiveWeightsConfig = ObjectiveWeightsConfig()
 )
 
 /**
@@ -475,7 +520,12 @@ data class RealtimeConfig(
     /**
      * Google Trace 配置（当generatorType为GOOGLE_TRACE时使用）
      */
-    val googleTraceConfig: GoogleTraceConfig? = null
+    val googleTraceConfig: GoogleTraceConfig? = null,
+    /**
+     * 目标函数权重配置
+     * 允许自由组合成本、时间、负载均衡等目标
+     */
+    val objectiveWeights: ObjectiveWeightsConfig = ObjectiveWeightsConfig()
 )
 
 /**
@@ -557,8 +607,26 @@ object CloudletGenConfig {
 /**
  * 目标函数配置
  */
+@Serializable
+data class ObjectiveWeightsConfig(
+    val cost: Double = 1.0 / 3,        // 成本权重
+    val totalTime: Double = 1.0 / 3,   // 总时间权重
+    val loadBalance: Double = 1.0 / 3, // 负载均衡权重
+    val makespan: Double = 0.0         // Makespan权重（可选）
+) {
+    init {
+        require(cost >= 0.0 && cost <= 1.0) { "成本权重必须在[0,1]范围内" }
+        require(totalTime >= 0.0 && totalTime <= 1.0) { "总时间权重必须在[0,1]范围内" }
+        require(loadBalance >= 0.0 && loadBalance <= 1.0) { "负载均衡权重必须在[0,1]范围内" }
+        require(makespan >= 0.0 && makespan <= 1.0) { "Makespan权重必须在[0,1]范围内" }
+
+        val sum = cost + totalTime + loadBalance + makespan
+        require(sum > 0.0) { "权重总和必须大于0" }
+    }
+}
+
 object ObjectiveConfig {
-    // 适应度函数权重
+    // 默认适应度函数权重（向后兼容）
     const val ALPHA = 1.0 / 3  // Cost权重
     const val BETA = 1.0 / 3    // TotalTime权重
     const val GAMMA = 1.0 / 3   // LoadBalance权重

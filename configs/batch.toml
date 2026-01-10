@@ -18,8 +18,20 @@ runs = 3
 generatorType = "LOG_NORMAL"
 
 # ========== 批处理专用设置 ==========
-# 注意：当前版本主要配置通过代码定义
-# 未来版本将支持更多TOML配置项
+# 任务生成器配置
+[batch.generator]
+type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
+# 生成器参数（可选，根据类型不同）
+# 对于LOG_NORMAL:
+# meanLength = 1000.0
+# varianceLength = 200.0
+
+# 目标函数权重配置
+[batch.objective]
+cost = 0.4         # 成本权重 (0.0-1.0)
+totalTime = 0.3    # 总时间权重 (0.0-1.0)
+loadBalance = 0.2  # 负载均衡权重 (0.0-1.0)
+makespan = 0.1     # Makespan权重 (0.0-1.0，可选)
 
 # ========== Google Trace 配置 ==========
 [batch.googleTrace]

@@ -909,11 +909,28 @@ realtime: RealtimeConfig(
 2. **UNIFORM** - 均匀分布生成器
    - 使用均匀分布生成所有参数
 
-3. **LOG_NORMAL_SCI** - 对数正态分布 SCI 生成器
-   - 使用对数正态分布生成任务执行时间
-   - 输出文件大小有独立的均值和方差参数
+3. **GOOGLE_TRACE** - Google Trace数据生成器
+   - 从Google Trace CSV文件读取真实任务数据
+   - 支持时间窗口过滤和任务数量限制
 
-**配置方式**:
+#### 配置文件方式（推荐）
+
+```toml
+[batch.generator]
+type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
+
+[batch.googleTrace]  # 当使用GOOGLE_TRACE时需要配置
+filePath = "data/google_trace/task_events.csv"
+maxTasks = 1000
+timeWindowStart = 0
+timeWindowEnd = 600000000000  # Long.MAX_VALUE的近似值
+
+[realtime.generator]
+type = "UNIFORM"     # 实时调度也支持相同配置
+```
+
+#### 代码配置方式（向后兼容）
+
 ```kotlin
 val config = ExperimentConfig(
     batch = BatchConfig(
@@ -921,6 +938,17 @@ val config = ExperimentConfig(
     )
 )
 ```
+
+#### Google Trace数据准备
+
+要使用Google Trace数据，需要：
+
+1. 下载Google Trace Day 1数据：`task_events.csv`
+2. 将文件放置在 `data/google_trace/` 目录下
+3. 配置相应的参数：
+   - `filePath`: CSV文件路径
+   - `maxTasks`: 最多读取的任务数量
+   - `timeWindowStart/End`: 时间窗口过滤（微秒时间戳）
 
 ### 数据中心配置
 
@@ -945,6 +973,26 @@ BW = 1024 Mbps             // 每个VM的带宽
 
 ### 目标函数配置
 
+项目支持通过配置文件自由组合目标函数权重，包括成本、总时间、负载均衡和Makespan。
+
+#### 配置文件方式（推荐）
+
+```toml
+[batch.objective]
+cost = 0.4         # 成本权重 (0.0-1.0)
+totalTime = 0.3    # 总时间权重 (0.0-1.0)
+loadBalance = 0.2  # 负载均衡权重 (0.0-1.0)
+makespan = 0.1     # Makespan权重 (0.0-1.0，可选)
+
+[realtime.objective]
+cost = 0.3
+totalTime = 0.4
+loadBalance = 0.3
+makespan = 0.0     # 实时调度通常不考虑Makespan
+```
+
+#### 代码配置方式（向后兼容）
+
 在 `ExperimentConfig.kt` 中的 `ObjectiveConfig` object:
 
 ```kotlin
@@ -953,6 +1001,15 @@ ALPHA = 1.0 / 3    // Cost（成本）权重
 BETA = 1.0 / 3     // TotalTime（总时间）权重
 GAMMA = 1.0 / 3    // LoadBalance（负载均衡）权重
 ```
+
+#### 目标函数说明
+
+- **Cost（成本）**: 任务执行的总成本，根据VM性能等级定价
+- **Total Time（总时间）**: 所有任务的执行时间总和
+- **Load Balance（负载均衡）**: VM负载的方差，越小表示负载越均衡
+- **Makespan（可选）**: 最后一个任务完成的时间，可用于优化整体响应时间
+
+权重总和应为1.0，不同的应用场景可以根据需求调整权重比例。
 
 ## 📊 实验结果
 

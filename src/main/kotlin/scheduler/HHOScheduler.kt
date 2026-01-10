@@ -186,10 +186,11 @@ private class HHO(
 class HHOScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
+    objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
     private val population: Int = 30,
     private val maxIter: Int = 100,
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
-) : Scheduler(cloudletList, vmList) {
+) : Scheduler(cloudletList, vmList, objectiveWeights) {
     
     private val hho: HHO
     

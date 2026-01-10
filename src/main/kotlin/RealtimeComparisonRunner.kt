@@ -52,7 +52,8 @@ class RealtimeComparisonRunner(
     private val algorithms: List<config.RealtimeAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
-    private val googleTraceConfig: config.GoogleTraceConfig? = null
+    private val googleTraceConfig: config.GoogleTraceConfig? = null,
+    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig()
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
@@ -110,7 +111,7 @@ class RealtimeComparisonRunner(
         val cloudletToVm = IntArray(cloudletList.size) { i ->
             finishedCloudlets.find { it.id == cloudletList[i].id }?.vm?.id?.toInt() ?: 0
         }
-        val objFunc = SchedulerObjectiveFunction(cloudletList, vmList)
+        val objFunc = SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
         val totalTime = objFunc.estimateTotalTime(cloudletToVm)
         val fitness = objFunc.calculate(cloudletToVm)
         

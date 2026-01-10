@@ -1,0 +1,44 @@
+# 自定义目标函数配置示例
+# 展示如何自定义任务生成器和目标函数权重
+
+[random]
+seed = 12345
+
+[batch]
+cloudletCount = 50
+population = 40
+maxIter = 80
+runs = 2
+
+# 任务生成器配置
+[batch.generator]
+type = "UNIFORM"  # 使用均匀分布生成器
+# UNIFORM生成器的参数
+# minLength = 500
+# maxLength = 2000
+
+# 自定义目标函数权重
+[batch.objective]
+cost = 0.2         # 降低成本权重
+totalTime = 0.5    # 提高总时间权重
+loadBalance = 0.2  # 保持负载均衡权重
+makespan = 0.1     # 添加Makespan权重
+
+[realtime]
+cloudletCount = 100
+simulationDuration = 800.0
+arrivalRate = 8.0
+runs = 2
+
+# 实时调度也使用相同配置
+[realtime.generator]
+type = "UNIFORM"
+
+[realtime.objective]
+cost = 0.3
+totalTime = 0.4
+loadBalance = 0.3
+makespan = 0.0  # 实时调度不考虑Makespan
+
+[output]
+resultsDir = "runs/custom_objective_test"

@@ -28,6 +28,38 @@
 - ✅ 自动检测CPU核心数并使用全部核心
 - ✅ 并行构建和缓存优化
 - ✅ Kotlin编译器优化
+
+## ⚙️ 配置功能
+
+### 任务生成器配置
+
+项目支持通过配置文件更改任务生成器：
+
+```toml
+[batch.generator]
+type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
+
+[realtime.generator]
+type = "UNIFORM"     # 实时调度也支持相同配置
+```
+
+### 目标函数权重配置
+
+可以自由组合成本、时间、负载均衡和Makespan目标：
+
+```toml
+[batch.objective]
+cost = 0.4         # 成本权重 (0.0-1.0)
+totalTime = 0.3    # 总时间权重 (0.0-1.0)
+loadBalance = 0.2  # 负载均衡权重 (0.0-1.0)
+makespan = 0.1     # Makespan权重 (0.0-1.0，可选)
+
+[realtime.objective]
+cost = 0.3
+totalTime = 0.4
+loadBalance = 0.3
+makespan = 0.0     # 实时调度通常不考虑Makespan
+```
 - ✅ 默认跳过测试以提升速度
 
 ## 📖 详细文档
