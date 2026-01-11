@@ -1,5 +1,5 @@
 # --- 阶段 1: 编译阶段 ---
-FROM eclipse-temurin:23-jdk-jammy AS builder
+FROM eclipse-temurin:23-jdk AS builder
 
 WORKDIR /build
 
@@ -19,9 +19,9 @@ COPY configs configs
 RUN ./gradlew fatJar --no-daemon -Pcompress=true
 
 # --- 阶段 2: 运行阶段 ---
-FROM eclipse-temurin:23-jre-jammy
+FROM eclipse-temurin:23-jre
 
-# 安装 ND4J 可能需要的本地库依赖 (glibc 等已经在 jammy 中)
+# 安装 ND4J 可能需要的本地库依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
