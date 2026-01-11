@@ -10,6 +10,9 @@ COPY build.gradle.kts .
 COPY settings.gradle.kts .
 COPY gradle.properties .
 
+# 修复权限问题：确保 gradlew 可执行
+RUN chmod +x gradlew
+
 # 预下载依赖 (利用镜像缓存)
 RUN ./gradlew dependencies --no-daemon
 

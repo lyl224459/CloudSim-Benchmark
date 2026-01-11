@@ -57,13 +57,21 @@ class RealtimeComparisonRunner(
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
     private val googleTraceConfig: config.GoogleTraceConfig? = null,
     private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
-    private val experimentDir: java.io.File? = null
+    private val experimentDir: java.io.File? = null,
+    private val useCoroutines: Boolean = true,
+    private val maxConcurrency: Int = 0
 ) {
     private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
 
-    // 协程作用域，用于并行执行算法
-    private val coroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    // 协程上下文：如果限制并发则使用固定线程池
+    private val coroutineContext = if (maxConcurrency > 0) {
+        newFixedThreadPoolContext(maxConcurrency, "RealtimeRunner")
+    } else {
+        Dispatchers.Default
+    }
+    
+    private val coroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
 
     /**
      * 运行单个实时调度算法

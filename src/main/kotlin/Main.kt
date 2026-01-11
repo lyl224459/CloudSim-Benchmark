@@ -336,7 +336,9 @@ fun main(args: Array<String>) = runBlocking {
                 generatorType = config.batch.generatorType,
                 googleTraceConfig = config.batch.googleTraceConfig,
                 objectiveWeights = config.batch.objectiveWeights,
-                experimentDir = experimentDir
+                experimentDir = experimentDir,
+                useCoroutines = parsedArgs.useCoroutines,
+                maxConcurrency = parsedArgs.maxConcurrency
             )
             runner.runComparison()
             Logger.info("批处理实验完成！")
@@ -383,7 +385,9 @@ fun main(args: Array<String>) = runBlocking {
                 generatorType = config.realtime.generatorType,
                 googleTraceConfig = config.realtime.googleTraceConfig,
                 objectiveWeights = config.realtime.objectiveWeights,
-                experimentDir = experimentDir
+                experimentDir = experimentDir,
+                useCoroutines = parsedArgs.useCoroutines,
+                maxConcurrency = parsedArgs.maxConcurrency
             )
             runner.runComparison()
             Logger.info("实时调度实验完成！")
