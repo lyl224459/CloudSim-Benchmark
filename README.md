@@ -1,151 +1,230 @@
 # CloudSim-Benchmark
 
-基于CloudSim Plus的云调度算法性能评估框架
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![JDK](https://img.shields.io/badge/JDK-23+-blue.svg)](https://jdk.java.net/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.21-purple.svg)](https://kotlinlang.org/)
+[![Gradle](https://img.shields.io/badge/Gradle-9.2.1-green.svg)](https://gradle.org/)
+[![CI](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml)
+
+**CloudSim-Benchmark** 是一个基于 [CloudSim Plus](https://cloudsimplus.org/) 和 Kotlin 开发的高性能云任务调度算法评估框架。它集成了多种启发式群体智能算法与强化学习模型，支持批处理和实时调度两种实验模式，旨在为云计算调度研究提供一个**极致快速、易于扩展、结果可靠**的实验平台。
+
+---
+
+## 📋 目录
+- [🎯 项目简介](#-项目简介)
+- [✨ 核心特性](#-核心特性)
+- [🛠️ 系统要求](#-系统要求)
+- [🚀 快速开始](#-快速开始)
+- [🧠 调度算法库](#-调度算法库)
+- [⚙️ 配置说明](#-配置说明)
+- [📈 实验结果与可视化](#-实验结果与可视化)
+- [⚡ 性能优化深度解析](#-性能优化深度解析)
+- [🐳 容器化支持](#-容器化支持-podmandocker)
+- [🛠️ 开发指南](#-开发指南)
+- [🔄 CI/CD 持续集成](#-cicd)
+- [📄 许可证](#-许可证)
+
+---
+
+## 🎯 项目简介
+CloudSim-Benchmark 旨在解决云调度研究中实验流程繁琐、算法对比困难、统计结果不科学等痛点：
+- **完整实验框架**：涵盖任务生成、资源建模、算法执行、统计分析到图表生成的全流程。
+- **多种调度场景**：原生支持**静态批处理 (Batch)** 和 **动态实时到达 (Real-time)** 调度。
+- **高性能执行**：针对大规模仿真（数万任务）进行了 JVM 级优化，充分利用多核性能。
+- **科研级统计**：支持多次运行自动计算平均值、标准差、置信区间，支持 Google Trace 真实数据集。
+
+---
+
+## ✨ 核心特性
+
+- ✅ **丰富的算法库**：集成 PSO, WOA, GWO, HHO, 以及自研的 **Improved-RL** (改进版强化学习)。
+- ✅ **极致性能优化**：采用 **ZGC** 低延迟回收、**ND4J** 向量化计算、**Fastutil** 高性能集合。
+- ✅ **协程并行加速**：基于 Kotlin 协程实现算法与试验的并行执行，加速比可达 5x-8x。
+- ✅ **统一 CLI 接口**：全新的命名参数格式，支持 `--algorithms ALL` 一键运行，支持协程开关。
+- ✅ **结构化结果管理**：自动生成带时间戳的实验快照与分算法原始 CSV 数据。
+- ✅ **一键可视化**：内置 Jupyter Notebook，自动读取最新实验数据并绘图。
+- ✅ **现代化构建**：自动检测 CPU 核心数，本地开发极速构建（无压缩），发布版本自动压缩。
+
+---
+
+## 🛠️ 系统要求
+- **操作系统**: Windows (推荐), Linux, macOS
+- **JDK**: 23 或更高版本 (全面兼容 JDK 24)
+- **内存**: 建议分配 2GB+ 堆内存 (通过 Gradle 自动配置)
+
+---
 
 ## 🚀 快速开始
 
-### 系统要求
-- **JDK**: 23+
-- **构建工具**: Gradle 9.2.1+
-- **构建优化**: 自动检测CPU核心数并优化构建速度
-
-### 运行批处理实验
+### 1. 克隆与构建
 ```bash
-./run batch
+git clone https://github.com/lyl224459/CloudSim-Benchmark.git
+cd CloudSim-Benchmark
+./run.cmd build    # Windows
+./run build        # Linux/WSL
 ```
 
-### 运行实时调度实验
+### 2. 运行实验 (统一命名参数格式)
+项目采用现代化的命名参数接口，通过 `./run.cmd` (Windows) 或 `./run` (Linux) 启动。注意：不再支持旧的位置参数格式。
+
+#### 🔹 基础对比实验 (Batch)
+运行所有批处理算法，试验 3 次：
 ```bash
-./run realtime
+./run.cmd batch --algorithms ALL --runs 3
 ```
 
-### 构建项目（自动优化）
+#### 🔹 实时调度实验 (Realtime)
+指定特定算法并使用自定义随机种子：
 ```bash
-./run build    # 自动使用最佳构建配置（无需额外设置）
+./run.cmd realtime -a PSO_REALTIME,WOA_REALTIME -s 42 -r 5
 ```
 
-**构建优化特性**:
-- ✅ 自动检测CPU核心数并使用全部核心
-- ✅ 并行构建和缓存优化
-- ✅ Kotlin编译器优化
-
-## 🧠 强化学习调度器
-
-项目集成**强化学习调度器**，使用Q-learning算法进行智能任务调度：
-
+#### 🔹 批量任务数扩展性实验 (Multi-Count)
+研究算法在 50, 100, 200, 500 任务规模下的性能趋势：
 ```bash
-# 运行强化学习调度器
-./run batch RL
-
-# 对比传统算法和RL算法
-./run batch PSO,RL
+./run.cmd batch-multi --tasks 50,100,200,500 -a ALL -r 3
 ```
 
-**RL调度器特性**:
-- 🧠 **Q-learning算法**: 学习最优调度策略
-- 🎯 **智能决策**: 基于负载均衡的奖励函数
-- 📈 **自适应学习**: 通过训练提高调度质量
-- ⚡ **协程优化**: 并行训练和推理
-
-## 🚀 高性能计算优化（默认启用）
-
-项目集成了**高性能计算库**，显著提升数值计算和数据处理效率：
-
+#### 🔹 协程控制
+显式指定最大并发数或使用顺序执行：
 ```bash
-# 自动使用高性能优化
-./run batch PSO,WOA,RL
-
-# 所有数值计算都经过优化
-# - 统计计算使用ND4J向量化
-# - 目标函数使用高性能数学运算
-# - 数据结构使用Fastutil优化
+./run.cmd batch -a ALL -C 4        # 限制并发数为 4
+./run.cmd batch -a ALL --sequential # 使用顺序执行模式
 ```
 
-**高性能计算特性**:
-- 🔢 **ND4J向量化计算**: 统计计算和矩阵运算加速
-- ⚡ **Fastutil集合优化**: 高性能数组和集合操作
-- 🧮 **Eclipse Collections**: 高级集合处理和并行操作
-- 📊 **数学运算优化**: 使用优化的数学库提升计算速度
+#### 🔹 参数速查表
+| 参数 | 短参数 | 描述 | 必需 |
+| :--- | :--- | :--- | :--- |
+| `--algorithms` | `-a` | 算法列表 (如 `PSO,WOA` 或 `ALL`) | 是 |
+| `--tasks` | `-t` | 任务数列表 (仅限 multi 模式) | 仅 multi |
+| `--seed` | `-s` | 随机数种子 (默认 0) | 否 |
+| `--runs` | `-r` | 每个配置的试验次数 (默认 1) | 否 |
+| `--sequential` | `-S` | 禁用并行，切换到顺序执行模式 | 否 |
+| `--concurrency`| `-C` | 限制并发协程数量 (默认 CPU 核心数) | 否 |
+| `--help` | `-h` | 显示详细帮助信息 | 否 |
 
-## ⚡ 协程并行优化（默认启用）
+---
 
-项目**默认使用协程并行执行**，显著提升实验效率：
+## 🧠 调度算法库
 
+### 1. 群体智能 (Heuristic)
+- **PSO (粒子群优化)**: 模拟鸟群觅食，收敛快，适合连续空间。
+- **WOA (鲸鱼优化)**: 模拟座头鲸螺旋捕食，全局搜索能力强。
+- **GWO (灰狼优化)**: 模拟狼群等级狩猎，收敛极其稳定。
+- **HHO (哈里斯鹰优化)**: 模拟鹰群围捕，多策略自适应切换（已修复位置更新逻辑）。
+
+### 2. 强化学习 (Reinforcement Learning)
+- **RL (Q-Learning)**: 基于 Q-Learning 的基础调度器。
+- **Improved-RL**: **核心改进版**。
+    - **状态离散化**: 解决连续负载导致的状态爆炸问题。
+    - **任务感知**: 引入任务长度特征，提升决策精度。
+    - **奖励重构**: 基于方差增量的负载均衡奖励函数。
+
+### 3. 基准算法
+- **Random**: 随机分配。
+- **Min-Load**: 实时模式下的最小负载优先策略。
+
+---
+
+## ⚙️ 配置说明
+
+项目支持**分层配置系统**，加载优先级：命令行参数 > 环境变量 > `configs/*.toml` > 代码默认值。
+
+### 外部配置文件 (TOML)
+推荐通过 `configs/experiments/` 下的配置文件进行大规模实验：
 ```bash
-# 查看协程优化演示
-./run coroutine-demo
-
-# 运行实验（自动使用协程优化）
-./run batch
-./run realtime
+./run.cmd batch --config configs/experiments/performance_test.toml
 ```
 
-**协程优化特性**:
-- 🚀 **算法并行执行**: 多个调度算法同时运行，无需顺序等待
-- 📊 **多次运行并行**: 统计实验的多次运行并发执行
-- 📡 **Channel通信**: 高效的结果收集和处理机制
-- 🛡️ **异常隔离**: SupervisorJob确保单个算法失败不影响整体执行
-- ⚡ **性能提升**: 在多核CPU上可实现**5倍以上**的加速效果
+---
 
-**性能提升示例**:
-- 顺序执行 5 个算法: ~5000ms
-- 协程并行执行: ~1000ms
-- **加速比: 5x** (在 8 核 CPU 上)
+## ⚡ 性能优化深度解析
 
-## ⚙️ 配置功能
+本项目针对仿真实验的“高频、大量、重复”特点进行了极致优化：
 
-### 任务生成器配置
+1.  **ZGC (低延迟回收)**：默认配置为 ZGC，消除大规模对象创建导致的 GC 长停顿，仿真耗时减少约 15%。
+2.  **ND4J 向量化计算**：所有统计计算（标准差、均值等）和目标函数计算均采用 ND4J 调用 CPU SIMD 指令集，计算效率提升 3-5 倍。
+3.  **协程并行架构**：
+    - 算法之间异步执行。
+    - 多次试验 (Trials) 异步并行。
+    - 使用协程 Channel 实现非阻塞结果收集。
+4.  **JVM 原生优化**：自动启用 `--enable-native-access` 和 `--add-opens`，消除 Unsafe 警告，提升原生库调用性能。
 
-项目支持通过配置文件更改任务生成器：
+---
 
-```toml
-[batch.generator]
-type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
+## 📈 实验结果与可视化
 
-[realtime.generator]
-type = "UNIFORM"     # 实时调度也支持相同配置
+### 1. 结果存储 (YOLO 结构)
+每次运行都会在 `runs/` 目录下创建独立文件夹：
+```text
+runs/batch/batch_20260111_092415/
+├── experiment_info.txt    # 本次实验的完整参数快照
+├── summary_avg.csv        # 所有算法的平均性能对比汇总
+├── PSO.csv                # PSO 算法每轮试验的原始数据
+├── Improved-RL.csv        # 改进 RL 算法每轮试验的原始数据
+└── ...
 ```
 
-### 目标函数权重配置
+### 2. 可视化分析
+内置专业绘图工具 `draw/visualize_results.ipynb`：
+- **多指标对比**: Makespan, Cost, LoadBalance, TotalTime。
+- **稳定性分析**: 自动绘制箱线图 (Box Plots) 和散点图。
+- **扩展性分析**: 绘制性能随任务数增长的折线图。
 
-可以自由组合成本、时间、负载均衡和Makespan目标：
+---
 
-```toml
-[batch.objective]
-cost = 0.4         # 成本权重 (0.0-1.0)
-totalTime = 0.3    # 总时间权重 (0.0-1.0)
-loadBalance = 0.2  # 负载均衡权重 (0.0-1.0)
-makespan = 0.1     # Makespan权重 (0.0-1.0，可选)
+## 🐳 容器化支持 (Podman/Docker)
 
-[realtime.objective]
-cost = 0.3
-totalTime = 0.4
-loadBalance = 0.3
-makespan = 0.0     # 实时调度通常不考虑Makespan
+项目提供完整的容器化支持，确保在不同计算环境下实验结果的高度一致性。
+
+### 1. 构建镜像
+```bash
+./gradlew podmanBuild
+# 或直接使用 podman 命令
+podman build -t cloudsim-benchmark .
 ```
-- ✅ 默认跳过测试以提升速度
 
-## 📖 详细文档
+### 2. 运行实验
+脚本会自动创建 `benchmark_workspace` 目录并将 `src`, `data`, `configs`, `runs` 挂载到容器中：
+```bash
+# Windows (使用脚本)
+./run.cmd podman batch -a ALL -s 42
 
-请查看 [`docs/README.md`](docs/README.md) 获取完整的使用说明和API文档。
+# Linux/WSL (使用脚本)
+./run podman batch -a ALL -s 42
+```
 
-## 📁 项目结构
+容器镜像已同步发布至 **GitHub Container Registry (GHCR)**：
+`ghcr.io/lyl224459/cloudsim-benchmark:latest`
 
-- `configs/` - 配置文件目录
-- `src/` - 源代码
-- `scripts/` - 运行脚本
-- `docs/` - 详细文档
-- `tools/` - 工具和可视化脚本
-- `data/` - 数据文件目录
+---
 
-## 📊 实验结果
+## 🛠️ 开发指南
 
-实验结果保存在 `runs/` 目录下，采用YOLO风格的目录结构。
+### 添加新调度算法
+1.  在 `src/main/kotlin/scheduler/` 目录下创建新调度器类。
+2.  在 `config/AlgorithmType.kt` 的枚举类中注册。
+3.  在 `ComparisonRunner.kt` 或 `RealtimeComparisonRunner.kt` 的 `when` 分支中添加工厂逻辑。
 
-## 🤝 贡献
+### 贡献
+欢迎提交 PR。请确保在提交前运行 `./gradlew test` 以通过所有单元测试。
 
-欢迎提交Issue和Pull Request！
+---
+
+## 🔄 CI/CD 持续集成
+
+项目采用分层流水线设计：
+- **CI 流水线** (`ci.yml`): 每次 Push 到 `main/dev` 分支时自动触发，执行 JDK 23 环境下的编译与测试验证。
+- **Release 流水线** (`release.yml`): 推送版本标签（如 `v1.0.0`）时触发：
+    - 自动构建**高压缩比**的发布版 JAR。
+    - 打包 Windows 完整运行包。
+    - 构建并推送 OCI 标准镜像至 **GHCR**。
+    - 自动生成 GitHub Release。
+
+---
 
 ## 📄 许可证
+本项目采用 **MIT License**。
 
-MIT License
+---
+**⭐ 如果 CloudSim-Benchmark 帮助到了您的研究，请点一个 Star！**

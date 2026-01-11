@@ -99,8 +99,13 @@ tasks.test {
     jvmArgs(
         "-Xmx2g",
         "-XX:+UseZGC",
-        "-XX:+ZGenerational",
-        "-XX:MaxGCPauseMillis=50"
+        "-XX:MaxGCPauseMillis=50",
+        "--enable-native-access=ALL-UNNAMED",
+        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED"
     )
 
     // 测试报告配置
@@ -145,10 +150,13 @@ tasks.named<JavaExec>("run") {
     jvmArgs = listOf(
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC",
-        "-XX:+ZGenerational"
+        "-XX:+UseZGC"
     )
     // 设置标准输出编码
     systemProperty("file.encoding", "UTF-8")
@@ -350,10 +358,13 @@ tasks.register<JavaExec>("runBatch") {
     jvmArgs = listOf(
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC",
-        "-XX:+ZGenerational"
+        "-XX:+UseZGC"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -390,10 +401,13 @@ tasks.register<JavaExec>("runRealtime") {
     jvmArgs = listOf(
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC",
-        "-XX:+ZGenerational"
+        "-XX:+UseZGC"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -432,10 +446,13 @@ tasks.register<JavaExec>("runBatchMulti") {
     jvmArgs = listOf(
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
         "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC",
-        "-XX:+ZGenerational"
+        "-XX:+UseZGC"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -471,8 +488,13 @@ tasks.register<JavaExec>("runRealtimeMulti") {
     jvmArgs = listOf(
         "--add-opens", "java.base/java.lang=ALL-UNNAMED",
         "--add-opens", "java.base/java.util=ALL-UNNAMED",
+        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+        "--enable-native-access=ALL-UNNAMED",
         "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8"
+        "-Dconsole.encoding=UTF-8",
+        "-XX:+UseZGC"
     )
     systemProperty("file.encoding", "UTF-8")
 }
@@ -543,45 +565,22 @@ tasks.register("memoryReport") {
     }
 }
 
-/**
- * 通用运行任务（支持自定义模式和所有参数）
- * 用法: 
- *   gradle runExp -Pmode=batch -Palgorithms=PSO,WOA -Pseed=42
- *   gradle runExp -Pmode=batch-multi -Palgorithms=PSO,WOA
- *   gradle runExp -Pmode=realtime -Palgorithms=PSO_REALTIME,WOA_REALTIME
- *   gradle runExp -Pmode=realtime-multi -Palgorithms=PSO_REALTIME,WOA_REALTIME
- */
-tasks.register<JavaExec>("runExp") {
-    group = "application"
-    description = "运行实验（支持自定义模式）"
-    mainClass.set("MainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    dependsOn("classes", "processResources")
+// ========== 容器化集成任务 ==========
+
+tasks.register<Exec>("podmanBuild") {
+    group = "distribution"
+    description = "使用 Podman 构建项目的容器镜像"
+    dependsOn("fatJar") // 确保先构建出最新的 JAR
     
-    // 获取参数（通过 -P 传递）
-    val mode = project.findProperty("mode") as String? ?: "realtime"
-    val algorithms = project.findProperty("algorithms") as String?
-    val seed = project.findProperty("seed") as String?
+    commandLine("podman", "build", "-t", "cloudsim-benchmark:latest", "-f", "Containerfile", ".")
     
-    // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>(mode)
-    if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.add(algorithms)
+    doFirst {
+        logger.lifecycle("🚀 正在构建 Podman 镜像: cloudsim-benchmark:latest...")
     }
-    if (seed != null && seed.isNotEmpty()) {
-        argsList.add(seed)
-    }
-    
-    args = argsList
-    
-    jvmArgs = listOf(
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC",
-        "-XX:+ZGenerational"
-    )
-    systemProperty("file.encoding", "UTF-8")
 }
 
+tasks.register<Exec>("podmanRunHelp") {
+    group = "distribution"
+    description = "在容器中运行帮助命令"
+    commandLine("podman", "run", "--rm", "cloudsim-benchmark:latest", "--help")
+}

@@ -126,6 +126,44 @@ run_program() {
     local mode="$1"
     shift
 
+    # 处理 Podman 模式
+    if [ "$mode" = "podman" ]; then
+        echo "========================================"
+        echo "CloudSim-Benchmark 容器化运行 (Podman)"
+        echo "========================================"
+        echo "时间: $(date)"
+        echo ""
+        
+        # 确保目录存在
+        mkdir -p benchmark_workspace
+        mkdir -p runs
+        
+        # 构建 Podman 命令
+        # 将四个目录挂载到容器内的 /app/benchmark_workspace 下
+        # 设置工作目录为该新建的根目录
+        echo "[容器] 正在启动..."
+        podman run --rm \
+            -v "$(pwd)/runs:/app/benchmark_workspace/runs" \
+            -v "$(pwd)/configs:/app/benchmark_workspace/configs" \
+            -v "$(pwd)/src:/app/benchmark_workspace/src" \
+            -v "$(pwd)/data:/app/benchmark_workspace/data" \
+            --workdir /app/benchmark_workspace \
+            cloudsim-benchmark:latest "$@"
+            
+        local exit_code=$?
+        if [ $exit_code -ne 0 ]; then
+            echo ""
+            echo "[错误] 容器执行失败，退出代码: $exit_code"
+            exit $exit_code
+        fi
+        
+        echo ""
+        echo "========================================"
+        echo "实验完成！结果已同步到本地 runs/ 文件夹"
+        echo "========================================"
+        return
+    fi
+
     echo "========================================"
     echo "CloudSim-Benchmark 实验平台"
     echo "========================================"
@@ -140,14 +178,21 @@ run_program() {
         args="$args $@"
     fi
 
+    # JVM 选项 (同步 run.cmd)
+    local jvm_opts="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 \
+        --enable-native-access=ALL-UNNAMED \
+        --add-opens java.base/java.lang=ALL-UNNAMED \
+        --add-opens java.base/java.util=ALL-UNNAMED \
+        --add-opens java.base/java.nio=ALL-UNNAMED \
+        --add-opens java.base/jdk.internal.misc=ALL-UNNAMED \
+        --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
+        -XX:+UseZGC -XX:MaxGCPauseMillis=50"
+
     echo "[运行] 启动实验..."
-    echo "[运行] 命令: $JAVA_CMD -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED -jar $JAR_PATH $args"
+    echo "[运行] 命令: $JAVA_CMD $jvm_opts -jar $JAR_PATH $args"
     echo ""
 
-    $JAVA_CMD -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 \
-              --add-opens java.base/java.lang=ALL-UNNAMED \
-              --add-opens java.base/java.util=ALL-UNNAMED \
-              -jar "$JAR_PATH" $args
+    $JAVA_CMD $jvm_opts -jar "$JAR_PATH" $args
 
     local exit_code=$?
     if [ $exit_code -ne 0 ]; then
@@ -171,6 +216,7 @@ handle_shortcut() {
         run-batch-multi) set -- "batch-multi" "$@" ;;
         run-realtime-multi) set -- "realtime-multi" "$@" ;;
         build)          set -- "build" "$@" ;;
+        podman)         set -- "podman" "$@" ;;
     esac
 }
 
@@ -189,7 +235,10 @@ main() {
             build_project
             exit 0
             ;;
-        batch|realtime|batch-multi|realtime-multi)
+        podman)
+            run_program "podman" "${@:2}"
+            ;;
+        batch|realtime|batch-multi|realtime-multi|coroutine-demo)
             check_jar
             run_program "$@"
             ;;

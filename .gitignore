@@ -1,33 +1,48 @@
-# Build outputs
+# --- Build outputs ---
 build/
 .gradle/
 bin/
+out/
 gradle/wrapper/gradle-wrapper.jar
 
-# IDE files
+# --- IDE files ---
 .idea/
 *.iml
 .vscode/
 .cursor/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# OS files
+# --- OS files ---
 .DS_Store
 Thumbs.db
 
-# Logs and results
+# --- Logs and results ---
 logs/
 runs/
+benchmark_workspace/
 *.log
+hs_err_pid*
 
-# Jupyter notebook checkpoints
+# --- Python / Jupyter ---
+__pycache__/
+*.py[cod]
+*$py.class
 .ipynb_checkpoints/
+.pytest_cache/
+.venv/
+env/
+venv/
 
-# Temporary files
+# --- Temporary files ---
 *.tmp
 *.temp
 *.bak
 
-TODO.md
-
-# Data files (uncomment if you want to ignore large data files)
+# --- Data files ---
 # data/google_trace/*.csv
+# 注释掉下面这行以保留 Google Trace 的说明文件
+# !data/google_trace/README.md

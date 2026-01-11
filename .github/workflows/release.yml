@@ -1,0 +1,134 @@
+name: Release - Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '手动指定版本号 (例如 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-release:
+    name: Build, Package and Release
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+      
+    - name: Set up JDK 23
+      uses: actions/setup-java@v4
+      with:
+        java-version: '23'
+        distribution: 'temurin'
+        cache: 'gradle'
+
+    - name: Build Fat JAR (Compressed)
+      run: .\gradlew.bat clean fatJar --no-daemon -Pcompress=true
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Prepare Release Version
+      id: ver
+      shell: bash
+      run: |
+        if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION="${{ github.ref_name }}"
+        fi
+        VERSION=${VERSION#v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Package Release Assets
+      shell: pwsh
+      run: |
+        $version = "${{ steps.ver.outputs.version }}"
+        $releaseDir = "release-artifacts"
+        New-Item -ItemType Directory -Force -Path $releaseDir
+        
+        # 1. 复制 JAR
+        $jar = Get-ChildItem -Path build/libs/cloudsim-benchmark-*-all.jar | Select-Object -First 1
+        Copy-Item -Path $jar.FullName -Destination "$releaseDir/cloudsim-benchmark-$version.jar"
+        
+        # 2. 创建 Windows 完整包 (含脚本、配置和 JAR)
+        $winDir = "cloudsim-benchmark-$version-windows"
+        New-Item -ItemType Directory -Force -Path $winDir
+        Copy-Item -Path $jar.FullName -Destination "$winDir/cloudsim-benchmark-all.jar"
+        Copy-Item -Path "run.cmd", "configs", "data", "README.md", "LICENSE" -Destination $winDir -Recurse -Force
+        Compress-Archive -Path "$winDir\*" -DestinationPath "$releaseDir/cloudsim-benchmark-$version-windows.zip" -Force
+        
+        # 3. 创建源码包
+        Compress-Archive -Path "src", "configs", "data", "*.gradle.kts", "gradle.properties", "gradle", "gradlew*", "Containerfile", "README.md", "LICENSE" -DestinationPath "$releaseDir/cloudsim-benchmark-$version-source.zip" -Force
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.ver.outputs.tag }}
+        name: CloudSim-Benchmark v${{ steps.ver.outputs.version }}
+        body: |
+          ## 🚀 CloudSim-Benchmark ${{ steps.ver.outputs.tag }} 发布
+          
+          ### 📦 包含产物
+          - **Executable JAR**: 包含所有依赖，直接通过 `java -jar` 运行。
+          - **Windows Package**: 包含便捷运行脚本和默认配置。
+          - **Source Code**: 完整开发环境源码。
+          
+          ### 🛠️ 运行环境
+          - JDK 23+ (推荐)
+          
+          ### 🐳 容器镜像
+          本版本已同步发布至 GitHub Container Registry:
+          `ghcr.io/${{ github.repository_owner }}/cloudsim-benchmark:${{ steps.ver.outputs.version }}`
+        draft: false
+        prerelease: false
+        files: |
+          release-artifacts/*.jar
+          release-artifacts/*.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-docker:
+    name: Build and Push Docker Image
+    needs: build-and-release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ghcr.io/${{ github.repository }}
+        tags: |
+          type=semver,pattern={{version}}
+          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: Containerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}

@@ -28,9 +28,7 @@ object Logger {
      * 信息日志（带参数）
      */
     fun info(message: String, vararg args: Any?) {
-        logger.info { 
-            if (args.isEmpty()) message else java.lang.String.format(message.replace("{}", "%s"), *args)
-        }
+        logger.info { format(message, *args) }
     }
     
     /**
@@ -44,9 +42,7 @@ object Logger {
      * 调试日志（带参数）
      */
     fun debug(message: String, vararg args: Any?) {
-        logger.debug { 
-            if (args.isEmpty()) message else java.lang.String.format(message.replace("{}", "%s"), *args)
-        }
+        logger.debug { format(message, *args) }
     }
     
     /**
@@ -60,9 +56,7 @@ object Logger {
      * 警告日志（带参数）
      */
     fun warn(message: String, vararg args: Any?) {
-        logger.warn { 
-            if (args.isEmpty()) message else java.lang.String.format(message.replace("{}", "%s"), *args)
-        }
+        logger.warn { format(message, *args) }
     }
     
     /**
@@ -80,7 +74,7 @@ object Logger {
      * 错误日志（带参数）
      */
     fun error(message: String, throwable: Throwable? = null, vararg args: Any?) {
-        val formattedMessage = if (args.isEmpty()) message else java.lang.String.format(message.replace("{}", "%s"), *args)
+        val formattedMessage = format(message, *args)
         if (throwable != null) {
             logger.error(throwable) { formattedMessage }
         } else {
@@ -99,11 +93,21 @@ object Logger {
      * 结果日志（带参数）
      */
     fun result(message: String, vararg args: Any?) {
-        resultLogger.info { 
-            if (args.isEmpty()) message else java.lang.String.format(message.replace("{}", "%s"), *args)
-        }
+        resultLogger.info { format(message, *args) }
     }
     
+    /**
+     * 统一的格式化逻辑
+     */
+    private fun format(message: String, vararg args: Any?): String {
+        return try {
+            if (args.isEmpty()) message 
+            else java.lang.String.format(message.replace("%", "%%").replace("{}", "%s"), *args)
+        } catch (e: Exception) {
+            "Log message format failed: ${e.message} | Pattern: $message | Args: ${args.contentToString()}"
+        }
+    }
+
     /**
      * 获取类日志记录器
      */
@@ -118,4 +122,3 @@ object Logger {
         return KotlinLogging.logger(name)
     }
 }
-

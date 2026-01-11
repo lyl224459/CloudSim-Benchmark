@@ -1,4 +1,6 @@
 import config.ExperimentConfig
+import config.BatchAlgorithmType
+import config.RealtimeAlgorithmType
 import datacenter.ComparisonRunner
 import datacenter.RealtimeComparisonRunner
 import datacenter.BatchCloudletCountRunner
@@ -12,8 +14,8 @@ import java.time.LocalDateTime
 import kotlin.system.exitProcess
 
 /**
- * 统一的命令行参数解析器
- * 支持命名参数格式，提供更好的可扩展性和一致性
+ * 简化的命令行参数解析器
+ * 只支持命名参数格式，放弃向后兼容性以获得更清晰的接口
  */
 class CommandLineParser(private val args: Array<String>) {
 
@@ -25,11 +27,12 @@ class CommandLineParser(private val args: Array<String>) {
         val runs: Int = 1,
         val configFile: String? = null,
         val verbose: Boolean = false,
-        val outputDir: String? = null
+        val outputDir: String? = null,
+        val useCoroutines: Boolean = true,
+        val maxConcurrency: Int = 0
     )
 
     private val namedArgs = mutableMapOf<String, String>()
-    private var positionalArgs = listOf<String>()
 
     fun parse(): ParsedArgs {
         val mode = parseArgs()
@@ -40,7 +43,7 @@ class CommandLineParser(private val args: Array<String>) {
             "batch-multi", "bm" -> parseBatchMultiArgs(mode)
             "realtime-multi", "rm" -> parseRealtimeMultiArgs(mode)
             "coroutine-demo", "cd" -> ParsedArgs("coroutine-demo")
-            else -> throw IllegalArgumentException("未知的运行模式: $mode")
+            else -> throw IllegalArgumentException("未知的运行模式: $mode。可用模式: batch, realtime, batch-multi, realtime-multi, coroutine-demo")
         }
     }
 
@@ -52,11 +55,15 @@ class CommandLineParser(private val args: Array<String>) {
             val arg = args[i]
             when {
                 arg.startsWith("--") -> {
-                    // 长参数: --name value
+                    // 长参数: --name value 或 --flag
                     val name = arg.substring(2)
                     if (name == "mode") {
-                        mode = args.getOrNull(i + 1)?.lowercase()
-                        i += 2
+                        if (i + 1 < args.size) {
+                            mode = args[i + 1].lowercase()
+                            i += 2
+                        } else {
+                            throw IllegalArgumentException("--mode 参数需要指定值")
+                        }
                     } else if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
                         namedArgs[name] = args[i + 1]
                         i += 2
@@ -69,111 +76,169 @@ class CommandLineParser(private val args: Array<String>) {
                     // 短参数: -n value 或 -v (布尔)
                     val name = arg.substring(1)
                     when (name) {
-                        "v" -> namedArgs["verbose"] = "true"
-                        "h" -> namedArgs["help"] = "true"
-                        else -> {
+                        "v" -> {
+                            namedArgs["verbose"] = "true"
+                            i++
+                        }
+                        "h" -> {
+                            namedArgs["help"] = "true"
+                            i++
+                        }
+                        "p" -> {
+                            namedArgs["sequential"] = "false"
+                            i++
+                        }
+                        "S" -> {
+                            namedArgs["sequential"] = "true"
+                            i++
+                        }
+                        "a" -> {
                             if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
-                                namedArgs[name] = args[i + 1]
+                                namedArgs["algorithms"] = args[i + 1]
                                 i += 2
                             } else {
-                                namedArgs[name] = "true"
-                                i++
+                                throw IllegalArgumentException("-a 参数需要指定算法列表")
                             }
                         }
+                        "s" -> {
+                            if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
+                                namedArgs["seed"] = args[i + 1]
+                                i += 2
+                            } else {
+                                throw IllegalArgumentException("-s 参数需要指定种子值")
+                            }
+                        }
+                        "r" -> {
+                            if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
+                                namedArgs["runs"] = args[i + 1]
+                                i += 2
+                            } else {
+                                throw IllegalArgumentException("-r 参数需要指定运行次数")
+                            }
+                        }
+                        "t" -> {
+                            if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
+                                namedArgs["tasks"] = args[i + 1]
+                                i += 2
+                            } else {
+                                throw IllegalArgumentException("-t 参数需要指定任务数列表")
+                            }
+                        }
+                        "c" -> {
+                            if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
+                                namedArgs["config"] = args[i + 1]
+                                i += 2
+                            } else {
+                                throw IllegalArgumentException("-c 参数需要指定配置文件")
+                            }
+                        }
+                        "o" -> {
+                            if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
+                                namedArgs["output"] = args[i + 1]
+                                i += 2
+                            } else {
+                                throw IllegalArgumentException("-o 参数需要指定输出目录")
+                            }
+                        }
+                        "C" -> {
+                            if (i + 1 < args.size && !args[i + 1].startsWith("-")) {
+                                namedArgs["concurrency"] = args[i + 1]
+                                i += 2
+                            } else {
+                                throw IllegalArgumentException("-C 参数需要指定并发数")
+                            }
+                        }
+                        else -> throw IllegalArgumentException("未知的短参数: -$name")
                     }
                 }
                 else -> {
-                    // 第一个位置参数作为模式（如果还没有设置模式）
+                    // 第一个非参数作为模式
                     if (mode == null) {
                         mode = arg.lowercase()
                         i++
                     } else {
-                        // 其他位置参数
-                        positionalArgs = args.drop(i)
-                        break
+                        throw IllegalArgumentException("意外的位置参数: $arg。所有参数都应使用命名格式 (--name value)")
                     }
                 }
             }
         }
 
-        return mode ?: "realtime"
+        return mode ?: throw IllegalArgumentException("必须指定运行模式。可用模式: batch, realtime, batch-multi, realtime-multi, coroutine-demo")
     }
 
     private fun parseBatchArgs(mode: String): ParsedArgs {
         return ParsedArgs(
             mode = mode,
-            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: parseLegacyAlgorithms(positionalArgs)),
-            randomSeed = parseRandomSeed(namedArgs["seed"] ?: parseLegacyRandomSeed(positionalArgs)),
+            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: throw IllegalArgumentException("$mode 模式需要指定算法列表 (--algorithms ALGO1,ALGO2 或 --algorithms ALL)"), "batch"),
+            randomSeed = parseRandomSeed(namedArgs["seed"]),
             runs = parseRuns(namedArgs["runs"]),
             configFile = namedArgs["config"],
             verbose = parseBoolean(namedArgs["verbose"]),
-            outputDir = namedArgs["output"]
+            outputDir = namedArgs["output"],
+            useCoroutines = !parseBoolean(namedArgs["sequential"]),
+            maxConcurrency = parseConcurrency(namedArgs["concurrency"])
         )
     }
 
     private fun parseRealtimeArgs(mode: String): ParsedArgs {
         return ParsedArgs(
             mode = mode,
-            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: parseLegacyAlgorithms(positionalArgs)),
-            randomSeed = parseRandomSeed(namedArgs["seed"] ?: parseLegacyRandomSeed(positionalArgs)),
+            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: throw IllegalArgumentException("$mode 模式需要指定算法列表 (--algorithms ALGO1,ALGO2 或 --algorithms ALL)"), "realtime"),
+            randomSeed = parseRandomSeed(namedArgs["seed"]),
             runs = parseRuns(namedArgs["runs"]),
             configFile = namedArgs["config"],
             verbose = parseBoolean(namedArgs["verbose"]),
-            outputDir = namedArgs["output"]
+            outputDir = namedArgs["output"],
+            useCoroutines = !parseBoolean(namedArgs["sequential"]),
+            maxConcurrency = parseConcurrency(namedArgs["concurrency"])
         )
     }
 
     private fun parseBatchMultiArgs(mode: String): ParsedArgs {
-        val taskCounts = parseTaskCounts(namedArgs["tasks"] ?: positionalArgs.getOrNull(0)
-            ?: throw IllegalArgumentException("$mode 模式需要指定任务数列表 (--tasks 或位置参数)"))
-
         return ParsedArgs(
             mode = mode,
-            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: parseLegacyAlgorithms(positionalArgs.drop(1))),
-            randomSeed = parseRandomSeed(namedArgs["seed"] ?: parseLegacyRandomSeed(positionalArgs.drop(2))),
-            taskCounts = taskCounts,
-            runs = parseRuns(namedArgs["runs"] ?: parseLegacyRuns(positionalArgs.drop(3))),
+            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: throw IllegalArgumentException("$mode 模式需要指定算法列表 (--algorithms ALGO1,ALGO2 或 --algorithms ALL)"), "batch"),
+            randomSeed = parseRandomSeed(namedArgs["seed"]),
+            taskCounts = parseTaskCounts(namedArgs["tasks"] ?: throw IllegalArgumentException("$mode 模式需要指定任务数列表 (--tasks COUNT1,COUNT2)")),
+            runs = parseRuns(namedArgs["runs"]),
             configFile = namedArgs["config"],
             verbose = parseBoolean(namedArgs["verbose"]),
-            outputDir = namedArgs["output"]
+            outputDir = namedArgs["output"],
+            useCoroutines = !parseBoolean(namedArgs["sequential"]),
+            maxConcurrency = parseConcurrency(namedArgs["concurrency"])
         )
     }
 
     private fun parseRealtimeMultiArgs(mode: String): ParsedArgs {
-        val taskCounts = parseTaskCounts(namedArgs["tasks"] ?: positionalArgs.getOrNull(0)
-            ?: throw IllegalArgumentException("$mode 模式需要指定任务数列表 (--tasks 或位置参数)"))
-
         return ParsedArgs(
             mode = mode,
-            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: parseLegacyAlgorithms(positionalArgs.drop(1))),
-            randomSeed = parseRandomSeed(namedArgs["seed"] ?: parseLegacyRandomSeed(positionalArgs.drop(2))),
-            taskCounts = taskCounts,
-            runs = parseRuns(namedArgs["runs"] ?: parseLegacyRuns(positionalArgs.drop(3))),
+            algorithms = parseAlgorithms(namedArgs["algorithms"] ?: throw IllegalArgumentException("$mode 模式需要指定算法列表 (--algorithms ALGO1,ALGO2 或 --algorithms ALL)"), "realtime"),
+            randomSeed = parseRandomSeed(namedArgs["seed"]),
+            taskCounts = parseTaskCounts(namedArgs["tasks"] ?: throw IllegalArgumentException("$mode 模式需要指定任务数列表 (--tasks COUNT1,COUNT2)")),
+            runs = parseRuns(namedArgs["runs"]),
             configFile = namedArgs["config"],
             verbose = parseBoolean(namedArgs["verbose"]),
-            outputDir = namedArgs["output"]
+            outputDir = namedArgs["output"],
+            useCoroutines = !parseBoolean(namedArgs["sequential"]),
+            maxConcurrency = parseConcurrency(namedArgs["concurrency"])
         )
     }
 
-    private fun parseLegacyAlgorithms(args: List<String>): String? {
-        // 过滤掉命名参数、随机种子（大数字 > 1000）、运行次数（小数字 1-100），剩下的当作算法名称
-        return args.filter { arg ->
-            !arg.startsWith("-") &&
-            arg.toLongOrNull()?.let { num -> num <= 1000 } != true &&
-            arg.toIntOrNull()?.let { num -> num in 1..100 } != true
-        }.joinToString(",").takeIf { it.isNotEmpty() }
-    }
+    private fun parseAlgorithms(value: String?, mode: String): List<String> {
+        if (value == null) return emptyList()
 
-    private fun parseLegacyRandomSeed(args: List<String>): String? {
-        return args.firstOrNull { it.toLongOrNull()?.let { num -> num > 1000 } == true }
-    }
+        val algorithms = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
-    private fun parseLegacyRuns(args: List<String>): String? {
-        return args.firstOrNull { it.toIntOrNull()?.let { num -> num in 1..100 } == true }
-    }
+        // 处理特殊值 "ALL"
+        if (algorithms.size == 1 && algorithms[0].uppercase() == "ALL") {
+            return when (mode) {
+                "batch", "batch-multi" -> BatchAlgorithmType.values().map { it.name }
+                "realtime", "realtime-multi" -> RealtimeAlgorithmType.values().map { it.name }
+                else -> throw IllegalArgumentException("未知的运行模式: $mode")
+            }
+        }
 
-    private fun parseAlgorithms(value: String?): List<String> {
-        return value?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+        return algorithms
     }
 
     private fun parseRandomSeed(value: String?): Long {
@@ -186,6 +251,10 @@ class CommandLineParser(private val args: Array<String>) {
 
     private fun parseBoolean(value: String?): Boolean {
         return value?.lowercase() in listOf("true", "1", "yes", "on")
+    }
+
+    private fun parseConcurrency(value: String?): Int {
+        return value?.toIntOrNull()?.takeIf { it > 0 } ?: 0
     }
 
     private fun parseTaskCounts(arg: String): List<Int> {
@@ -520,7 +589,7 @@ private fun validateEnvironment() {
  * 打印使用说明
  */
 private fun printUsage() {
-    Logger.info("CloudSim-Benchmark 统一命令行参数格式")
+    Logger.info("CloudSim-Benchmark 命令行参数格式")
     Logger.info("")
     Logger.info("用法: java -jar cloudsim-benchmark.jar [mode] [命名参数...]")
     Logger.info("")
@@ -532,7 +601,8 @@ private fun printUsage() {
     Logger.info("  coroutine-demo, cd - 协程优化功能演示")
     Logger.info("")
     Logger.info("命名参数 (支持长参数 --name value 和短参数 -n value):")
-    Logger.info("  --algorithms, -a ALGO1,ALGO2,...  要运行的算法列表")
+    Logger.info("  --algorithms, -a ALGO1,ALGO2,...  要运行的算法列表 (必需)")
+    Logger.info("                                    或使用 'ALL' 运行该模式下的所有算法")
     Logger.info("                                    批处理: RANDOM, PSO, WOA, GWO, HHO, RL, IMPROVED_RL")
     Logger.info("                                    实时: MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME")
     Logger.info("  --seed, -s SEED                  随机数种子 (默认: 0)")
@@ -541,32 +611,42 @@ private fun printUsage() {
     Logger.info("  --config, -c FILE               配置文件路径")
     Logger.info("  --output, -o DIR                输出目录")
     Logger.info("  --verbose, -v                   详细输出模式")
+    Logger.info("  --sequential, -S                禁用协程并行执行，使用顺序执行")
+    Logger.info("  --concurrency, -C NUM          最大并发数 (默认: CPU核心数)")
     Logger.info("  --help, -h                      显示此帮助信息")
     Logger.info("")
     Logger.info("示例:")
     Logger.info("")
-    Logger.info("  # 基本用法 - 运行所有算法")
-    Logger.info("  java -jar cloudsim-benchmark.jar batch")
-    Logger.info("  java -jar cloudsim-benchmark.jar realtime")
+    Logger.info("  # 批处理模式 - 运行所有算法")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch --algorithms ALL")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch -a ALL")
     Logger.info("")
-    Logger.info("  # 指定算法 (新格式，推荐)")
+    Logger.info("  # 批处理模式 - 指定算法")
     Logger.info("  java -jar cloudsim-benchmark.jar batch --algorithms PSO,WOA,GWO")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch -a PSO,WOA,GWO")
+    Logger.info("")
+    Logger.info("  # 实时调度模式 - 运行所有算法")
+    Logger.info("  java -jar cloudsim-benchmark.jar realtime --algorithms ALL")
+    Logger.info("  java -jar cloudsim-benchmark.jar realtime -a ALL")
+    Logger.info("")
+    Logger.info("  # 实时调度模式 - 指定算法")
+    Logger.info("  java -jar cloudsim-benchmark.jar realtime --algorithms PSO_REALTIME,WOA_REALTIME")
     Logger.info("  java -jar cloudsim-benchmark.jar realtime -a PSO_REALTIME,WOA_REALTIME")
     Logger.info("")
-    Logger.info("  # 随机种子和运行次数")
+    Logger.info("  # 设置随机种子和运行次数")
     Logger.info("  java -jar cloudsim-benchmark.jar batch --algorithms PSO --seed 42 --runs 5")
-    Logger.info("  java -jar cloudsim-benchmark.jar realtime -a WOA_REALTIME -s 123 -r 10")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch -a PSO -s 42 -r 5")
     Logger.info("")
-    Logger.info("  # 批量任务数实验")
+    Logger.info("  # 批量任务数实验 - 运行所有算法")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch-multi --tasks 50,100,200,500 --algorithms ALL")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch-multi -t 50,100,200,500 -a ALL")
+    Logger.info("")
+    Logger.info("  # 批量任务数实验 - 指定算法")
     Logger.info("  java -jar cloudsim-benchmark.jar batch-multi --tasks 50,100,200,500 --algorithms PSO,WOA")
-    Logger.info("  java -jar cloudsim-benchmark.jar realtime-multi -t 50,100,200 -a PSO_REALTIME -s 42")
+    Logger.info("  java -jar cloudsim-benchmark.jar batch-multi -t 50,100,200,500 -a PSO,WOA")
     Logger.info("")
     Logger.info("  # 高级配置")
     Logger.info("  java -jar cloudsim-benchmark.jar batch --config custom.toml --output results/ --verbose")
-    Logger.info("")
-    Logger.info("向后兼容 (旧格式仍支持，但推荐使用新格式):")
-    Logger.info("  java -jar cloudsim-benchmark.jar batch PSO,WOA 42    # 旧格式")
-    Logger.info("  java -jar cloudsim-benchmark.jar batch -a PSO,WOA -s 42  # 新格式")
     Logger.info("")
     Logger.info("配置:")
     Logger.info("  所有配置参数在 config.ExperimentConfig 中统一管理")

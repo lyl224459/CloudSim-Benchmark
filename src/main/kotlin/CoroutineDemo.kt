@@ -53,8 +53,8 @@ object CoroutineDemo {
         Logger.info("\n性能对比结果:")
         Logger.info("顺序执行时间: {}ms", sequentialTime)
         Logger.info("并行执行时间: {}ms", parallelTime)
-        Logger.info("加速比: ${String.format("%.2f", speedup)}x")
-        Logger.info("并行效率: {:.1f}%", efficiency)
+        Logger.info("加速比: {}x", String.format("%.2f", speedup))
+        Logger.info("并行效率: {}%", String.format("%.1f", efficiency))
 
         if (speedup > 1.5) {
             Logger.info("✅ 协程并行执行显著提升性能！")
