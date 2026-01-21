@@ -2,8 +2,6 @@ package datacenter
 
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
-import org.nd4j.linalg.api.ndarray.INDArray
-import org.nd4j.linalg.factory.Nd4j
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -41,47 +39,53 @@ class SchedulerObjectiveFunction(
     
     /**
      * 估算最大完成时间（Makespan）- 高性能版本
-     * 使用ND4J进行向量化计算
      */
     fun estimateMakespan(cloudletToVm: IntArray): Double {
-        val executeTimes = Nd4j.zeros(vmNum)
+        val executeTimes = DoubleArray(vmNum)
 
         // 累加每个VM的执行时间
         for (i in 0 until cloudletNum) {
             val length = cloudletList[i].length.toDouble()
             val vmId = cloudletToVm[i]
             val execTime = length / vmList[vmId].mips
-            val currentTime = executeTimes.getDouble(vmId.toLong())
-            executeTimes.putScalar(vmId.toLong(), currentTime + execTime)
+            executeTimes[vmId] += execTime
         }
 
-        return executeTimes.maxNumber().toDouble()
+        var maxTime = 0.0
+        for (time in executeTimes) {
+            if (time > maxTime) maxTime = time
+        }
+        return maxTime
     }
     
     /**
      * 估算负载均衡度（Load Balance）- 高性能版本
-     * 使用ND4J进行向量化计算，提升性能
      */
     fun estimateLB(cloudletToVm: IntArray): Double {
-        // 使用ND4J进行向量化计算
-        val executeTimes = Nd4j.zeros(vmNum)
+        val executeTimes = DoubleArray(vmNum)
 
         // 累加每个VM的执行时间
         for (i in 0 until cloudletNum) {
             val length = cloudletList[i].length.toDouble()
             val vmId = cloudletToVm[i]
             val execTime = length / vmList[vmId].mips
-            val currentTime = executeTimes.getDouble(vmId.toLong())
-            executeTimes.putScalar(vmId.toLong(), currentTime + execTime)
+            executeTimes[vmId] += execTime
         }
 
         // 计算平均执行时间
-        val avgExecuteTime = executeTimes.meanNumber().toDouble()
+        var totalTime = 0.0
+        for (time in executeTimes) {
+            totalTime += time
+        }
+        val avgExecuteTime = totalTime / vmNum
 
-        // 计算方差的平方根（标准差）
-        val diff = executeTimes.sub(avgExecuteTime)
-        val squaredDiff = diff.mul(diff)
-        val variance = squaredDiff.meanNumber().toDouble()
+        // 计算方差
+        var sumSquaredDiff = 0.0
+        for (time in executeTimes) {
+            val diff = time - avgExecuteTime
+            sumSquaredDiff += diff * diff
+        }
+        val variance = sumSquaredDiff / vmNum
 
         return sqrt(variance)
     }

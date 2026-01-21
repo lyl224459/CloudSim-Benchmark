@@ -42,6 +42,8 @@ venv/
 *.temp
 *.bak
 
+TODO.md
+
 # --- Data files ---
 # data/google_trace/*.csv
 # 注释掉下面这行以保留 Google Trace 的说明文件

@@ -5,8 +5,6 @@ import it.unimi.dsi.fastutil.doubles.DoubleList
 import it.unimi.dsi.fastutil.ints.IntArrayList
 import it.unimi.dsi.fastutil.ints.IntList
 import it.unimi.dsi.fastutil.objects.ObjectArrayList
-import org.eclipse.collections.api.list.primitive.DoubleList as ECDoubleList
-import org.eclipse.collections.impl.factory.primitive.DoubleLists
 
 /**
  * 优化的集合操作工具类
@@ -53,14 +51,13 @@ object OptimizedCollections {
     }
 
     /**
-     * 计算Double列表的统计信息（向量化）
+     * 计算Double列表的统计信息
      */
     fun calculateStats(values: DoubleArrayList): StatisticalValue {
         if (values.isEmpty()) {
             throw IllegalArgumentException("数组不能为空")
         }
 
-        // 使用向量化计算
         val array = values.toDoubleArray()
         return StatisticalValue.fromArray(array)
     }
@@ -140,32 +137,5 @@ object OptimizedCollections {
     fun average(values: IntArrayList): Double {
         if (values.isEmpty()) throw NoSuchElementException()
         return sum(values).toDouble() / values.size
-    }
-
-    /**
-     * Eclipse Collections 扩展
-     */
-    object EclipseCollections {
-
-        /**
-         * 创建不可变Double列表
-         */
-        fun immutableDoubleList(vararg values: Double): ECDoubleList {
-            return DoubleLists.immutable.of(*values)
-        }
-
-        /**
-         * 创建可变Double列表
-         */
-        fun mutableDoubleList(): org.eclipse.collections.api.list.primitive.MutableDoubleList {
-            return DoubleLists.mutable.empty()
-        }
-
-        /**
-         * 创建可变Double列表（指定容量）
-         */
-        fun mutableDoubleList(capacity: Int): org.eclipse.collections.api.list.primitive.MutableDoubleList {
-            return DoubleLists.mutable.withInitialCapacity(capacity)
-        }
     }
 }

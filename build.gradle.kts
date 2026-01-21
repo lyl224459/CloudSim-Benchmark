@@ -66,9 +66,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
 
     // 高性能计算库
-    implementation("org.nd4j:nd4j-native-platform:1.0.0-M2.1")  // ND4J - 高性能数值计算
     implementation("it.unimi.dsi:fastutil:8.5.12")            // Fastutil - 高性能集合
-    implementation("org.eclipse.collections:eclipse-collections:11.1.0")  // Eclipse Collections - 高级集合操作
 
     testImplementation(kotlin("test"))
 
