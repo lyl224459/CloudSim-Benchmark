@@ -64,6 +64,10 @@
 #
 ##############################################################################
 
+# 设置环境变量以确保正确的字符编码
+export LANG=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
 # Attempt to set APP_HOME
 
 # Resolve links: $0 may be a link
@@ -200,7 +204,7 @@ fi
 
 
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m" "-Dfile.encoding=UTF-8" "-Dstdout.encoding=UTF-8" "-Dstderr.encoding=UTF-8"'
 
 # Collect all arguments for the java command:
 #   * DEFAULT_JVM_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
@@ -237,6 +241,9 @@ fi
 # This will of course break if any of these variables contains a newline or
 # an unmatched quote.
 #
+
+# Set encoding environment variables and JVM options
+export JAVA_OPTS="$JAVA_OPTS -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8"
 
 eval "set -- $(
         printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |

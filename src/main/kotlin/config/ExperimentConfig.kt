@@ -5,8 +5,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
 import util.Logger
 import java.io.File
-import java.io.FileInputStream
-import java.util.Properties
 
 /**
  * 配置验证异常
@@ -38,47 +36,29 @@ data class ValidationError(
 )
 
 /**
- * TOML配置文件数据类
+ * 实验模式枚举
+ */
+enum class ExperimentMode {
+    BATCH,
+    REALTIME,
+    BATCH_MULTI,
+    REALTIME_MULTI
+}
+
+/**
+ * TOML格式的实验配置
  */
 @Serializable
-data class TomlConfig(
+data class ExperimentTomlConfig(
+    val mode: String? = null,  // 实验模式
     val random: RandomConfig? = null,
     val batch: TomlBatchConfig? = null,
     val realtime: TomlRealtimeConfig? = null,
     val optimizer: TomlOptimizerConfig? = null,
-    val output: TomlOutputConfig? = null,
-    val experiment: TomlExperimentConfig? = null,
     // 算法配置
     val algorithms: Map<String, Map<String, AlgorithmConfig>>? = null,
     // 预设配置
     val presets: Map<String, List<String>>? = null
-)
-
-@Serializable
-data class TomlOutputConfig(
-    val resultsDir: String = "runs",
-    val csv: CsvConfig = CsvConfig(),
-    val logging: LoggingConfig = LoggingConfig()
-)
-
-@Serializable
-data class CsvConfig(
-    val enabled: Boolean = true,
-    val delimiter: String = ","
-)
-
-@Serializable
-data class LoggingConfig(
-    val level: String = "INFO",
-    val file: Boolean = true,
-    val console: Boolean = true
-)
-
-@Serializable
-data class TomlExperimentConfig(
-    val autoCreateDirs: Boolean = true,
-    val nameFormat: String = "{mode}_{timestamp}_{algorithms}",
-    val maxConcurrent: Int = 2
 )
 
 @Serializable
@@ -148,9 +128,12 @@ data class TomlOptimizerConfig(
 
 /**
  * 实验配置类
- * 统一管理所有实验参数
+ * 专门管理实验参数，如任务数量、算法参数、目标函数等
  */
 data class ExperimentConfig(
+    // ========== 实验模式 ==========
+    val mode: ExperimentMode = ExperimentMode.BATCH,
+    
     // ========== 批处理模式配置 ==========
     val batch: BatchConfig = BatchConfig(),
 
@@ -165,11 +148,11 @@ data class ExperimentConfig(
 ) {
     companion object {
         /**
-         * 从多种来源加载配置并验证
-         * 优先级：命令行参数 > 环境变量 > 配置文件 > 默认配置
+         * 从配置文件加载实验配置
+         * 优先级：指定配置文件 > 默认配置
          */
-        fun load(args: Array<String> = emptyArray()): ExperimentConfig {
-            val config = loadInternal(args)
+        fun load(configPath: String): ExperimentConfig {
+            val config = loadInternal(configPath)
             validateConfig(config)
             return config
         }
@@ -196,34 +179,111 @@ data class ExperimentConfig(
         }
 
         /**
+         * 解析实验模式
+         */
+        fun parseExperimentMode(mode: String): ExperimentMode = try {
+            ExperimentMode.valueOf(mode.uppercase())
+        } catch (e: IllegalArgumentException) {
+            Logger.warn("未知的实验模式: {}, 使用默认值 BATCH", mode)
+            ExperimentMode.BATCH
+        }
+
+        /**
          * 内部加载方法（不验证）
          */
-        private fun loadInternal(args: Array<String> = emptyArray()): ExperimentConfig {
+        private fun loadInternal(configPath: String): ExperimentConfig {
             try {
-                var config = ExperimentConfig()
+                val file = File(configPath)
+                if (!file.exists()) {
+                    throw IllegalArgumentException("配置文件不存在: $configPath")
+                }
 
-                // 1. 加载默认配置
-                Logger.debug("加载默认配置")
+                val tomlContent = file.readText()
+                val tomlConfig = Toml.decodeFromString(serializer<ExperimentTomlConfig>(), tomlContent)
 
-                // 2. 加载配置文件
-                config = loadFromConfigFile(config)
+                val mode = if (tomlConfig.mode != null) {
+                    parseExperimentMode(tomlConfig.mode)
+                } else {
+                    ExperimentMode.BATCH  // 默认为批处理模式
+                }
 
-                // 3. 加载环境变量配置
-                config = loadFromEnvironment(config)
-
-                // 4. 加载系统属性配置
-                config = loadFromSystemProperties(config)
-
-                // 5. 应用命令行参数覆盖（这里不再处理命令行参数）
-                // 命令行参数现在由Main.kt处理
-
-                Logger.debug("配置加载完成")
-                return config
-
+                return ExperimentConfig(
+                    mode = mode,
+                    randomSeed = tomlConfig.random?.seed ?: 0L,
+                    batch = mergeBatchConfig(BatchConfig(), tomlConfig.batch),
+                    realtime = mergeRealtimeConfig(RealtimeConfig(), tomlConfig.realtime),
+                    optimizer = mergeOptimizerConfig(OptimizerConfig(), tomlConfig.optimizer)
+                )
             } catch (e: Exception) {
-                Logger.error("加载配置时发生错误，使用默认配置: " + e.message, e)
-                return ExperimentConfig()
+                Logger.error("加载实验配置时发生错误: ${e.message}", e)
+                throw e
             }
+        }
+
+        /**
+         * 合并批处理配置
+         */
+        private fun mergeBatchConfig(base: BatchConfig, toml: TomlBatchConfig?): BatchConfig {
+            if (toml == null) return base
+
+            // 解析生成器配置（新格式优先）
+            val generatorType = if (toml.generator.type != "LOG_NORMAL") {
+                parseGeneratorType(toml.generator.type)
+            } else {
+                parseGeneratorType(toml.generatorType) // 向后兼容
+            }
+
+            // 解析目标函数权重
+            val objectiveWeights = toml.objective
+
+            return base.copy(
+                cloudletCount = toml.cloudletCount,
+                population = toml.population ?: base.population,
+                maxIter = toml.maxIter ?: base.maxIter,
+                runs = toml.runs,
+                generatorType = generatorType,
+                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
+                objectiveWeights = objectiveWeights
+            )
+        }
+
+        /**
+         * 合并实时调度配置
+         */
+        private fun mergeRealtimeConfig(base: RealtimeConfig, toml: TomlRealtimeConfig?): RealtimeConfig {
+            if (toml == null) return base
+
+            // 解析生成器配置（新格式优先）
+            val generatorType = if (toml.generator.type != "LOG_NORMAL") {
+                parseGeneratorType(toml.generator.type)
+            } else {
+                parseGeneratorType(toml.generatorType) // 向后兼容
+            }
+
+            // 解析目标函数权重
+            val objectiveWeights = toml.objective
+
+            return base.copy(
+                cloudletCount = toml.cloudletCount,
+                simulationDuration = toml.simulationDuration,
+                arrivalRate = toml.arrivalRate,
+                runs = toml.runs,
+                generatorType = generatorType,
+                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
+                objectiveWeights = objectiveWeights
+            )
+        }
+
+        /**
+         * 合并优化器配置
+         */
+        private fun mergeOptimizerConfig(base: OptimizerConfig, toml: TomlOptimizerConfig?): OptimizerConfig {
+            if (toml == null) return base
+
+            return base.copy(
+                population = toml.population ?: base.population,
+                maxIter = toml.maxIter ?: base.maxIter
+            )
         }
 
         /**
@@ -410,218 +470,6 @@ data class ExperimentConfig(
                     "$context 模式中目标函数权重总和应为 1.0（当前: ${String.format("%.3f", totalWeight)})"))
             }
         }
-
-        /**
-         * 从配置文件加载配置
-         */
-        private fun loadFromConfigFile(baseConfig: ExperimentConfig): ExperimentConfig {
-            val configFiles = listOf(
-                "configs/default.toml",
-                "configs/batch.toml",
-                "configs/realtime.toml",
-                "configs/algorithms.toml",
-                "cloudsim-benchmark.toml",
-                "config.toml",
-                "cloudsim-benchmark.properties",
-                "config.properties",
-                System.getProperty("config.file"),
-                System.getenv("CONFIG_FILE")
-            ).filterNotNull()
-
-            var resultConfig = baseConfig
-
-            for (configFile in configFiles) {
-                val file = File(configFile)
-                if (file.exists() && file.isFile) {
-                    try {
-                        Logger.debug("从配置文件加载: {}", configFile)
-                        resultConfig = when (file.extension.lowercase()) {
-                            "toml" -> loadAndMergeTomlConfig(resultConfig, file)
-                            "properties", "props" -> loadPropertiesConfig(resultConfig, file)
-                            else -> {
-                                Logger.warn("不支持的配置文件格式: {}", file.extension)
-                                resultConfig
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Logger.warn("加载配置文件失败 $configFile: ${e.message}")
-                    }
-                }
-            }
-
-            return resultConfig
-        }
-
-        /**
-         * 加载并合并TOML配置文件
-         */
-        private fun loadAndMergeTomlConfig(baseConfig: ExperimentConfig, file: File): ExperimentConfig {
-            try {
-                val tomlContent = file.readText()
-                val tomlConfig = Toml.decodeFromString(serializer<TomlConfig>(), tomlContent)
-
-                return baseConfig.copy(
-                    randomSeed = tomlConfig.random?.seed ?: baseConfig.randomSeed,
-                    batch = mergeBatchConfig(baseConfig.batch, tomlConfig.batch),
-                    realtime = mergeRealtimeConfig(baseConfig.realtime, tomlConfig.realtime),
-                    optimizer = mergeOptimizerConfig(baseConfig.optimizer, tomlConfig.optimizer)
-                )
-            } catch (e: Exception) {
-                Logger.warn("TOML配置文件解析失败: ${e.message}")
-                return baseConfig
-            }
-        }
-
-        /**
-         * 合并批处理配置
-         */
-        private fun mergeBatchConfig(base: BatchConfig, toml: TomlBatchConfig?): BatchConfig {
-            if (toml == null) return base
-
-            // 解析生成器配置（新格式优先）
-            val generatorType = if (toml.generator.type != "LOG_NORMAL") {
-                parseGeneratorType(toml.generator.type)
-            } else {
-                parseGeneratorType(toml.generatorType) // 向后兼容
-            }
-
-            // 解析目标函数权重
-            val objectiveWeights = toml.objective
-
-            return base.copy(
-                cloudletCount = toml.cloudletCount,
-                population = toml.population ?: base.population,
-                maxIter = toml.maxIter ?: base.maxIter,
-                runs = toml.runs,
-                generatorType = generatorType,
-                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
-                objectiveWeights = objectiveWeights
-            )
-        }
-
-        /**
-         * 合并实时调度配置
-         */
-               private fun mergeRealtimeConfig(base: RealtimeConfig, toml: TomlRealtimeConfig?): RealtimeConfig {
-            if (toml == null) return base
-
-            // 解析生成器配置（新格式优先）
-            val generatorType = if (toml.generator.type != "LOG_NORMAL") {
-                parseGeneratorType(toml.generator.type)
-            } else {
-                parseGeneratorType(toml.generatorType) // 向后兼容
-            }
-
-            // 解析目标函数权重
-            val objectiveWeights = toml.objective
-
-            return base.copy(
-                cloudletCount = toml.cloudletCount,
-                simulationDuration = toml.simulationDuration,
-                arrivalRate = toml.arrivalRate,
-                runs = toml.runs,
-                generatorType = generatorType,
-                googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
-                objectiveWeights = objectiveWeights
-            )
-        }
-
-        /**
-         * 合并优化器配置
-         */
-        private fun mergeOptimizerConfig(base: OptimizerConfig, toml: TomlOptimizerConfig?): OptimizerConfig {
-            if (toml == null) return base
-
-            return base.copy(
-                population = toml.population,
-                maxIter = toml.maxIter
-            )
-        }
-
-        /**
-         * 加载Properties配置文件
-         */
-        private fun loadPropertiesConfig(baseConfig: ExperimentConfig, file: File): ExperimentConfig {
-            val properties = Properties()
-            FileInputStream(file).use { properties.load(it) }
-            return applyProperties(baseConfig, properties)
-        }
-
-        // 已公开 parseGeneratorType，内部调用复用
-
-        /**
-         * 从环境变量加载配置
-         */
-        private fun loadFromEnvironment(baseConfig: ExperimentConfig): ExperimentConfig {
-            val envMap = System.getenv()
-            if (envMap.isEmpty()) return baseConfig
-
-            Logger.debug("从环境变量加载配置")
-            val properties = Properties()
-
-            // 映射环境变量到配置属性
-            envMap.forEach { (key, value) ->
-                when (key.uppercase()) {
-                    "CLOUDSIM_RANDOM_SEED" -> properties.setProperty("random.seed", value)
-                    "CLOUDSIM_BATCH_CLOUDLET_COUNT" -> properties.setProperty("batch.cloudlet.count", value)
-                    "CLOUDSIM_BATCH_POPULATION" -> properties.setProperty("batch.population", value)
-                    "CLOUDSIM_BATCH_MAX_ITER" -> properties.setProperty("batch.max.iter", value)
-                    "CLOUDSIM_BATCH_RUNS" -> properties.setProperty("batch.runs", value)
-                    "CLOUDSIM_REALTIME_CLOUDLET_COUNT" -> properties.setProperty("realtime.cloudlet.count", value)
-                    "CLOUDSIM_REALTIME_DURATION" -> properties.setProperty("realtime.simulation.duration", value)
-                    "CLOUDSIM_REALTIME_ARRIVAL_RATE" -> properties.setProperty("realtime.arrival.rate", value)
-                    "CLOUDSIM_REALTIME_RUNS" -> properties.setProperty("realtime.runs", value)
-                    "CLOUDSIM_OPTIMIZER_POPULATION" -> properties.setProperty("optimizer.population", value)
-                    "CLOUDSIM_OPTIMIZER_MAX_ITER" -> properties.setProperty("optimizer.max.iter", value)
-                }
-            }
-
-            return applyProperties(baseConfig, properties)
-        }
-
-        /**
-         * 从系统属性加载配置
-         */
-        private fun loadFromSystemProperties(baseConfig: ExperimentConfig): ExperimentConfig {
-            val properties = Properties()
-            System.getProperties().forEach { key, value ->
-                val keyStr = key.toString()
-                if (keyStr.startsWith("cloudsim.")) {
-                    properties.setProperty(keyStr.substring("cloudsim.".length), value.toString())
-                }
-            }
-
-            if (properties.isEmpty) return baseConfig
-
-            Logger.debug("从系统属性加载配置")
-            return applyProperties(baseConfig, properties)
-        }
-
-
-        /**
-         * 应用Properties到配置对象
-         */
-        private fun applyProperties(baseConfig: ExperimentConfig, properties: Properties): ExperimentConfig {
-            return baseConfig.copy(
-                randomSeed = properties.getProperty("random.seed")?.toLongOrNull() ?: baseConfig.randomSeed,
-                batch = baseConfig.batch.copy(
-                    cloudletCount = properties.getProperty("batch.cloudlet.count")?.toIntOrNull() ?: baseConfig.batch.cloudletCount,
-                    population = properties.getProperty("batch.population")?.toIntOrNull() ?: baseConfig.batch.population,
-                    maxIter = properties.getProperty("batch.max.iter")?.toIntOrNull() ?: baseConfig.batch.maxIter,
-                    runs = properties.getProperty("batch.runs")?.toIntOrNull() ?: baseConfig.batch.runs
-                ),
-                realtime = baseConfig.realtime.copy(
-                    cloudletCount = properties.getProperty("realtime.cloudlet.count")?.toIntOrNull() ?: baseConfig.realtime.cloudletCount,
-                    simulationDuration = properties.getProperty("realtime.simulation.duration")?.toDoubleOrNull() ?: baseConfig.realtime.simulationDuration,
-                    arrivalRate = properties.getProperty("realtime.arrival.rate")?.toDoubleOrNull() ?: baseConfig.realtime.arrivalRate,
-                    runs = properties.getProperty("realtime.runs")?.toIntOrNull() ?: baseConfig.realtime.runs
-                ),
-                optimizer = baseConfig.optimizer.copy(
-                    population = properties.getProperty("optimizer.population")?.toIntOrNull() ?: baseConfig.optimizer.population,
-                    maxIter = properties.getProperty("optimizer.max.iter")?.toIntOrNull() ?: baseConfig.optimizer.maxIter
-                )
-            )
-        }
     }
 }
 
@@ -794,4 +642,3 @@ object ObjectiveConfig {
     const val BETA = 1.0 / 3    // TotalTime权重
     const val GAMMA = 1.0 / 3   // LoadBalance权重
 }
-

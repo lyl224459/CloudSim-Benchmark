@@ -1,4 +1,6 @@
 import config.ExperimentConfig
+import config.SystemConfig
+import config.ConfigurationManager
 import config.BatchAlgorithmType
 import config.RealtimeAlgorithmType
 import datacenter.ComparisonRunner
@@ -20,7 +22,7 @@ import kotlin.system.exitProcess
 class CommandLineParser(private val args: Array<String>) {
 
     data class ParsedArgs(
-        val mode: String,
+        val mode: String? = null,  // 现在可以为空，因为可以从配置文件获取
         val algorithms: List<String> = emptyList(),
         val randomSeed: Long = 0L,
         val taskCounts: List<Int> = emptyList(),
@@ -43,11 +45,12 @@ class CommandLineParser(private val args: Array<String>) {
             "batch-multi", "bm" -> parseBatchMultiArgs(mode)
             "realtime-multi", "rm" -> parseRealtimeMultiArgs(mode)
             "coroutine-demo", "cd" -> ParsedArgs("coroutine-demo")
+            null -> ParsedArgs()  // 从配置文件获取模式
             else -> throw IllegalArgumentException("未知的运行模式: $mode。可用模式: batch, realtime, batch-multi, realtime-multi, coroutine-demo")
         }
     }
 
-    private fun parseArgs(): String {
+    private fun parseArgs(): String? {
         var i = 0
         var mode: String? = null
 
@@ -163,7 +166,7 @@ class CommandLineParser(private val args: Array<String>) {
             }
         }
 
-        return mode ?: throw IllegalArgumentException("必须指定运行模式。可用模式: batch, realtime, batch-multi, realtime-multi, coroutine-demo")
+        return mode
     }
 
     private fun parseBatchArgs(mode: String): ParsedArgs {
@@ -300,23 +303,34 @@ fun main(args: Array<String>) = runBlocking {
         val parser = CommandLineParser(args)
         val parsedArgs = parser.parse()
 
-        Logger.info("运行模式: {}", parsedArgs.mode)
+        // 使用配置管理器加载配置
+        val configs = loadConfigs(parsedArgs)
+        
+        // 确定运行模式：优先使用命令行参数，其次使用配置文件中的模式
+        val mode = if (!parsedArgs.mode.isNullOrEmpty()) {
+            parsedArgs.mode
+        } else {
+            // 将枚举转换为小写字符串
+            configs.experimentConfig.mode.name.lowercase()
+        }
+        
+        Logger.info("运行模式: {}", mode)
 
-        // 加载配置
-        val config = loadConfig(parsedArgs)
+        // 根据系统配置更新日志设置
+        configureLogging(configs.systemConfig)
 
         // 配置结果管理器
-        ResultsManager.configure(config)
+        ResultsManager.configure(configs.experimentConfig)
 
         // 创建实验目录
         val experimentDir = ResultsManager.createExperimentDirectory(
-            parsedArgs.mode,
-            experimentName = "${parsedArgs.mode}_${LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}"
+            mode,
+            experimentName = "${mode}_${LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"))}"
         )
 
         Logger.info("实验目录: {}", experimentDir.absolutePath)
 
-        when (parsedArgs.mode) {
+        when (mode) {
         "coroutine-demo", "cd" -> {
             Logger.info("运行协程优化功能演示...")
             CoroutineDemo.runDemo()
@@ -324,18 +338,18 @@ fun main(args: Array<String>) = runBlocking {
         "batch", "b" -> {
             Logger.info("开始批处理调度算法对比实验...")
             Logger.info("配置: 任务数={}, 种群={}, 迭代={}, 运行次数={}", 
-                config.batch.cloudletCount, config.batch.population, config.batch.maxIter, config.batch.runs)
-            Logger.info("随机数种子: {}", config.randomSeed)
+                configs.experimentConfig.batch.cloudletCount, configs.experimentConfig.batch.population, configs.experimentConfig.batch.maxIter, configs.experimentConfig.batch.runs)
+            Logger.info("随机数种子: {}", configs.experimentConfig.randomSeed)
             val runner = ComparisonRunner(
-                cloudletCount = config.batch.cloudletCount,
-                population = config.batch.population,
-                maxIter = config.batch.maxIter,
-                randomSeed = config.randomSeed,
-                algorithms = config.batch.algorithms,
-                runs = config.batch.runs,
-                generatorType = config.batch.generatorType,
-                googleTraceConfig = config.batch.googleTraceConfig,
-                objectiveWeights = config.batch.objectiveWeights,
+                cloudletCount = configs.experimentConfig.batch.cloudletCount,
+                population = configs.experimentConfig.batch.population,
+                maxIter = configs.experimentConfig.batch.maxIter,
+                randomSeed = configs.experimentConfig.randomSeed,
+                algorithms = configs.experimentConfig.batch.algorithms,
+                runs = configs.experimentConfig.batch.runs,
+                generatorType = configs.experimentConfig.batch.generatorType,
+                googleTraceConfig = configs.experimentConfig.batch.googleTraceConfig,
+                objectiveWeights = configs.experimentConfig.batch.objectiveWeights,
                 experimentDir = experimentDir,
                 useCoroutines = parsedArgs.useCoroutines,
                 maxConcurrency = parsedArgs.maxConcurrency
@@ -350,7 +364,7 @@ fun main(args: Array<String>) = runBlocking {
                 Logger.warn("未指定任务数列表，使用默认值: 50, 100, 200, 500")
                 listOf(50, 100, 200, 500)
             }
-            runBatchCloudletCountExperiment(cloudletCounts, config, experimentDir)
+            runBatchCloudletCountExperiment(cloudletCounts, configs.experimentConfig, experimentDir)
         }
         "realtime-multi" -> {
             // 实时调度模式批量任务数实验
@@ -359,32 +373,32 @@ fun main(args: Array<String>) = runBlocking {
                 Logger.warn("未指定任务数列表，使用默认值: 50, 100, 200, 500")
                 listOf(50, 100, 200, 500)
             }
-            runRealtimeCloudletCountExperiment(cloudletCounts, config, experimentDir)
+            runRealtimeCloudletCountExperiment(cloudletCounts, configs.experimentConfig, experimentDir)
         }
-        "realtime", "r", "" -> {
+        "realtime", "r" -> {
             Logger.info("开始实时调度算法对比实验...")
             Logger.info("配置: 任务数={}, 持续时间={}s, 到达率={}/s, 运行次数={}", 
-                config.realtime.cloudletCount, config.realtime.simulationDuration, config.realtime.arrivalRate, config.realtime.runs)
+                configs.experimentConfig.realtime.cloudletCount, configs.experimentConfig.realtime.simulationDuration, configs.experimentConfig.realtime.arrivalRate, configs.experimentConfig.realtime.runs)
             Logger.info("优化算法: 种群={}, 迭代={}", 
-                config.optimizer.population, config.optimizer.maxIter)
-            Logger.info("随机数种子: {}", config.randomSeed)
-            if (config.realtime.algorithms.isNotEmpty()) {
-                Logger.info("选定算法: {}", config.realtime.algorithms.joinToString(", ") { it.name })
+                configs.experimentConfig.optimizer.population, configs.experimentConfig.optimizer.maxIter)
+            Logger.info("随机数种子: {}", configs.experimentConfig.randomSeed)
+            if (configs.experimentConfig.realtime.algorithms.isNotEmpty()) {
+                Logger.info("选定算法: {}", configs.experimentConfig.realtime.algorithms.joinToString(", ") { it.name })
             } else {
                 Logger.info("运行所有算法")
             }
             val runner = RealtimeComparisonRunner(
-                cloudletCount = config.realtime.cloudletCount,
-                simulationDuration = config.realtime.simulationDuration,
-                arrivalRate = config.realtime.arrivalRate,
-                population = config.optimizer.population,
-                maxIter = config.optimizer.maxIter,
-                randomSeed = config.randomSeed,
-                algorithms = config.realtime.algorithms,
-                runs = config.realtime.runs,
-                generatorType = config.realtime.generatorType,
-                googleTraceConfig = config.realtime.googleTraceConfig,
-                objectiveWeights = config.realtime.objectiveWeights,
+                cloudletCount = configs.experimentConfig.realtime.cloudletCount,
+                simulationDuration = configs.experimentConfig.realtime.simulationDuration,
+                arrivalRate = configs.experimentConfig.realtime.arrivalRate,
+                population = configs.experimentConfig.optimizer.population,
+                maxIter = configs.experimentConfig.optimizer.maxIter,
+                randomSeed = configs.experimentConfig.randomSeed,
+                algorithms = configs.experimentConfig.realtime.algorithms,
+                runs = configs.experimentConfig.realtime.runs,
+                generatorType = configs.experimentConfig.realtime.generatorType,
+                googleTraceConfig = configs.experimentConfig.realtime.googleTraceConfig,
+                objectiveWeights = configs.experimentConfig.realtime.objectiveWeights,
                 experimentDir = experimentDir,
                 useCoroutines = parsedArgs.useCoroutines,
                 maxConcurrency = parsedArgs.maxConcurrency
@@ -393,9 +407,9 @@ fun main(args: Array<String>) = runBlocking {
             Logger.info("实时调度实验完成！")
         }
         else -> {
-            Logger.error("未知的运行模式: ${parsedArgs.mode}")
+            Logger.error("未知的运行模式: ${mode}")
             printUsage()
-            throw IllegalArgumentException("未知的运行模式: ${parsedArgs.mode}")
+            throw IllegalArgumentException("未知的运行模式: ${mode}")
         }
     }
 
@@ -430,46 +444,27 @@ fun main(args: Array<String>) = runBlocking {
 }
 
 /**
- * 加载配置
- * 支持从多种来源加载配置并应用命令行覆盖
+ * 加载系统配置和实验配置
  */
-private fun loadConfig(parsedArgs: CommandLineParser.ParsedArgs): ExperimentConfig {
-    // 使用新的配置加载器从文件和环境变量加载基础配置
-    val baseConfig = ExperimentConfig.load()
-
-    // 使用随机种子覆盖（如果指定了）
-    val configWithSeed = if (parsedArgs.randomSeed > 0) {
-        baseConfig.copy(randomSeed = parsedArgs.randomSeed)
+private fun loadConfigs(parsedArgs: CommandLineParser.ParsedArgs): ConfigurationManager.LoadedConfigs {
+    return if (!parsedArgs.configFile.isNullOrEmpty()) {
+        ConfigurationManager.loadFromSingleFile(parsedArgs.configFile!!)
     } else {
-        baseConfig
+        // 如果没有提供配置文件，使用默认配置
+        ConfigurationManager.LoadedConfigs(
+            systemConfig = SystemConfig.createDefault(),
+            experimentConfig = ExperimentConfig.createDefault()
+        )
     }
+}
 
-    // 根据模式设置算法配置和运行参数
-    return when (parsedArgs.mode) {
-        "batch", "batch-multi" -> {
-            val batchAlgorithms = validateAndParseAlgorithms(parsedArgs.algorithms, config.BatchAlgorithmType.values(), "批处理")
-            configWithSeed.copy(
-                batch = configWithSeed.batch.copy(
-                    algorithms = if (batchAlgorithms.isEmpty()) emptyList() else batchAlgorithms,
-                    runs = if (parsedArgs.mode == "batch-multi") parsedArgs.runs else configWithSeed.batch.runs,
-                    cloudletCount = if (parsedArgs.mode == "batch-multi" && parsedArgs.taskCounts.isNotEmpty())
-                        parsedArgs.taskCounts.first() else configWithSeed.batch.cloudletCount
-                )
-            )
-        }
-        "realtime", "realtime-multi" -> {
-            val realtimeAlgorithms = validateAndParseAlgorithms(parsedArgs.algorithms, config.RealtimeAlgorithmType.values(), "实时")
-            configWithSeed.copy(
-                realtime = configWithSeed.realtime.copy(
-                    algorithms = if (realtimeAlgorithms.isEmpty()) emptyList() else realtimeAlgorithms,
-                    runs = if (parsedArgs.mode == "realtime-multi") parsedArgs.runs else configWithSeed.realtime.runs,
-                    cloudletCount = if (parsedArgs.mode == "realtime-multi" && parsedArgs.taskCounts.isNotEmpty())
-                        parsedArgs.taskCounts.first() else configWithSeed.realtime.cloudletCount
-                )
-            )
-        }
-        else -> configWithSeed
-    }
+/**
+ * 根据系统配置更新日志设置
+ */
+private fun configureLogging(systemConfig: SystemConfig) {
+    // 可以在这里根据系统配置更新日志级别
+    // 目前我们使用logback.xml中的配置
+    Logger.info("系统配置加载完成 - 输出目录: ${systemConfig.output.resultsDir}, 日志级别: ${systemConfig.logging.level}")
 }
 
 /**
@@ -558,7 +553,7 @@ private fun validateEnvironment() {
         Logger.debug("最大可用内存: {} MB", maxMemoryMB)
 
         if (maxMemoryMB < 512) {
-            Logger.warn("可用内存较少 ({}} MB)，可能影响大規模实验性能", maxMemoryMB)
+            Logger.warn("可用内存较少 ({} MB)，可能影响大規模实验性能", maxMemoryMB)
         }
 
         // 检查编码设置
@@ -624,36 +619,41 @@ private fun printUsage() {
     Logger.info("  # 批处理模式 - 运行所有算法")
     Logger.info("  java -jar cloudsim-benchmark.jar batch --algorithms ALL")
     Logger.info("  java -jar cloudsim-benchmark.jar batch -a ALL")
-    Logger.info("")
+    Logger.info("  ")
+    Logger.info("  # 从单一配置文件运行实验（配置文件中指定模式）")
+    Logger.info("  java -jar cloudsim-benchmark.jar --config my_experiment_with_mode.toml")
+    Logger.info("  ")
     Logger.info("  # 批处理模式 - 指定算法")
     Logger.info("  java -jar cloudsim-benchmark.jar batch --algorithms PSO,WOA,GWO")
     Logger.info("  java -jar cloudsim-benchmark.jar batch -a PSO,WOA,GWO")
-    Logger.info("")
+    Logger.info("  ")
     Logger.info("  # 实时调度模式 - 运行所有算法")
     Logger.info("  java -jar cloudsim-benchmark.jar realtime --algorithms ALL")
     Logger.info("  java -jar cloudsim-benchmark.jar realtime -a ALL")
-    Logger.info("")
+    Logger.info("  ")
     Logger.info("  # 实时调度模式 - 指定算法")
     Logger.info("  java -jar cloudsim-benchmark.jar realtime --algorithms PSO_REALTIME,WOA_REALTIME")
     Logger.info("  java -jar cloudsim-benchmark.jar realtime -a PSO_REALTIME,WOA_REALTIME")
-    Logger.info("")
+    Logger.info("  ")
     Logger.info("  # 设置随机种子和运行次数")
     Logger.info("  java -jar cloudsim-benchmark.jar batch --algorithms PSO --seed 42 --runs 5")
     Logger.info("  java -jar cloudsim-benchmark.jar batch -a PSO -s 42 -r 5")
-    Logger.info("")
+    Logger.info("  ")
     Logger.info("  # 批量任务数实验 - 运行所有算法")
     Logger.info("  java -jar cloudsim-benchmark.jar batch-multi --tasks 50,100,200,500 --algorithms ALL")
     Logger.info("  java -jar cloudsim-benchmark.jar batch-multi -t 50,100,200,500 -a ALL")
-    Logger.info("")
+    Logger.info("  ")
     Logger.info("  # 批量任务数实验 - 指定算法")
     Logger.info("  java -jar cloudsim-benchmark.jar batch-multi --tasks 50,100,200,500 --algorithms PSO,WOA")
     Logger.info("  java -jar cloudsim-benchmark.jar batch-multi -t 50,100,200,500 -a PSO,WOA")
-    Logger.info("")
+    Logger.info("  ")
     Logger.info("  # 高级配置")
-    Logger.info("  java -jar cloudsim-benchmark.jar batch --config custom.toml --output results/ --verbose")
-    Logger.info("")
+    Logger.info("  java -jar cloudsim-benchmark.jar --config custom.toml --output results/ --verbose")
+    Logger.info("  ")
     Logger.info("配置:")
-    Logger.info("  所有配置参数在 config.ExperimentConfig 中统一管理")
-    Logger.info("  支持 TOML 配置文件，运行时可通过 --config 指定")
+    Logger.info("  实验配置在 config.ExperimentConfig 中管理")
+    Logger.info("  系统配置在 config.SystemConfig 中管理")
+    Logger.info("  支持 TOML 配置文件，运行时可通过 --config 指定单一配置文件")
+    Logger.info("  配置文件中可指定实验模式，如：[mode] = \"batch\"")
     Logger.info("  批量实验的每个任务数会运行多次并计算统计值")
 }

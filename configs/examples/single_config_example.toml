@@ -1,0 +1,91 @@
+# 示例配置文件：展示如何使用单一配置文件进行一次实验
+# 包含系统配置和实验配置
+
+# 实验模式（必填）
+mode = "batch"
+
+# 系统配置部分
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "{mode}_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[jvm]
+maxHeapSize = "4g"
+gcAlgorithm = "ZGC"
+
+# 实验配置部分
+[random]
+seed = 42
+
+[batch]
+cloudletCount = 100
+population = 30
+maxIter = 50
+runs = 5
+
+[batch.generator]
+type = "LOG_NORMAL"
+
+[batch.objective]
+cost = 0.3
+totalTime = 0.4
+loadBalance = 0.3
+makespan = 0.0
+
+[realtime]
+cloudletCount = 200
+simulationDuration = 500.0
+arrivalRate = 5.0
+runs = 3
+
+[realtime.generator]
+type = "LOG_NORMAL"
+
+[realtime.objective]
+cost = 0.25
+totalTime = 0.25
+loadBalance = 0.25
+makespan = 0.25
+
+[optimizer]
+population = 20
+maxIter = 20
+
+# 算法配置（可选）
+[algorithms.PSO]
+enabled = true
+description = "粒子群优化算法"
+population = 30
+maxIter = 50
+
+[algorithms.WOA]
+enabled = true
+description = "鲸鱼优化算法"
+population = 25
+maxIter = 40
+
+# 预设配置（可选）
+[presets.small_scale]
+- "PSO"
+- "WOA"
+- "GWO"
+
+[presets.large_scale]
+- "PSO"
+- "WOA"
+- "GWO"
+- "HHO"
+- "Improved-RL"

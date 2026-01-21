@@ -1,0 +1,65 @@
+# 实时多任务数模式测试配置文件
+# 该配置用于运行实时调度算法在不同任务数下的扩展性实验
+
+# 实验模式（必填）
+mode = "realtime_multi"
+
+# 系统配置部分
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "realtime_multi_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[jvm]
+maxHeapSize = "4g"
+gcAlgorithm = "ZGC"
+
+# 实时多任务数实验配置
+[random]
+seed = 42
+
+[realtime_multi]
+cloudletCounts = [50, 100, 200]
+simulationDuration = 500.0
+arrivalRate = 5.0
+runs = 3
+
+[realtime_multi.generator]
+type = "LOG_NORMAL"
+
+[realtime_multi.objective]
+cost = 0.25
+totalTime = 0.25
+loadBalance = 0.25
+makespan = 0.25
+
+# 算法配置
+[algorithms.PSO_REALTIME]
+enabled = true
+description = "实时粒子群优化算法"
+population = 20
+maxIter = 20
+
+[algorithms.WOA_REALTIME]
+enabled = true
+description = "实时鲸鱼优化算法"
+population = 20
+maxIter = 20
+
+[algorithms.RL_REALTIME]
+enabled = true
+description = "实时强化学习算法"
+population = 20
+maxIter = 20

@@ -1,0 +1,65 @@
+# 批处理多任务数模式测试配置文件
+# 该配置用于运行批处理调度算法在不同任务数下的扩展性实验
+
+# 实验模式（必填）
+mode = "batch_multi"
+
+# 系统配置部分
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "batch_multi_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[jvm]
+maxHeapSize = "4g"
+gcAlgorithm = "ZGC"
+
+# 批处理多任务数实验配置
+[random]
+seed = 42
+
+[batch_multi]
+cloudletCounts = [50, 100, 200, 500]
+population = 30
+maxIter = 50
+runs = 3
+
+[batch_multi.generator]
+type = "LOG_NORMAL"
+
+[batch_multi.objective]
+cost = 0.3
+totalTime = 0.4
+loadBalance = 0.3
+makespan = 0.0
+
+# 算法配置
+[algorithms.PSO]
+enabled = true
+description = "粒子群优化算法"
+population = 30
+maxIter = 50
+
+[algorithms.WOA]
+enabled = true
+description = "鲸鱼优化算法"
+population = 25
+maxIter = 40
+
+[algorithms.GWO]
+enabled = true
+description = "灰狼优化算法"
+population = 30
+maxIter = 50
