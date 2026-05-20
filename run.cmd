@@ -1,33 +1,21 @@
 @echo off
-:: CloudSim-Benchmark 运行脚本
-:: 支持新的命名参数格式
-:: 示例:
-::   run.cmd batch --algorithms ALL
-::   run.cmd realtime --algorithms ALL
-::   run.cmd --help
+setlocal EnableDelayedExpansion
 
-:: 强制控制台使用 UTF-8 编码
 chcp 65001 >nul
+set "JAR_FILE=build\libs\cloudsim-benchmark-1.0.0-all.jar"
+set "PROXY_GRADLE_ARGS="
 
-set JAR_FILE=build/libs/cloudsim-benchmark-1.0.0-all.jar
+call :configure_system_proxy
 
-if not exist "%JAR_FILE%" (
-    echo [错误] 找不到 JAR 文件，请先运行: gradlew fatJar
-    exit /b 1
+if "%~1"=="build" (
+    call :build_project
+    exit /b %errorlevel%
 )
 
-:: 执行程序
-if "%1"=="podman" (
+if "%~1"=="podman" (
     shift
-    echo [容器] 正在初始化工作空间...
-    
-    :: 在当前目录创建项目工作根目录（如果不存在）
     if not exist "benchmark_workspace" mkdir benchmark_workspace
     if not exist "runs" mkdir runs
-
-    echo [容器] 正在通过 Podman 运行...
-    :: 将四个目录挂载到容器内的 /app/benchmark_workspace 下
-    :: 并设置容器的工作目录为该新建的根目录
     podman run --rm ^
         -v "%cd%\runs:/app/benchmark_workspace/runs" ^
         -v "%cd%\configs:/app/benchmark_workspace/configs" ^
@@ -38,4 +26,37 @@ if "%1"=="podman" (
     exit /b %errorlevel%
 )
 
+if not exist "%JAR_FILE%" (
+    echo [WARN] Jar not found, building first...
+    call :build_project
+    if errorlevel 1 exit /b %errorlevel%
+)
+
 java -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 --enable-native-access=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar "%JAR_FILE%" %*
+exit /b %errorlevel%
+
+:configure_system_proxy
+set "SYSTEM_PROXY="
+set "PROXY_ENABLE="
+for /f "tokens=3" %%p in ('reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyEnable 2^>nul') do set "PROXY_ENABLE=%%p"
+if /i not "%PROXY_ENABLE%"=="0x1" exit /b 0
+for /f "tokens=2,*" %%a in ('reg query "HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings" /v ProxyServer 2^>nul') do set "SYSTEM_PROXY=%%b"
+if not defined SYSTEM_PROXY exit /b 0
+for /f "tokens=1 delims=;" %%p in ("%SYSTEM_PROXY%") do set "SYSTEM_PROXY=%%p"
+for /f "tokens=1,2 delims==" %%a in ("%SYSTEM_PROXY%") do if not "%%b"=="" set "SYSTEM_PROXY=%%b"
+for /f "tokens=1,2 delims=:" %%a in ("%SYSTEM_PROXY%") do (
+    set "PROXY_HOST=%%a"
+    set "PROXY_PORT=%%b"
+)
+if defined PROXY_HOST if defined PROXY_PORT (
+    set "GRADLE_OPTS=!GRADLE_OPTS! -Dhttp.proxyHost=!PROXY_HOST! -Dhttp.proxyPort=!PROXY_PORT! -Dhttps.proxyHost=!PROXY_HOST! -Dhttps.proxyPort=!PROXY_PORT!"
+    set "JAVA_TOOL_OPTIONS=!JAVA_TOOL_OPTIONS! -Dhttp.proxyHost=!PROXY_HOST! -Dhttp.proxyPort=!PROXY_PORT! -Dhttps.proxyHost=!PROXY_HOST! -Dhttps.proxyPort=!PROXY_PORT!"
+    set "PROXY_GRADLE_ARGS=-Dhttp.proxyHost=!PROXY_HOST! -Dhttp.proxyPort=!PROXY_PORT! -Dhttps.proxyHost=!PROXY_HOST! -Dhttps.proxyPort=!PROXY_PORT!"
+    echo [Proxy] Using system proxy: !PROXY_HOST!:!PROXY_PORT!
+)
+exit /b 0
+
+:build_project
+echo [Build] Running Gradle fatJar...
+call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon --no-configuration-cache
+exit /b %errorlevel%

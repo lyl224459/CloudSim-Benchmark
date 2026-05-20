@@ -4,11 +4,13 @@ import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.brokers.DatacenterBrokerSimple
 import scheduler.*
+import util.ExperimentConcurrency
+import util.ExperimentOutputContext
 import util.Logger
 import util.StatisticalValue
-import util.ResultsManager
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
 import java.text.DecimalFormat
 import java.util.*
 import kotlin.system.measureTimeMillis
@@ -46,32 +48,25 @@ class ComparisonRunner(
     private val population: Int = 30,
     private val maxIter: Int = 100,
     private val randomSeed: Long = 0L,
-    private val algorithms: List<config.BatchAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
     private val runs: Int = 1,  // 运行次数，默认1次
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
     private val googleTraceConfig: config.GoogleTraceConfig? = null,
     private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
+    private val resolvedAlgorithms: List<ResolvedAlgorithm>,
     private val experimentDir: java.io.File? = null,
+    private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir),
     private val useCoroutines: Boolean = true,
-    private val maxConcurrency: Int = 0
+    private val maxConcurrency: Int = 0,
+    private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency)
 ) {
-    private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
-
-    // 协程上下文：如果限制并发则使用固定线程池
-    private val coroutineContext = if (maxConcurrency > 0) {
-        newFixedThreadPoolContext(maxConcurrency, "BatchRunner")
-    } else {
-        Dispatchers.Default
-    }
-    
-    private val coroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
 
     /**
      * 运行单个算法并返回结果
      */
     private fun runAlgorithm(
         algorithmName: String,
+        runSeed: Long,
         schedulerFactory: (List<org.cloudsimplus.cloudlets.Cloudlet>, List<org.cloudsimplus.vms.Vm>) -> Scheduler
     ): AlgorithmResult {
         Logger.info("\n${"=".repeat(60)}")
@@ -94,6 +89,7 @@ class ComparisonRunner(
         broker.submitVmList(vmList)
         
         // 创建云任务列表
+        val random = Random(runSeed)
         val cloudletGenerator = CloudletGenerator(random, generatorType, googleTraceConfig)
         val cloudletList = cloudletGenerator.createCloudlets(0, cloudletCount)
         broker.submitCloudletList(cloudletList)
@@ -183,106 +179,97 @@ class ComparisonRunner(
      */
     suspend fun runComparison(): List<AlgorithmResult> = coroutineScope {
         Logger.info("\n${"=".repeat(60)}")
-        Logger.info("开始算法对比实验（协程优化）")
+        Logger.info("开始算法对比实验")
         Logger.info("任务数量: {}", cloudletCount)
         Logger.info("种群大小: {}", population)
         Logger.info("最大迭代次数: {}", maxIter)
         Logger.info("随机数种子: {}", randomSeed)
         Logger.info("运行次数: {}", runs)
+        Logger.info("执行模式: {}", executionModeDescription())
         Logger.info("${"=".repeat(60)}")
 
-        // 保存实验信息
-        experimentDir?.let { dir ->
-            ResultsManager.saveExperimentInfo(dir, mapOf(
-                "运行模式" to "批处理 (Batch)",
-                "任务数量" to cloudletCount,
-                "种群大小" to population,
-                "最大迭代次数" to maxIter,
-                "随机数种子" to randomSeed,
-                "运行次数" to runs,
-                "任务生成器" to generatorType.name
-            ))
-        }
+        outputContext.saveExperimentInfo(mapOf(
+            "运行模式" to "批处理 (Batch)",
+            "任务数量" to cloudletCount,
+            "种群大小" to population,
+            "最大迭代次数" to maxIter,
+            "随机数种子" to randomSeed,
+            "运行次数" to runs,
+            "任务生成器" to generatorType.name
+        ))
 
-        // 确定要运行的算法列表（如果配置为空，则运行所有算法）
-        val algorithmsToRun = if (algorithms.isEmpty()) {
-            config.BatchAlgorithmType.entries
-        } else {
-            algorithms
-        }
-
+        val algorithmsToRun = algorithmsToRun()
         Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
 
+        val results = mutableListOf<AlgorithmResult>()
         val executionTime = measureTimeMillis {
-            // 创建结果通道
-            val resultsChannel = Channel<AlgorithmResult>(algorithmsToRun.size)
+            results.addAll(executeAlgorithms(algorithmsToRun).sortedBy { it.algorithmName })
 
-            // 并行执行所有算法
-            val algorithmJobs = algorithmsToRun.map { algorithmType ->
-                async(Dispatchers.Default) {
-                    try {
-                        Logger.debug("开始执行算法: {}", algorithmType.name)
-                        val result = executeAlgorithmAsync(algorithmType)
-                        Logger.debug("算法 {} 执行完成", algorithmType.name)
-                        resultsChannel.send(result)
-                    } catch (e: Exception) {
-                        Logger.error("算法 {} 执行失败: {}", e, algorithmType.name, e.message)
-                        // 发送错误结果
-                        resultsChannel.send(AlgorithmResult(
-                            algorithmName = algorithmType.name,
-                            makespan = Double.NaN,
-                            loadBalance = Double.NaN,
-                            cost = Double.NaN,
-                            totalTime = Double.NaN,
-                            fitness = Double.NaN
-                        ))
-                    }
-                }
-            }
+            Logger.info("所有算法执行完成")
+            printComparisonResults(results)
+            exportToCSV(results)
 
-            // 等待所有算法完成并收集结果
-            val results = mutableListOf<AlgorithmResult>()
-            repeat(algorithmsToRun.size) {
-                results.add(resultsChannel.receive())
-            }
-
-            // 等待所有协程完成
-            algorithmJobs.forEach { it.join() }
-            resultsChannel.close()
-
-            Logger.info("所有算法并行执行完成")
-            printComparisonResults(results.sortedBy { it.algorithmName })
-            exportToCSV(results.sortedBy { it.algorithmName })
-
-            // 保存汇总结果
-            experimentDir?.let { dir ->
-                val summaryData = results.sortedBy { it.algorithmName }.map { r ->
-                    mapOf(
-                        "Algorithm" to r.algorithmName,
-                        "AvgMakespan" to r.makespan,
-                        "AvgLoadBalance" to r.loadBalance,
-                        "AvgCost" to r.cost,
-                        "AvgTotalTime" to r.totalTime,
-                        "AvgFitness" to r.fitness
-                    )
-                }
-                ResultsManager.saveSummaryResults(
-                    dir, summaryData,
-                    listOf("Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness")
+            val summaryData = results.map { r ->
+                mapOf(
+                    "Algorithm" to r.algorithmName,
+                    "AvgMakespan" to r.makespan,
+                    "AvgLoadBalance" to r.loadBalance,
+                    "AvgCost" to r.cost,
+                    "AvgTotalTime" to r.totalTime,
+                    "AvgFitness" to r.fitness
                 )
             }
+            outputContext.saveSummaryResults(
+                summaryData,
+                listOf("Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness")
+            )
         }
 
         Logger.info("算法对比实验完成，总耗时: {}ms", executionTime)
 
-        // 返回空列表，因为结果已经通过通道处理并保存
-        emptyList()
+        results
     }
-    
+
+    private fun algorithmsToRun(): List<ResolvedAlgorithm> {
+        if (resolvedAlgorithms.isEmpty()) {
+            throw IllegalArgumentException("ComparisonRunner 需要已解析的算法列表")
+        }
+        return resolvedAlgorithms
+    }
+
+    private suspend fun executeAlgorithms(algorithmsToRun: List<ResolvedAlgorithm>): List<AlgorithmResult> {
+        return concurrency.map(algorithmsToRun) { executeAlgorithmSafely(it) }
+    }
+
+    private suspend fun executeAlgorithmSafely(algorithm: ResolvedAlgorithm): AlgorithmResult {
+        return try {
+            Logger.debug("开始执行算法: {}", algorithm.name)
+            val result = executeAlgorithmAsync(algorithm)
+            Logger.debug("算法 {} 执行完成", algorithm.name)
+            result
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.error("算法 {} 执行失败: {}", e, algorithm.name, e.message)
+            AlgorithmResult(
+                algorithmName = algorithm.name,
+                makespan = Double.NaN,
+                loadBalance = Double.NaN,
+                cost = Double.NaN,
+                totalTime = Double.NaN,
+                fitness = Double.NaN
+            )
+        }
+    }
+
+    private fun executionModeDescription(): String {
+        return concurrency.description
+    }
+
     /**
      * 运行所有算法并返回统计结果（用于批量实验）
      */
-    fun runComparisonWithStatistics(): List<AlgorithmStatistics> {
+    suspend fun runComparisonWithStatistics(): List<AlgorithmStatistics> {
         Logger.info("\n${"=".repeat(60)}")
         Logger.info("开始算法对比实验（统计模式）")
         Logger.info("任务数量: {}", cloudletCount)
@@ -290,117 +277,15 @@ class ComparisonRunner(
         Logger.info("最大迭代次数: {}", maxIter)
         Logger.info("随机数种子: {}", randomSeed)
         Logger.info("运行次数: {}", runs)
+        Logger.info("执行模式: {}", executionModeDescription())
         Logger.info("${"=".repeat(60)}")
-        
-        val statistics = mutableListOf<AlgorithmStatistics>()
-        
-        // 确定要运行的算法列表（如果配置为空，则运行所有算法）
-        val algorithmsToRun = if (algorithms.isEmpty()) {
-            config.BatchAlgorithmType.entries
-        } else {
-            algorithms
-        }
-        
+
+        val algorithmsToRun = algorithmsToRun()
         Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
-        
-        // 根据配置运行选定的算法
-        for (algorithmType in algorithmsToRun) {
-            val runResults = mutableListOf<AlgorithmResult>()
-            
-            // 运行多次
-            for (run in 1..runs) {
-                Logger.info("\n--- {} 算法，第 {}/{} 次运行 ---", algorithmType.name, run, runs)
-                val result = when (algorithmType) {
-                    config.BatchAlgorithmType.RANDOM -> {
-                        runAlgorithm("Random") { cloudlets, vms ->
-                            RandomScheduler(cloudlets, vms, objectiveWeights, Random(randomSeed + run))
-                        }
-                    }
-                    config.BatchAlgorithmType.PSO -> {
-                        runAlgorithm("PSO") { cloudlets, vms ->
-                            PSOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                        }
-                    }
-                    config.BatchAlgorithmType.WOA -> {
-                        runAlgorithm("WOA") { cloudlets, vms ->
-                            WOAScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                        }
-                    }
-                    config.BatchAlgorithmType.GWO -> {
-                        runAlgorithm("GWO") { cloudlets, vms ->
-                            GWOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                        }
-                    }
-                    config.BatchAlgorithmType.HHO -> {
-                        runAlgorithm("HHO") { cloudlets, vms ->
-                            HHOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                        }
-                    }
-                    config.BatchAlgorithmType.RL -> {
-                        runAlgorithm("RL") { cloudlets, vms ->
-                            RLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
-                        }
-                    }
-                    config.BatchAlgorithmType.IMPROVED_RL -> {
-                        runAlgorithm("Improved-RL") { cloudlets, vms ->
-                            ImprovedRLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
-                        }
-                    }
-                }
-                runResults.add(result)
-            }
-            
-            // 计算统计值
-            val makespanStats = DescriptiveStatistics()
-            val loadBalanceStats = DescriptiveStatistics()
-            val costStats = DescriptiveStatistics()
-            val totalTimeStats = DescriptiveStatistics()
-            val fitnessStats = DescriptiveStatistics()
-            
-            for (result in runResults) {
-                makespanStats.addValue(result.makespan)
-                loadBalanceStats.addValue(result.loadBalance)
-                costStats.addValue(result.cost)
-                totalTimeStats.addValue(result.totalTime)
-                fitnessStats.addValue(result.fitness)
-            }
-            
-            statistics.add(AlgorithmStatistics(
-                algorithmName = runResults[0].algorithmName,
-                makespan = StatisticalValue(
-                    mean = makespanStats.mean,
-                    stdDev = makespanStats.standardDeviation,
-                    min = makespanStats.min,
-                    max = makespanStats.max
-                ),
-                loadBalance = StatisticalValue(
-                    mean = loadBalanceStats.mean,
-                    stdDev = loadBalanceStats.standardDeviation,
-                    min = loadBalanceStats.min,
-                    max = loadBalanceStats.max
-                ),
-                cost = StatisticalValue(
-                    mean = costStats.mean,
-                    stdDev = costStats.standardDeviation,
-                    min = costStats.min,
-                    max = costStats.max
-                ),
-                totalTime = StatisticalValue(
-                    mean = totalTimeStats.mean,
-                    stdDev = totalTimeStats.standardDeviation,
-                    min = totalTimeStats.min,
-                    max = totalTimeStats.max
-                ),
-                fitness = StatisticalValue(
-                    mean = fitnessStats.mean,
-                    stdDev = fitnessStats.standardDeviation,
-                    min = fitnessStats.min,
-                    max = fitnessStats.max
-                )
-            ))
-        }
-        
-        return statistics
+
+        return concurrency.map(algorithmsToRun) { algorithm ->
+            calculateStatistics(executeAlgorithmRuns(algorithm))
+        }.sortedBy { it.algorithmName }
     }
     
     /**
@@ -439,43 +324,63 @@ class ComparisonRunner(
         Logger.result("  最小 Fitness: {} ({})", bestFitness?.algorithmName, dft.format(bestFitness?.fitness))
         Logger.result("${"=".repeat(80)}\n")
         
-        // 导出 CSV 文件
-        exportToCSV(results)
     }
     
     /**
      * 导出结果到 CSV 文件
      */
     private fun exportToCSV(results: List<AlgorithmResult>) {
-        val csvFile = ResultsManager.generateBatchResultFileName()
+        if (!outputContext.csvEnabled) {
+            Logger.info("CSV 输出已禁用，跳过批处理结果导出")
+            return
+        }
+        val csvFile = outputContext.generateResultFileName("batch_comparison")
         csvFile.bufferedWriter().use { writer ->
             // 写入表头
             if (runs > 1) {
-                writer.write("Algorithm,Makespan_Mean,Makespan_StdDev,LoadBalance_Mean,LoadBalance_StdDev," +
-                        "Cost_Mean,Cost_StdDev,TotalTime_Mean,TotalTime_StdDev,Fitness_Mean,Fitness_StdDev,Runs\n")
+                writer.write(
+                    outputContext.csvLine(
+                        listOf(
+                            "Algorithm", "Makespan_Mean", "Makespan_StdDev", "LoadBalance_Mean", "LoadBalance_StdDev",
+                            "Cost_Mean", "Cost_StdDev", "TotalTime_Mean", "TotalTime_StdDev", "Fitness_Mean", "Fitness_StdDev", "Runs"
+                        )
+                    ) + "\n"
+                )
             } else {
-                writer.write("Algorithm,Makespan,LoadBalance,Cost,TotalTime,Fitness\n")
+                writer.write(outputContext.csvLine(listOf("Algorithm", "Makespan", "LoadBalance", "Cost", "TotalTime", "Fitness")) + "\n")
             }
             
             // 写入数据
             for (result in results) {
                 if (runs > 1) {
                     // 多次运行：导出平均值和标准差（需要从统计结果中获取）
-                    writer.write("${result.algorithmName}," +
-                            "${result.makespan},0.0," +
-                            "${result.loadBalance},0.0," +
-                            "${result.cost},0.0," +
-                            "${result.totalTime},0.0," +
-                            "${result.fitness},0.0," +
-                            "${runs}\n")
+                    writer.write(
+                        outputContext.csvLine(
+                            listOf(
+                                result.algorithmName,
+                                result.makespan, 0.0,
+                                result.loadBalance, 0.0,
+                                result.cost, 0.0,
+                                result.totalTime, 0.0,
+                                result.fitness, 0.0,
+                                runs
+                            )
+                        ) + "\n"
+                    )
                 } else {
                     // 单次运行：导出原始值
-                    writer.write("${result.algorithmName}," +
-                            "${result.makespan}," +
-                            "${result.loadBalance}," +
-                            "${result.cost}," +
-                            "${result.totalTime}," +
-                            "${result.fitness}\n")
+                    writer.write(
+                        outputContext.csvLine(
+                            listOf(
+                                result.algorithmName,
+                                result.makespan,
+                                result.loadBalance,
+                                result.cost,
+                                result.totalTime,
+                                result.fitness
+                            )
+                        ) + "\n"
+                    )
                 }
             }
         }
@@ -495,95 +400,81 @@ class ComparisonRunner(
         }
     }
 
+    fun runComparisonWithStatisticsSync(): List<AlgorithmStatistics> = runBlocking {
+        runComparisonWithStatistics()
+    }
+
     /**
      * 异步执行单个算法
      */
-    private suspend fun executeAlgorithmAsync(algorithmType: config.BatchAlgorithmType): AlgorithmResult = coroutineScope {
-        if (runs > 1) {
-            // 多次运行，使用协程并行执行
-            val runJobs = (1..runs).map { run ->
-                async(Dispatchers.Default) {
-                    Logger.debug("算法 {} 开始第 {}/{} 次运行", algorithmType.name, run, runs)
-                    val result = executeSingleRunAsync(algorithmType, run)
-                    Logger.debug("算法 {} 第 {} 次运行完成", algorithmType.name, run)
-                    result
-                }
-            }
+    private suspend fun executeAlgorithmAsync(algorithm: ResolvedAlgorithm): AlgorithmResult = coroutineScope {
+        averageResults(executeAlgorithmRuns(algorithm))
+    }
 
-            // 收集所有运行结果
-            val runResults = runJobs.map { it.await() }
-
-            // 计算统计结果
-            AlgorithmResult(
-                algorithmName = runResults[0].algorithmName,
-                makespan = runResults.map { it.makespan }.average(),
-                loadBalance = runResults.map { it.loadBalance }.average(),
-                cost = runResults.map { it.cost }.average(),
-                totalTime = runResults.map { it.totalTime }.average(),
-                fitness = runResults.map { it.fitness }.average()
-            )
-        } else {
-            // 单次运行
-            executeSingleRunAsync(algorithmType, 1)
+    private suspend fun executeAlgorithmRuns(algorithm: ResolvedAlgorithm): List<AlgorithmResult> {
+        return concurrency.map(1..runs) { run ->
+            Logger.debug("算法 {} 开始第 {}/{} 次运行", algorithm.name, run, runs)
+            val result = executeSingleRunAsync(algorithm, run)
+            Logger.debug("算法 {} 第 {} 次运行完成", algorithm.name, run)
+            result
         }
+    }
+
+    private fun averageResults(runResults: List<AlgorithmResult>): AlgorithmResult {
+        return AlgorithmResult(
+            algorithmName = runResults[0].algorithmName,
+            makespan = runResults.map { it.makespan }.average(),
+            loadBalance = runResults.map { it.loadBalance }.average(),
+            cost = runResults.map { it.cost }.average(),
+            totalTime = runResults.map { it.totalTime }.average(),
+            fitness = runResults.map { it.fitness }.average()
+        )
+    }
+
+    private fun calculateStatistics(runResults: List<AlgorithmResult>): AlgorithmStatistics {
+        fun stats(values: List<Double>): StatisticalValue {
+            val ds = DescriptiveStatistics()
+            values.forEach(ds::addValue)
+            return StatisticalValue(ds.mean, ds.standardDeviation, ds.min, ds.max)
+        }
+
+        return AlgorithmStatistics(
+            algorithmName = runResults[0].algorithmName,
+            makespan = stats(runResults.map { it.makespan }),
+            loadBalance = stats(runResults.map { it.loadBalance }),
+            cost = stats(runResults.map { it.cost }),
+            totalTime = stats(runResults.map { it.totalTime }),
+            fitness = stats(runResults.map { it.fitness })
+        )
     }
 
     /**
      * 异步执行单次运行
      */
-    private suspend fun executeSingleRunAsync(algorithmType: config.BatchAlgorithmType, run: Int): AlgorithmResult =
-        withContext(Dispatchers.Default) {
-            val result = when (algorithmType) {
-                config.BatchAlgorithmType.RANDOM -> {
-                    runAlgorithm("Random") { cloudlets, vms ->
-                        RandomScheduler(cloudlets, vms, objectiveWeights, Random(randomSeed + run))
-                    }
-                }
-                config.BatchAlgorithmType.PSO -> {
-                    runAlgorithm("PSO") { cloudlets, vms ->
-                        PSOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                    }
-                }
-                config.BatchAlgorithmType.WOA -> {
-                    runAlgorithm("WOA") { cloudlets, vms ->
-                        WOAScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                    }
-                }
-                config.BatchAlgorithmType.GWO -> {
-                    runAlgorithm("GWO") { cloudlets, vms ->
-                        GWOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                    }
-                }
-                config.BatchAlgorithmType.HHO -> {
-                    runAlgorithm("HHO") { cloudlets, vms ->
-                        HHOScheduler(cloudlets, vms, objectiveWeights, population, maxIter, Random(randomSeed + run))
-                    }
-                }
-                config.BatchAlgorithmType.RL -> {
-                    runAlgorithm("RL") { cloudlets, vms ->
-                        RLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
-                    }
-                }
-                config.BatchAlgorithmType.IMPROVED_RL -> {
-                    runAlgorithm("Improved-RL") { cloudlets, vms ->
-                        ImprovedRLScheduler(cloudlets, vms, objectiveWeights, random = kotlin.random.Random(randomSeed + run))
-                    }
-                }
-            }
-
-            // 保存单次试验结果
-            experimentDir?.let { dir ->
-                ResultsManager.saveAlgorithmTrialResult(
-                    dir, result.algorithmName, run,
-                    mapOf(
-                        "Makespan" to result.makespan,
-                        "LoadBalance" to result.loadBalance,
-                        "Cost" to result.cost,
-                        "TotalTime" to result.totalTime,
-                        "Fitness" to result.fitness
-                    )
+    private suspend fun executeSingleRunAsync(algorithm: ResolvedAlgorithm, run: Int): AlgorithmResult =
+        concurrency.run {
+            val runSeed = randomSeed + run
+            val result = runAlgorithm(algorithm.displayName, runSeed) { cloudlets, vms ->
+                algorithm.definition.batchFactory!!.invoke(
+                    cloudlets,
+                    vms,
+                    objectiveWeights,
+                    algorithm.settings,
+                    runSeed
                 )
             }
+
+            outputContext.saveAlgorithmTrialResult(
+                result.algorithmName,
+                run,
+                mapOf(
+                    "Makespan" to result.makespan,
+                    "LoadBalance" to result.loadBalance,
+                    "Cost" to result.cost,
+                    "TotalTime" to result.totalTime,
+                    "Fitness" to result.fitness
+                )
+            )
             result
         }
 }

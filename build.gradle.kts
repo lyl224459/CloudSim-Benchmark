@@ -327,8 +327,8 @@ tasks.register<CreateStartScripts>("createRunScript") {
 /**
  * 批处理模式运行任务
  * 用法: 
- *   gradle runBatch                                    # 运行所有算法
- *   gradle runBatch -Palgorithms=PSO,WOA              # 运行指定算法
+ *   gradle runBatch                                    # 运行默认 profile / 模式
+ *   gradle runBatch -Palgorithms=PSO,WOA              # 覆盖算法列表
  *   gradle runBatch -Palgorithms=PSO,WOA -Pseed=42     # 指定算法和随机种子
  */
 tasks.register<JavaExec>("runBatch") {
@@ -343,12 +343,12 @@ tasks.register<JavaExec>("runBatch") {
     val seed = project.findProperty("seed") as String?
     
     // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>("batch")
+    val argsList = mutableListOf<String>("run", "--mode", "batch")
     if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.add(algorithms)
+        argsList.addAll(listOf("--algorithms", algorithms))
     }
     if (seed != null && seed.isNotEmpty()) {
-        argsList.add(seed)
+        argsList.addAll(listOf("--seed", seed))
     }
     
     args = argsList
@@ -370,8 +370,8 @@ tasks.register<JavaExec>("runBatch") {
 /**
  * 实时调度模式运行任务
  * 用法: 
- *   gradle runRealtime                                    # 运行所有算法
- *   gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME  # 运行指定算法
+ *   gradle runRealtime                                    # 运行默认 profile / 模式
+ *   gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME  # 覆盖算法列表
  *   gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME -Pseed=123  # 指定算法和随机种子
  */
 tasks.register<JavaExec>("runRealtime") {
@@ -386,12 +386,12 @@ tasks.register<JavaExec>("runRealtime") {
     val seed = project.findProperty("seed") as String?
     
     // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>("realtime")
+    val argsList = mutableListOf<String>("run", "--mode", "realtime")
     if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.add(algorithms)
+        argsList.addAll(listOf("--algorithms", algorithms))
     }
     if (seed != null && seed.isNotEmpty()) {
-        argsList.add(seed)
+        argsList.addAll(listOf("--seed", seed))
     }
     
     args = argsList
@@ -413,7 +413,7 @@ tasks.register<JavaExec>("runRealtime") {
 /**
  * 批量任务数实验任务
  * 用法: 
- *   gradle runBatchMulti                                    # 默认任务数 (50,100,200,500)
+ *   gradle runBatchMulti                                    # 默认任务数 / profile
  *   gradle runBatchMulti -PcloudletCounts=50,100,200,500,1000  # 指定任务数
  *   gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA  # 指定任务数和算法
  *   gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA -Pseed=42  # 完整参数
@@ -431,12 +431,12 @@ tasks.register<JavaExec>("runBatchMulti") {
     val seed = project.findProperty("seed") as String?
     
     // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>("batch-multi", cloudletCounts)
+    val argsList = mutableListOf<String>("run", "--mode", "batch-multi", "--tasks", cloudletCounts)
     if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.add(algorithms)
+        argsList.addAll(listOf("--algorithms", algorithms))
     }
     if (seed != null && seed.isNotEmpty()) {
-        argsList.add(seed)
+        argsList.addAll(listOf("--seed", seed))
     }
     
     args = argsList
@@ -467,18 +467,17 @@ tasks.register<JavaExec>("runRealtimeMulti") {
     val algorithms = project.findProperty("algorithms") as String?
     val seed = project.findProperty("seed") as String?
 
-    val argsList = mutableListOf<String>("realtime-multi")
+    val argsList = mutableListOf<String>("run", "--mode", "realtime-multi")
     if (cloudletCounts != null && cloudletCounts.isNotEmpty()) {
-        argsList.add(cloudletCounts)
+        argsList.addAll(listOf("--tasks", cloudletCounts))
     } else {
-        // Default cloudlet counts if not provided
-        argsList.add("50,100,200,500")
+        argsList.addAll(listOf("--tasks", "50,100,200,500"))
     }
     if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.add(algorithms)
+        argsList.addAll(listOf("--algorithms", algorithms))
     }
     if (seed != null && seed.isNotEmpty()) {
-        argsList.add(seed)
+        argsList.addAll(listOf("--seed", seed))
     }
 
     args = argsList

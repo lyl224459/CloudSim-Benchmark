@@ -2,10 +2,9 @@ package datacenter
 
 import config.CloudletGenConfig
 import config.GoogleTraceConfig
+import config.RealtimeArrivalConfig
 import datacenter.generator.CloudletGeneratorFactory
 import org.cloudsimplus.cloudlets.Cloudlet
-import org.cloudsimplus.cloudlets.CloudletSimple
-import org.cloudsimplus.utilizationmodels.UtilizationModelFull
 import java.util.*
 
 /**
@@ -16,6 +15,7 @@ class RealtimeCloudletGenerator(
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
     private val arrivalRate: Double = 10.0,  // 平均每秒到达的任务数（泊松分布）
     private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE,
+    private val arrivalConfig: RealtimeArrivalConfig = RealtimeArrivalConfig(),
     private val googleTraceConfig: GoogleTraceConfig? = null
 ) {
     private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random, googleTraceConfig)
@@ -33,32 +33,89 @@ class RealtimeCloudletGenerator(
         count: Int = config.DatacenterConfig.DEFAULT_CLOUDLET_N,
         simulationDuration: Double = 1000.0
     ): List<Cloudlet> {
-        // 使用指数分布生成任务到达间隔（泊松过程的到达间隔）
-        var currentTime = 0.0
-        val lambda = arrivalRate  // 到达率
-        
-        val cloudlets = mutableListOf<Cloudlet>()
-        
-        // 先生成所有任务（不带到达时间）
         val baseCloudlets = strategy.createCloudlets(userId, count, random)
-        
-        // 为每个任务设置到达时间
-        for (cloudlet in baseCloudlets) {
-            // 生成到达间隔（指数分布）
-            val interArrivalTime = -Math.log(1 - random.nextDouble()) / lambda
-            
-            // 确保任务在仿真时间内到达
-            currentTime += interArrivalTime
-            if (currentTime > simulationDuration) {
-                break
-            }
-            
-            // 设置任务到达时间（提交延迟）
-            cloudlet.setSubmissionDelay(currentTime)
+        val arrivalTimes = generateArrivalTimes(count, simulationDuration)
+
+        val cloudlets = mutableListOf<Cloudlet>()
+        for ((index, arrivalTime) in arrivalTimes.withIndex()) {
+            if (index >= baseCloudlets.size) break
+            val cloudlet = baseCloudlets[index]
+            cloudlet.setSubmissionDelay(arrivalTime)
             cloudlets.add(cloudlet)
         }
-        
         return cloudlets
+    }
+
+    internal fun generateArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+        if (count <= 0 || simulationDuration <= 0.0) {
+            return emptyList()
+        }
+
+        return when (arrivalConfig.distribution.lowercase()) {
+            "uniform" -> generateUniformArrivalTimes(count, simulationDuration)
+            "burst" -> generateBurstArrivalTimes(count, simulationDuration)
+            else -> generatePoissonArrivalTimes(count, simulationDuration)
+        }
+    }
+
+    private fun generatePoissonArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+        val times = mutableListOf<Double>()
+        var currentTime = 0.0
+
+        repeat(count) {
+            currentTime += exponentialInterArrival(arrivalRate)
+            if (currentTime > simulationDuration) {
+                return times
+            }
+            times.add(currentTime)
+        }
+        return times
+    }
+
+    private fun generateUniformArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+        val interval = if (arrivalRate > 0.0) {
+            1.0 / arrivalRate
+        } else {
+            simulationDuration / count.toDouble()
+        }
+        val times = mutableListOf<Double>()
+        var currentTime = interval
+        repeat(count) {
+            if (currentTime > simulationDuration) {
+                return times
+            }
+            times.add(currentTime)
+            currentTime += interval
+        }
+        return times
+    }
+
+    private fun generateBurstArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+        val times = mutableListOf<Double>()
+        val burstWindow = arrivalConfig.burstDuration.coerceAtLeast(1.0)
+        val cycleWindow = (burstWindow * 2.0).coerceAtLeast(burstWindow + 1.0)
+        var currentTime = 0.0
+
+        repeat(count) {
+            val positionInCycle = currentTime % cycleWindow
+            val activeRate = if (positionInCycle <= burstWindow) {
+                arrivalRate * arrivalConfig.burstIntensity
+            } else {
+                (arrivalRate / arrivalConfig.burstIntensity).coerceAtLeast(0.1)
+            }
+
+            currentTime += exponentialInterArrival(activeRate)
+            if (currentTime > simulationDuration) {
+                return times
+            }
+            times.add(currentTime)
+        }
+        return times
+    }
+
+    private fun exponentialInterArrival(rate: Double): Double {
+        val safeRate = rate.coerceAtLeast(0.0001)
+        return -Math.log(1.0 - random.nextDouble()) / safeRate
     }
 }
 

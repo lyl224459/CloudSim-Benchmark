@@ -1,8 +1,11 @@
 package config
 
 import com.akuleshov7.ktoml.Toml
+import com.akuleshov7.ktoml.TomlInputConfig
+import com.akuleshov7.ktoml.TomlOutputConfig
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.serializer
+import kotlinx.serialization.modules.EmptySerializersModule
 import util.Logger
 import java.io.File
 
@@ -50,15 +53,22 @@ enum class ExperimentMode {
  */
 @Serializable
 data class ExperimentTomlConfig(
+    val defaultProfile: String? = null,
     val mode: String? = null,  // 实验模式
     val random: RandomConfig? = null,
     val batch: TomlBatchConfig? = null,
+    val batch_multi: TomlBatchConfig? = null,
     val realtime: TomlRealtimeConfig? = null,
+    val realtime_multi: TomlRealtimeConfig? = null,
     val optimizer: TomlOptimizerConfig? = null,
     // 算法配置
-    val algorithms: Map<String, Map<String, AlgorithmConfig>>? = null,
+    @kotlinx.serialization.Transient
+    val algorithms: Map<String, AlgorithmConfig> = emptyMap(),
     // 预设配置
-    val presets: Map<String, List<String>>? = null
+    @kotlinx.serialization.Transient
+    val presets: Map<String, PresetConfig> = emptyMap(),
+    @kotlinx.serialization.Transient
+    val profiles: Map<String, ProfileConfig> = emptyMap()
 )
 
 @Serializable
@@ -70,6 +80,24 @@ data class AlgorithmConfig(
 )
 
 @Serializable
+data class PresetConfig(
+    val algorithms: List<String> = emptyList()
+)
+
+@Serializable
+data class ProfileConfig(
+    val mode: String = "",
+    val algorithms: List<String> = emptyList(),
+    val preset: String? = null,
+    val runs: Int? = null,
+    val seed: Long? = null,
+    val tasks: List<Int> = emptyList(),
+    val outputDir: String? = null,
+    val batch: TomlBatchConfig? = null,
+    val realtime: TomlRealtimeConfig? = null
+)
+
+@Serializable
 data class RandomConfig(
     val seed: Long = 0L
 )
@@ -77,6 +105,7 @@ data class RandomConfig(
 @Serializable
 data class TomlBatchConfig(
     val cloudletCount: Int = 100,
+    val cloudletCounts: List<Int> = emptyList(),
     val population: Int = 30,
     val maxIter: Int = 50,
     val runs: Int = 1,
@@ -90,14 +119,32 @@ data class TomlBatchConfig(
 @Serializable
 data class TomlRealtimeConfig(
     val cloudletCount: Int = 200,
+    val cloudletCounts: List<Int> = emptyList(),
     val simulationDuration: Double = 500.0,
     val arrivalRate: Double = 5.0,
     val runs: Int = 1,
     val generator: GeneratorConfig = GeneratorConfig.LOG_NORMAL,
     val objective: ObjectiveWeightsConfig = ObjectiveWeightsConfig(),
+    val arrival: RealtimeArrivalConfig = RealtimeArrivalConfig(),
+    val scheduling: RealtimeSchedulingConfig = RealtimeSchedulingConfig(),
     // 向后兼容
     val generatorType: String = "LOG_NORMAL",
     val googleTrace: GoogleTraceConfig? = null
+)
+
+@Serializable
+data class RealtimeArrivalConfig(
+    val distribution: String = "poisson",
+    val burstIntensity: Double = 2.0,
+    val burstDuration: Double = 50.0
+)
+
+@Serializable
+data class RealtimeSchedulingConfig(
+    val strategy: String = "dynamic",
+    val maxQueueSize: Int = Int.MAX_VALUE,
+    val taskTimeout: Double = 0.0,
+    val resourceReservation: String = "none"
 )
 
 @Serializable
@@ -131,6 +178,10 @@ data class TomlOptimizerConfig(
  * 专门管理实验参数，如任务数量、算法参数、目标函数等
  */
 data class ExperimentConfig(
+    val defaultProfile: String? = null,
+
+    val profiles: Map<String, ProfileConfig> = emptyMap(),
+
     // ========== 实验模式 ==========
     val mode: ExperimentMode = ExperimentMode.BATCH,
     
@@ -144,7 +195,11 @@ data class ExperimentConfig(
     val randomSeed: Long = 0L,
 
     // ========== 优化算法配置 ==========
-    val optimizer: OptimizerConfig = OptimizerConfig()
+    val optimizer: OptimizerConfig = OptimizerConfig(),
+
+    // ========== 算法与预设配置 ==========
+    val algorithmConfigs: Map<String, AlgorithmConfig> = emptyMap(),
+    val presets: Map<String, PresetConfig> = emptyMap()
 ) {
     companion object {
         /**
@@ -152,7 +207,16 @@ data class ExperimentConfig(
          * 优先级：指定配置文件 > 默认配置
          */
         fun load(configPath: String): ExperimentConfig {
-            val config = loadInternal(configPath)
+            val config = loadInternal(configPath, requireProfiles = true)
+            validateConfig(config, requireProfiles = true)
+            return config
+        }
+
+        /**
+         * 加载算法库或仅包含算法/预设的配置片段。
+         */
+        fun loadLibrary(configPath: String): ExperimentConfig {
+            val config = loadInternal(configPath, requireProfiles = false)
             validateConfig(config)
             return config
         }
@@ -182,7 +246,7 @@ data class ExperimentConfig(
          * 解析实验模式
          */
         fun parseExperimentMode(mode: String): ExperimentMode = try {
-            ExperimentMode.valueOf(mode.uppercase())
+            ExperimentMode.valueOf(mode.uppercase().replace("-", "_"))
         } catch (e: IllegalArgumentException) {
             Logger.warn("未知的实验模式: {}, 使用默认值 BATCH", mode)
             ExperimentMode.BATCH
@@ -191,7 +255,7 @@ data class ExperimentConfig(
         /**
          * 内部加载方法（不验证）
          */
-        private fun loadInternal(configPath: String): ExperimentConfig {
+        private fun loadInternal(configPath: String, requireProfiles: Boolean): ExperimentConfig {
             try {
                 val file = File(configPath)
                 if (!file.exists()) {
@@ -199,20 +263,29 @@ data class ExperimentConfig(
                 }
 
                 val tomlContent = file.readText()
-                val tomlConfig = Toml.decodeFromString(serializer<ExperimentTomlConfig>(), tomlContent)
+                val tomlConfig = Toml(
+                    TomlInputConfig(ignoreUnknownNames = true),
+                    TomlOutputConfig(),
+                    EmptySerializersModule()
+                ).decodeFromString(serializer<ExperimentTomlConfig>(), tomlContent)
 
-                val mode = if (tomlConfig.mode != null) {
-                    parseExperimentMode(tomlConfig.mode)
-                } else {
-                    ExperimentMode.BATCH  // 默认为批处理模式
+                val profiles = parseProfileConfigs(tomlContent)
+                if (profiles.isEmpty()) {
+                    if (tomlConfig.mode != null || tomlConfig.batch != null || tomlConfig.realtime != null) {
+                        throw IllegalArgumentException("旧顶层实验 schema 已废弃，请迁移到 [profiles.NAME]")
+                    }
+                    if (requireProfiles) {
+                        throw IllegalArgumentException("未找到 profiles 配置，请至少定义一个 [profiles.NAME]")
+                    }
                 }
 
                 return ExperimentConfig(
-                    mode = mode,
+                    defaultProfile = tomlConfig.defaultProfile,
+                    profiles = profiles,
                     randomSeed = tomlConfig.random?.seed ?: 0L,
-                    batch = mergeBatchConfig(BatchConfig(), tomlConfig.batch),
-                    realtime = mergeRealtimeConfig(RealtimeConfig(), tomlConfig.realtime),
-                    optimizer = mergeOptimizerConfig(OptimizerConfig(), tomlConfig.optimizer)
+                    optimizer = mergeOptimizerConfig(OptimizerConfig(), tomlConfig.optimizer),
+                    algorithmConfigs = parseAlgorithmConfigs(tomlContent),
+                    presets = parsePresetConfigs(tomlContent)
                 )
             } catch (e: Exception) {
                 Logger.error("加载实验配置时发生错误: ${e.message}", e)
@@ -223,7 +296,7 @@ data class ExperimentConfig(
         /**
          * 合并批处理配置
          */
-        private fun mergeBatchConfig(base: BatchConfig, toml: TomlBatchConfig?): BatchConfig {
+        internal fun mergeBatchConfig(base: BatchConfig, toml: TomlBatchConfig?): BatchConfig {
             if (toml == null) return base
 
             // 解析生成器配置（新格式优先）
@@ -238,8 +311,9 @@ data class ExperimentConfig(
 
             return base.copy(
                 cloudletCount = toml.cloudletCount,
-                population = toml.population ?: base.population,
-                maxIter = toml.maxIter ?: base.maxIter,
+                cloudletCounts = toml.cloudletCounts,
+                population = toml.population,
+                maxIter = toml.maxIter,
                 runs = toml.runs,
                 generatorType = generatorType,
                 googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
@@ -250,7 +324,7 @@ data class ExperimentConfig(
         /**
          * 合并实时调度配置
          */
-        private fun mergeRealtimeConfig(base: RealtimeConfig, toml: TomlRealtimeConfig?): RealtimeConfig {
+        internal fun mergeRealtimeConfig(base: RealtimeConfig, toml: TomlRealtimeConfig?): RealtimeConfig {
             if (toml == null) return base
 
             // 解析生成器配置（新格式优先）
@@ -267,11 +341,249 @@ data class ExperimentConfig(
                 cloudletCount = toml.cloudletCount,
                 simulationDuration = toml.simulationDuration,
                 arrivalRate = toml.arrivalRate,
+                cloudletCounts = toml.cloudletCounts,
                 runs = toml.runs,
                 generatorType = generatorType,
                 googleTraceConfig = toml.googleTrace ?: base.googleTraceConfig,
-                objectiveWeights = objectiveWeights
+                objectiveWeights = objectiveWeights,
+                arrival = toml.arrival,
+                scheduling = toml.scheduling
             )
+        }
+
+        private fun buildBatchToml(properties: Map<String, String>, base: TomlBatchConfig?): TomlBatchConfig {
+            if (properties.isEmpty()) return base ?: TomlBatchConfig()
+            val current = base ?: TomlBatchConfig()
+            return TomlBatchConfig(
+                cloudletCount = properties["cloudletCount"]?.let { parseRequiredInt("batch.cloudletCount", it) } ?: current.cloudletCount,
+                cloudletCounts = properties["cloudletCounts"]?.let { parseIntArrayValue(it) } ?: current.cloudletCounts,
+                population = properties["population"]?.let { parseRequiredInt("batch.population", it) } ?: current.population,
+                maxIter = properties["maxIter"]?.let { parseRequiredInt("batch.maxIter", it) } ?: current.maxIter,
+                runs = properties["runs"]?.let { parseRequiredInt("batch.runs", it) } ?: current.runs,
+                generator = current.generator,
+                objective = current.objective,
+                generatorType = properties["generatorType"]?.let { TomlSectionParser.unquote(it) } ?: current.generatorType,
+                googleTrace = current.googleTrace
+            )
+        }
+
+        private fun buildRealtimeToml(properties: Map<String, String>, base: TomlRealtimeConfig?): TomlRealtimeConfig {
+            if (properties.isEmpty()) return base ?: TomlRealtimeConfig()
+            val current = base ?: TomlRealtimeConfig()
+            return TomlRealtimeConfig(
+                cloudletCount = properties["cloudletCount"]?.let { parseRequiredInt("realtime.cloudletCount", it) } ?: current.cloudletCount,
+                cloudletCounts = properties["cloudletCounts"]?.let { parseIntArrayValue(it) } ?: current.cloudletCounts,
+                simulationDuration = properties["simulationDuration"]?.let { parseRequiredDouble("realtime.simulationDuration", it) } ?: current.simulationDuration,
+                arrivalRate = properties["arrivalRate"]?.let { parseRequiredDouble("realtime.arrivalRate", it) } ?: current.arrivalRate,
+                runs = properties["runs"]?.let { parseRequiredInt("realtime.runs", it) } ?: current.runs,
+                generator = current.generator,
+                objective = current.objective,
+                arrival = current.arrival,
+                scheduling = current.scheduling,
+                generatorType = properties["generatorType"]?.let { TomlSectionParser.unquote(it) } ?: current.generatorType,
+                googleTrace = current.googleTrace
+            )
+        }
+
+        fun normalizeAlgorithmName(name: String): String =
+            name.trim().replace("-", "_").replace(" ", "_").uppercase()
+
+        private fun parseProfileConfigs(content: String): Map<String, ProfileConfig> {
+            val profiles = linkedMapOf<String, ProfileConfig>()
+            val sections = TomlSectionParser.parse(content).filter { it.path.firstOrNull() == "profiles" }
+
+            for (section in sections) {
+                if (section.path.size !in 2..4) {
+                    throw IllegalArgumentException("未知 profile 配置段: [${section.name}]")
+                }
+
+                val profileName = section.path[1]
+                val profile = profiles[profileName] ?: ProfileConfig()
+                val updated = when (section.path.size) {
+                    2 -> applyProfileRoot(profileName, profile, section.values)
+                    3 -> when (section.path[2]) {
+                        "batch" -> profile.copy(batch = buildBatchToml(section.values, profile.batch))
+                        "realtime" -> profile.copy(realtime = buildRealtimeToml(section.values, profile.realtime))
+                        else -> throw IllegalArgumentException("未知 profile 配置段: [${section.name}]")
+                    }
+                    4 -> when (section.path[2] to section.path[3]) {
+                        "batch" to "objective" -> profile.copy(batch = applyBatchObjective(section.values, profile.batch))
+                        "realtime" to "objective" -> profile.copy(realtime = applyRealtimeObjective(section.values, profile.realtime))
+                        "realtime" to "arrival" -> profile.copy(realtime = applyRealtimeArrival(section.values, profile.realtime))
+                        "realtime" to "scheduling" -> profile.copy(realtime = applyRealtimeScheduling(section.values, profile.realtime))
+                        else -> throw IllegalArgumentException("未知 profile 配置段: [${section.name}]")
+                    }
+                    else -> profile
+                }
+                profiles[profileName] = updated
+            }
+
+            return profiles
+        }
+
+        private fun applyProfileRoot(
+            profileName: String,
+            profile: ProfileConfig,
+            properties: Map<String, String>
+        ): ProfileConfig {
+            validateKeys("profiles.$profileName", properties, setOf("mode", "algorithms", "preset", "runs", "seed", "tasks", "outputDir"))
+            return profile.copy(
+                mode = properties["mode"]?.let { TomlSectionParser.unquote(it) } ?: profile.mode,
+                preset = properties["preset"]?.let { TomlSectionParser.unquote(it) } ?: profile.preset,
+                runs = properties["runs"]?.let { parseRequiredInt("profiles.$profileName.runs", it) } ?: profile.runs,
+                seed = properties["seed"]?.let { parseRequiredLong("profiles.$profileName.seed", it) } ?: profile.seed,
+                tasks = properties["tasks"]?.let { parseIntArrayValue(it) } ?: profile.tasks,
+                outputDir = properties["outputDir"]?.let { TomlSectionParser.unquote(it) } ?: profile.outputDir,
+                algorithms = properties["algorithms"]?.let { parseArrayValue(it) } ?: profile.algorithms
+            )
+        }
+
+        private fun applyBatchObjective(properties: Map<String, String>, base: TomlBatchConfig?): TomlBatchConfig {
+            validateKeys("profiles.*.batch.objective", properties, setOf("cost", "totalTime", "loadBalance", "makespan"))
+            val current = base ?: TomlBatchConfig()
+            return current.copy(objective = buildObjectiveWeights(properties, current.objective, "batch.objective"))
+        }
+
+        private fun applyRealtimeObjective(properties: Map<String, String>, base: TomlRealtimeConfig?): TomlRealtimeConfig {
+            validateKeys("profiles.*.realtime.objective", properties, setOf("cost", "totalTime", "loadBalance", "makespan"))
+            val current = base ?: TomlRealtimeConfig()
+            return current.copy(objective = buildObjectiveWeights(properties, current.objective, "realtime.objective"))
+        }
+
+        private fun applyRealtimeArrival(properties: Map<String, String>, base: TomlRealtimeConfig?): TomlRealtimeConfig {
+            validateKeys("profiles.*.realtime.arrival", properties, setOf("distribution", "burstIntensity", "burstDuration"))
+            val current = base ?: TomlRealtimeConfig()
+            val arrival = current.arrival.copy(
+                distribution = properties["distribution"]?.let { TomlSectionParser.unquote(it) } ?: current.arrival.distribution,
+                burstIntensity = properties["burstIntensity"]?.let { parseRequiredDouble("realtime.arrival.burstIntensity", it) } ?: current.arrival.burstIntensity,
+                burstDuration = properties["burstDuration"]?.let { parseRequiredDouble("realtime.arrival.burstDuration", it) } ?: current.arrival.burstDuration
+            )
+            return current.copy(arrival = arrival)
+        }
+
+        private fun applyRealtimeScheduling(properties: Map<String, String>, base: TomlRealtimeConfig?): TomlRealtimeConfig {
+            validateKeys("profiles.*.realtime.scheduling", properties, setOf("strategy", "maxQueueSize", "taskTimeout", "resourceReservation"))
+            val current = base ?: TomlRealtimeConfig()
+            val scheduling = current.scheduling.copy(
+                strategy = properties["strategy"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.strategy,
+                maxQueueSize = properties["maxQueueSize"]?.let { parseRequiredInt("realtime.scheduling.maxQueueSize", it) } ?: current.scheduling.maxQueueSize,
+                taskTimeout = properties["taskTimeout"]?.let { parseRequiredDouble("realtime.scheduling.taskTimeout", it) } ?: current.scheduling.taskTimeout,
+                resourceReservation = properties["resourceReservation"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.resourceReservation
+            )
+            return current.copy(scheduling = scheduling)
+        }
+
+        private fun buildObjectiveWeights(
+            properties: Map<String, String>,
+            current: ObjectiveWeightsConfig,
+            context: String
+        ): ObjectiveWeightsConfig =
+            ObjectiveWeightsConfig(
+                cost = properties["cost"]?.let { parseRequiredDouble("$context.cost", it) } ?: current.cost,
+                totalTime = properties["totalTime"]?.let { parseRequiredDouble("$context.totalTime", it) } ?: current.totalTime,
+                loadBalance = properties["loadBalance"]?.let { parseRequiredDouble("$context.loadBalance", it) } ?: current.loadBalance,
+                makespan = properties["makespan"]?.let { parseRequiredDouble("$context.makespan", it) } ?: current.makespan
+            )
+
+        private fun parseAlgorithmConfigs(content: String): Map<String, AlgorithmConfig> {
+            val configs = linkedMapOf<String, AlgorithmConfig>()
+            var currentAlgorithm: String? = null
+            val properties = linkedMapOf<String, String>()
+
+            fun flush() {
+                val algorithm = currentAlgorithm ?: return
+                configs[normalizeAlgorithmName(algorithm)] = AlgorithmConfig(
+                    enabled = properties["enabled"]?.toBooleanStrictOrNull() ?: true,
+                    description = properties["description"]?.trim('"', '\'') ?: "",
+                    population = properties["population"]?.let { parseRequiredInt("algorithms.$algorithm.population", it) },
+                    maxIter = properties["maxIter"]?.let { parseRequiredInt("algorithms.$algorithm.maxIter", it) }
+                )
+                properties.clear()
+            }
+
+            for (line in content.lineSequence()) {
+                val trimmed = line.trim()
+                when {
+                    trimmed.matches(Regex("""\[algorithms\.[^\]]+]""")) -> {
+                        flush()
+                        currentAlgorithm = trimmed.removePrefix("[algorithms.").removeSuffix("]")
+                    }
+                    currentAlgorithm != null && trimmed.startsWith("[") -> {
+                        flush()
+                        currentAlgorithm = null
+                    }
+                    currentAlgorithm != null && "=" in trimmed && !trimmed.startsWith("#") -> {
+                        val key = trimmed.substringBefore("=").trim()
+                        val value = trimmed.substringAfter("=").trim()
+                        properties[key] = value
+                    }
+                }
+            }
+            flush()
+            return configs
+        }
+
+        private fun parsePresetConfigs(content: String): Map<String, PresetConfig> {
+            val presets = linkedMapOf<String, PresetConfig>()
+            var currentPreset: String? = null
+            val algorithms = mutableListOf<String>()
+
+            fun flush() {
+                val preset = currentPreset ?: return
+                presets[preset] = PresetConfig(algorithms = algorithms.toList())
+                algorithms.clear()
+            }
+
+            for (line in content.lineSequence()) {
+                val trimmed = line.trim()
+                when {
+                    trimmed.matches(Regex("""\[presets\.[^\]]+]""")) -> {
+                        flush()
+                        currentPreset = trimmed.removePrefix("[presets.").removeSuffix("]")
+                    }
+                    currentPreset != null && trimmed.startsWith("[") -> {
+                        flush()
+                        currentPreset = null
+                    }
+                    currentPreset != null && trimmed.startsWith("algorithms") && "=" in trimmed -> {
+                        algorithms.clear()
+                        algorithms.addAll(parseArrayValue(trimmed.substringAfter("=")))
+                    }
+                    currentPreset != null && trimmed.startsWith("-") -> {
+                        algorithms.add(trimmed.removePrefix("-").trim().trim('"', '\''))
+                    }
+                }
+            }
+            flush()
+            return presets
+        }
+
+        private fun parseArrayValue(raw: String): List<String> =
+            TomlSectionParser.stringList(raw)
+
+        private fun parseIntArrayValue(raw: String): List<Int> =
+            TomlSectionParser.intList(raw)
+
+        private fun parseBoolArrayValue(raw: String): List<Boolean> =
+            parseArrayValue(raw).mapNotNull { it.toBooleanStrictOrNull() }
+
+        private fun parseRequiredInt(field: String, raw: String): Int =
+            TomlSectionParser.unquote(raw).toIntOrNull()
+                ?: throw IllegalArgumentException("$field 必须是整数: $raw")
+
+        private fun parseRequiredLong(field: String, raw: String): Long =
+            TomlSectionParser.unquote(raw).toLongOrNull()
+                ?: throw IllegalArgumentException("$field 必须是整数: $raw")
+
+        private fun parseRequiredDouble(field: String, raw: String): Double =
+            TomlSectionParser.unquote(raw).toDoubleOrNull()
+                ?: throw IllegalArgumentException("$field 必须是数字: $raw")
+
+        private fun validateKeys(context: String, values: Map<String, String>, allowed: Set<String>) {
+            val unknown = values.keys.filter { it !in allowed }
+            if (unknown.isNotEmpty()) {
+                throw IllegalArgumentException("$context 包含未知字段: ${unknown.joinToString(", ")}")
+            }
         }
 
         /**
@@ -281,8 +593,8 @@ data class ExperimentConfig(
             if (toml == null) return base
 
             return base.copy(
-                population = toml.population ?: base.population,
-                maxIter = toml.maxIter ?: base.maxIter
+                population = toml.population,
+                maxIter = toml.maxIter
             )
         }
 
@@ -290,7 +602,7 @@ data class ExperimentConfig(
          * 验证配置参数的合理性
          * @throws ConfigValidationException 当配置无效时，包含详细的验证错误信息
          */
-        private fun validateConfig(config: ExperimentConfig) {
+        private fun validateConfig(config: ExperimentConfig, requireProfiles: Boolean = false) {
             val errors = mutableListOf<ValidationError>()
 
             try {
@@ -302,6 +614,15 @@ data class ExperimentConfig(
 
                 // 验证优化算法配置
                 validateOptimizerConfig(config.optimizer, errors)
+
+                // 验证算法覆盖配置
+                validateAlgorithmConfigs(config.algorithmConfigs, errors)
+
+                // 验证预设配置
+                validatePresetConfigs(config.presets, errors)
+
+                // 验证 profiles 配置
+                validateProfileConfigs(config, errors, requireProfiles)
 
                 // 验证随机种子
                 validateRandomConfig(config.randomSeed, errors)
@@ -363,6 +684,13 @@ data class ExperimentConfig(
                 errors.add(ValidationError("batch.runs", batch.runs.toString(),
                     "批处理运行次数过多，可能耗时过长，建议不超过100"))
             }
+
+            for ((index, count) in batch.cloudletCounts.withIndex()) {
+                if (count <= 0) {
+                    errors.add(ValidationError("batch.cloudletCounts[$index]", count.toString(),
+                        "批量任务数必须大于0"))
+                }
+            }
         }
 
         /**
@@ -403,6 +731,120 @@ data class ExperimentConfig(
             if (realtime.runs > 50) {
                 errors.add(ValidationError("realtime.runs", realtime.runs.toString(),
                     "实时调度运行次数过多，可能耗时过长，建议不超过50"))
+            }
+
+            val distributions = setOf("poisson", "uniform", "burst")
+            if (realtime.arrival.distribution.lowercase() !in distributions) {
+                errors.add(ValidationError("realtime.arrival.distribution", realtime.arrival.distribution,
+                    "到达分布必须是以下值之一: ${distributions.joinToString(", ")}"))
+            }
+            if (realtime.arrival.burstIntensity <= 0.0) {
+                errors.add(ValidationError("realtime.arrival.burstIntensity", realtime.arrival.burstIntensity.toString(),
+                    "突发强度必须大于0"))
+            }
+            if (realtime.arrival.burstDuration <= 0.0) {
+                errors.add(ValidationError("realtime.arrival.burstDuration", realtime.arrival.burstDuration.toString(),
+                    "突发持续时间必须大于0"))
+            }
+
+            val strategies = setOf("dynamic", "static")
+            if (realtime.scheduling.strategy.lowercase() !in strategies) {
+                errors.add(ValidationError("realtime.scheduling.strategy", realtime.scheduling.strategy,
+                    "实时调度策略必须是以下值之一: ${strategies.joinToString(", ")}"))
+            }
+            if (realtime.scheduling.maxQueueSize <= 0) {
+                errors.add(ValidationError("realtime.scheduling.maxQueueSize", realtime.scheduling.maxQueueSize.toString(),
+                    "最大队列长度必须大于0"))
+            }
+            if (realtime.scheduling.taskTimeout < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.taskTimeout", realtime.scheduling.taskTimeout.toString(),
+                    "任务超时时间不能为负数"))
+            }
+            val reservations = setOf("none", "partial", "full")
+            if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {
+                errors.add(ValidationError("realtime.scheduling.resourceReservation", realtime.scheduling.resourceReservation,
+                    "资源预留策略必须是以下值之一: ${reservations.joinToString(", ")}"))
+            }
+
+            for ((index, count) in realtime.cloudletCounts.withIndex()) {
+                if (count <= 0) {
+                    errors.add(ValidationError("realtime.cloudletCounts[$index]", count.toString(),
+                        "批量任务数必须大于0"))
+                }
+            }
+        }
+
+        private fun validateAlgorithmConfigs(
+            algorithmConfigs: Map<String, AlgorithmConfig>,
+            errors: MutableList<ValidationError>
+        ) {
+            for ((name, config) in algorithmConfigs) {
+                config.population?.let { population ->
+                    if (population <= 0) {
+                        errors.add(ValidationError("algorithms.$name.population", population.toString(),
+                            "算法级种群大小必须大于0"))
+                    }
+                }
+                config.maxIter?.let { maxIter ->
+                    if (maxIter <= 0) {
+                        errors.add(ValidationError("algorithms.$name.maxIter", maxIter.toString(),
+                            "算法级最大迭代次数必须大于0"))
+                    }
+                }
+            }
+        }
+
+        private fun validatePresetConfigs(
+            presets: Map<String, PresetConfig>,
+            errors: MutableList<ValidationError>
+        ) {
+            for ((name, preset) in presets) {
+                if (preset.algorithms.isEmpty()) {
+                    errors.add(ValidationError("presets.$name.algorithms", "[]",
+                        "预设算法列表不能为空"))
+                }
+            }
+        }
+
+        private fun validateProfileConfigs(
+            config: ExperimentConfig,
+            errors: MutableList<ValidationError>,
+            requireProfiles: Boolean
+        ) {
+            if (requireProfiles && config.profiles.isEmpty()) {
+                errors.add(ValidationError("profiles", "[]", "profiles 配置不能为空"))
+            }
+
+            config.defaultProfile?.let { defaultProfile ->
+                if (config.profiles.isNotEmpty() && defaultProfile !in config.profiles) {
+                    errors.add(ValidationError("defaultProfile", defaultProfile,
+                        "defaultProfile 必须引用已定义的 profile"))
+                }
+            }
+
+            for ((name, profile) in config.profiles) {
+                if (profile.mode.isBlank()) {
+                    errors.add(ValidationError("profiles.$name.mode", profile.mode, "profile 必须指定 mode"))
+                } else {
+                    val normalizedMode = profile.mode.lowercase().replace("_", "-")
+                    if (normalizedMode !in setOf("batch", "realtime", "batch-multi", "realtime-multi")) {
+                        errors.add(ValidationError("profiles.$name.mode", profile.mode,
+                            "profile.mode 必须是 batch, realtime, batch-multi, realtime-multi 之一"))
+                    }
+                }
+
+                if (profile.algorithms.isNotEmpty() && !profile.preset.isNullOrBlank()) {
+                    errors.add(ValidationError("profiles.$name", profile.algorithms.joinToString(","),
+                        "profile 的 algorithms 与 preset 互斥"))
+                }
+
+                if (profile.runs != null && profile.runs <= 0) {
+                    errors.add(ValidationError("profiles.$name.runs", profile.runs.toString(), "runs 必须大于 0"))
+                }
+
+                if (profile.tasks.any { it <= 0 }) {
+                    errors.add(ValidationError("profiles.$name.tasks", profile.tasks.joinToString(","), "tasks 必须全部大于 0"))
+                }
             }
         }
 
@@ -478,6 +920,7 @@ data class ExperimentConfig(
  */
 data class BatchConfig(
     val cloudletCount: Int = 100,
+    val cloudletCounts: List<Int> = emptyList(),
     val population: Int = 30,
     val maxIter: Int = 50,
     /**
@@ -511,6 +954,7 @@ data class BatchConfig(
  */
 data class RealtimeConfig(
     val cloudletCount: Int = 200,
+    val cloudletCounts: List<Int> = emptyList(),
     val simulationDuration: Double = 500.0,  // 仿真持续时间（秒）
     val arrivalRate: Double = 5.0,            // 平均每秒到达的任务数
     /**
@@ -536,7 +980,9 @@ data class RealtimeConfig(
      * 目标函数权重配置
      * 允许自由组合成本、时间、负载均衡等目标
      */
-    val objectiveWeights: ObjectiveWeightsConfig = ObjectiveWeightsConfig()
+    val objectiveWeights: ObjectiveWeightsConfig = ObjectiveWeightsConfig(),
+    val arrival: RealtimeArrivalConfig = RealtimeArrivalConfig(),
+    val scheduling: RealtimeSchedulingConfig = RealtimeSchedulingConfig()
 )
 
 /**

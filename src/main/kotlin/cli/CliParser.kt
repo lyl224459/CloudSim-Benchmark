@@ -1,0 +1,324 @@
+package cli
+
+private val supportedModes = setOf("batch", "realtime", "batch-multi", "realtime-multi")
+private val legacyModes = mapOf(
+    "batch" to "run --mode batch",
+    "b" to "run --mode batch",
+    "realtime" to "run --mode realtime",
+    "r" to "run --mode realtime",
+    "batch-multi" to "run --mode batch-multi",
+    "bm" to "run --mode batch-multi",
+    "batch_multi" to "run --mode batch-multi",
+    "realtime-multi" to "run --mode realtime-multi",
+    "rm" to "run --mode realtime-multi",
+    "realtime_multi" to "run --mode realtime-multi"
+)
+
+class CliParser(private val args: Array<String>) {
+
+    sealed interface Command
+
+    data class RunCommand(
+        val mode: String? = null,
+        val algorithms: List<String> = emptyList(),
+        val preset: String? = null,
+        val profile: String? = null,
+        val randomSeed: Long? = null,
+        val taskCounts: List<Int> = emptyList(),
+        val runs: Int? = null,
+        val configFile: String? = null,
+        val verbose: Boolean = false,
+        val outputDir: String? = null,
+        val useCoroutines: Boolean = true,
+        val maxConcurrency: Int = 0,
+        val dryRun: Boolean = false
+    ) : Command
+
+    data class ListAlgorithmsCommand(val mode: String) : Command
+    data class ListProfilesCommand(val configFile: String) : Command
+    data class ListPresetsCommand(val configFile: String) : Command
+    data class ConfigValidateCommand(val configFile: String) : Command
+    data class ConfigPrintCommand(val configFile: String, val profile: String? = null) : Command
+    data object HelpCommand : Command
+
+    fun parse(): Command {
+        if (args.isEmpty() || args.any { it == "--help" || it == "-h" }) {
+            return HelpCommand
+        }
+
+        val command = args[0].lowercase()
+        legacyModes[command]?.let { replacement ->
+            throw IllegalArgumentException(
+                "旧入口 \"$command\" 已停用。请使用: $replacement ${args.drop(1).joinToString(" ")}".trim()
+            )
+        }
+
+        return when (command) {
+            "run" -> parseRun(args.drop(1))
+            "list" -> parseList(args.drop(1))
+            "config" -> parseConfig(args.drop(1))
+            else -> throw IllegalArgumentException(
+                "未知命令: $command。可用命令: run, list, config。运行 --help 查看示例。"
+            )
+        }
+    }
+
+    private fun parseRun(tokens: List<String>): RunCommand {
+        var mode: String? = null
+        var algorithms = emptyList<String>()
+        var preset: String? = null
+        var profile: String? = null
+        var randomSeed: Long? = null
+        var taskCounts = emptyList<Int>()
+        var runs: Int? = null
+        var configFile: String? = null
+        var verbose = false
+        var outputDir: String? = null
+        var useCoroutines = true
+        var maxConcurrency = 0
+        var dryRun = false
+
+        var i = 0
+        while (i < tokens.size) {
+            val token = tokens[i]
+            when {
+                token == "--mode" -> {
+                    mode = normalizeMode(readValue(tokens, i, token))
+                    i += 2
+                }
+                token.startsWith("--mode=") -> {
+                    mode = normalizeMode(token.substringAfter("="))
+                    i++
+                }
+                token == "--algorithms" || token == "-a" -> {
+                    algorithms = parseNameList(readValue(tokens, i, token))
+                    i += 2
+                }
+                token.startsWith("--algorithms=") -> {
+                    algorithms = parseNameList(token.substringAfter("="))
+                    i++
+                }
+                token == "--preset" -> {
+                    preset = readValue(tokens, i, token)
+                    i += 2
+                }
+                token.startsWith("--preset=") -> {
+                    preset = token.substringAfter("=")
+                    i++
+                }
+                token == "--profile" || token == "-p" -> {
+                    profile = readValue(tokens, i, token)
+                    i += 2
+                }
+                token.startsWith("--profile=") -> {
+                    profile = token.substringAfter("=")
+                    i++
+                }
+                token == "--seed" || token == "-s" -> {
+                    randomSeed = parseLong(readValue(tokens, i, token), token)
+                    i += 2
+                }
+                token.startsWith("--seed=") -> {
+                    randomSeed = parseLong(token.substringAfter("="), "--seed")
+                    i++
+                }
+                token == "--runs" || token == "-r" -> {
+                    runs = parsePositiveInt(readValue(tokens, i, token), token)
+                    i += 2
+                }
+                token.startsWith("--runs=") -> {
+                    runs = parsePositiveInt(token.substringAfter("="), "--runs")
+                    i++
+                }
+                token == "--tasks" || token == "-t" -> {
+                    taskCounts = parseTaskCounts(readValue(tokens, i, token))
+                    i += 2
+                }
+                token.startsWith("--tasks=") -> {
+                    taskCounts = parseTaskCounts(token.substringAfter("="))
+                    i++
+                }
+                token == "--config" || token == "-c" -> {
+                    configFile = readValue(tokens, i, token)
+                    i += 2
+                }
+                token.startsWith("--config=") -> {
+                    configFile = token.substringAfter("=")
+                    i++
+                }
+                token == "--output" || token == "-o" -> {
+                    outputDir = readValue(tokens, i, token)
+                    i += 2
+                }
+                token.startsWith("--output=") -> {
+                    outputDir = token.substringAfter("=")
+                    i++
+                }
+                token == "--sequential" || token == "-S" -> {
+                    useCoroutines = false
+                    i++
+                }
+                token == "--concurrency" || token == "-C" -> {
+                    maxConcurrency = parsePositiveInt(readValue(tokens, i, token), token)
+                    i += 2
+                }
+                token.startsWith("--concurrency=") -> {
+                    maxConcurrency = parsePositiveInt(token.substringAfter("="), "--concurrency")
+                    i++
+                }
+                token == "--dry-run" -> {
+                    dryRun = true
+                    i++
+                }
+                token == "--verbose" || token == "-v" -> {
+                    verbose = true
+                    i++
+                }
+                token.startsWith("-") -> throw IllegalArgumentException("未知参数: $token")
+                else -> throw IllegalArgumentException("意外的位置参数: $token。请使用命名参数，例如 run --mode batch -a RANDOM")
+            }
+        }
+
+        val resolvedMode = mode?.let { normalizeMode(it) }
+        if (resolvedMode != null && resolvedMode !in supportedModes) {
+            throw IllegalArgumentException("无效运行模式: $resolvedMode。可用模式: ${supportedModes.joinToString(", ")}")
+        }
+        if (algorithms.isNotEmpty() && !preset.isNullOrBlank()) {
+            throw IllegalArgumentException("--preset 与 --algorithms/-a 互斥，请只指定一种算法选择方式")
+        }
+
+        return RunCommand(
+            mode = resolvedMode,
+            algorithms = algorithms,
+            preset = preset,
+            profile = profile,
+            randomSeed = randomSeed,
+            taskCounts = taskCounts,
+            runs = runs,
+            configFile = configFile,
+            verbose = verbose,
+            outputDir = outputDir,
+            useCoroutines = useCoroutines,
+            maxConcurrency = maxConcurrency,
+            dryRun = dryRun
+        )
+    }
+
+    private fun parseList(tokens: List<String>): Command {
+        if (tokens.isEmpty()) {
+            throw IllegalArgumentException("list 命令需要子命令: algorithms, profiles 或 presets")
+        }
+        return when (tokens[0].lowercase()) {
+            "algorithms" -> ListAlgorithmsCommand(parseRequiredMode(tokens.drop(1), "list algorithms"))
+            "profiles" -> ListProfilesCommand(parseRequiredConfig(tokens.drop(1), "list profiles"))
+            "presets" -> ListPresetsCommand(parseRequiredConfig(tokens.drop(1), "list presets"))
+            else -> throw IllegalArgumentException("未知 list 子命令: ${tokens[0]}。可用: algorithms, profiles, presets")
+        }
+    }
+
+    private fun parseConfig(tokens: List<String>): Command {
+        if (tokens.isEmpty()) {
+            throw IllegalArgumentException("config 命令需要子命令: validate 或 print")
+        }
+        return when (tokens[0].lowercase()) {
+            "validate" -> ConfigValidateCommand(parseRequiredConfig(tokens.drop(1), "config validate"))
+            "print" -> {
+                val (configFile, profile) = parseConfigAndOptionalProfile(tokens.drop(1), "config print")
+                ConfigPrintCommand(configFile, profile)
+            }
+            else -> throw IllegalArgumentException("未知 config 子命令: ${tokens[0]}。可用: validate, print")
+        }
+    }
+
+    private fun parseRequiredMode(tokens: List<String>, commandName: String): String {
+        var mode: String? = null
+        var i = 0
+        while (i < tokens.size) {
+            when {
+                tokens[i] == "--mode" || tokens[i] == "-m" -> {
+                    mode = normalizeMode(readValue(tokens, i, tokens[i]))
+                    i += 2
+                }
+                tokens[i].startsWith("--mode=") -> {
+                    mode = normalizeMode(tokens[i].substringAfter("="))
+                    i++
+                }
+                tokens[i].startsWith("-") -> throw IllegalArgumentException("未知参数: ${tokens[i]}")
+                else -> throw IllegalArgumentException("意外的位置参数: ${tokens[i]}")
+            }
+        }
+        val resolvedMode = mode ?: throw IllegalArgumentException("$commandName 需要 --mode batch|realtime")
+        if (resolvedMode !in setOf("batch", "realtime")) {
+            throw IllegalArgumentException("$commandName 只接受 --mode batch 或 realtime")
+        }
+        return resolvedMode
+    }
+
+    private fun parseRequiredConfig(tokens: List<String>, commandName: String): String {
+        return parseConfigAndOptionalProfile(tokens, commandName).first
+    }
+
+    private fun parseConfigAndOptionalProfile(tokens: List<String>, commandName: String): Pair<String, String?> {
+        var configFile: String? = null
+        var profile: String? = null
+        var i = 0
+        while (i < tokens.size) {
+            when {
+                tokens[i] == "--config" || tokens[i] == "-c" -> {
+                    configFile = readValue(tokens, i, tokens[i])
+                    i += 2
+                }
+                tokens[i].startsWith("--config=") -> {
+                    configFile = tokens[i].substringAfter("=")
+                    i++
+                }
+                tokens[i] == "--profile" || tokens[i] == "-p" -> {
+                    profile = readValue(tokens, i, tokens[i])
+                    i += 2
+                }
+                tokens[i].startsWith("--profile=") -> {
+                    profile = tokens[i].substringAfter("=")
+                    i++
+                }
+                tokens[i].startsWith("-") -> throw IllegalArgumentException("未知参数: ${tokens[i]}")
+                else -> throw IllegalArgumentException("意外的位置参数: ${tokens[i]}")
+            }
+        }
+        return (configFile ?: throw IllegalArgumentException("$commandName 需要 --config FILE")) to profile
+    }
+
+    private fun readValue(tokens: List<String>, index: Int, option: String): String {
+        if (index + 1 >= tokens.size) {
+            throw IllegalArgumentException("$option 参数需要指定值")
+        }
+        return tokens[index + 1]
+    }
+
+    private fun parseNameList(value: String): List<String> =
+        value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
+    private fun parseTaskCounts(value: String): List<Int> =
+        parseNameList(value).map { part ->
+            part.toIntOrNull()?.takeIf { it > 0 }
+                ?: throw IllegalArgumentException("无效的任务数: $part。任务数必须是大于 0 的整数")
+        }
+
+    private fun parsePositiveInt(value: String, option: String): Int =
+        value.toIntOrNull()?.takeIf { it > 0 }
+            ?: throw IllegalArgumentException("$option 必须是大于 0 的整数: $value")
+
+    private fun parseLong(value: String, option: String): Long =
+        value.toLongOrNull()
+            ?: throw IllegalArgumentException("$option 必须是整数: $value")
+}
+
+fun normalizeMode(mode: String): String =
+    when (mode.lowercase().replace("_", "-")) {
+        "b" -> "batch"
+        "r" -> "realtime"
+        "bm" -> "batch-multi"
+        "rm" -> "realtime-multi"
+        else -> mode.lowercase().replace("_", "-")
+    }
+
+fun supportedModes(): Set<String> = supportedModes

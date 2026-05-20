@@ -69,16 +69,18 @@ cd CloudSim-Benchmark
 ./run build        # Linux/WSL
 ```
 
-### 2. 运行实验 (统一命名参数格式)
+Windows 脚本会自动读取系统代理（Internet Settings 中的 `ProxyEnable`/`ProxyServer`）并传递给 Gradle，首次下载 Gradle Wrapper 时无需在仓库中写死代理地址。若 JAR 不存在，`run.cmd` 会自动执行 `gradlew.bat fatJar --no-daemon`。
 
-项目采用现代化的命名参数接口，通过 `./run.cmd` (Windows) 或 `./run` (Linux) 启动。注意：不再支持旧的位置参数格式。
+### 2. 运行实验 (子命令 CLI)
+
+项目现在使用明确的子命令接口，通过 `./run.cmd` (Windows) 或 `./run` (Linux) 启动。旧入口 `batch` / `realtime` / `batch-multi` / `realtime-multi` 已停用，会直接给出迁移提示。
 
 #### 🔹 基础对比实验 (Batch)
 
 运行所有批处理算法，试验 3 次：
 
 ```bash
-./run.cmd batch --algorithms ALL --runs 3
+./run.cmd run --mode batch --algorithms ALL --runs 3
 ```
 
 #### 🔹 实时调度实验 (Realtime)
@@ -86,7 +88,7 @@ cd CloudSim-Benchmark
 指定特定算法并使用自定义随机种子：
 
 ```bash
-./run.cmd realtime -a PSO_REALTIME,WOA_REALTIME -s 42 -r 5
+./run.cmd run --mode realtime -a PSO_REALTIME,WOA_REALTIME -s 42 -r 5
 ```
 
 #### 🔹 批量任务数扩展性实验 (Multi-Count)
@@ -94,7 +96,7 @@ cd CloudSim-Benchmark
 研究算法在 50, 100, 200, 500 任务规模下的性能趋势：
 
 ```bash
-./run.cmd batch-multi --tasks 50,100,200,500 -a ALL -r 3
+./run.cmd run --mode batch-multi --tasks 50,100,200,500 -a ALL -r 3
 ```
 
 #### 🔹 协程控制
@@ -102,20 +104,37 @@ cd CloudSim-Benchmark
 显式指定最大并发数或使用顺序执行：
 
 ```bash
-./run.cmd batch -a ALL -C 4        # 限制并发数为 4
-./run.cmd batch -a ALL --sequential # 使用顺序执行模式
+./run.cmd run --mode batch -a ALL -C 4         # 限制并发数为 4
+./run.cmd run --mode batch -a ALL --sequential # 使用顺序执行模式
+```
+
+#### 🔹 Dry Run / 管理命令
+
+```bash
+./run.cmd run --mode batch --dry-run --config configs/examples/batch_test.toml
+./run.cmd list algorithms --mode batch
+./run.cmd list profiles --config configs/examples/single_config_example.toml
+./run.cmd list presets --config configs/examples/single_config_example.toml
+./run.cmd config validate --config configs/examples/realtime_test.toml
+./run.cmd config print --config configs/examples/batch_test.toml --profile batch_test
 ```
 
 #### 🔹 参数速查表
 
 | 参数                  | 短参数 | 描述                                 | 必需     |
 | :-------------------- | :----- | :----------------------------------- | :------- |
-| `--algorithms`      | `-a` | 算法列表 (如 `PSO,WOA` 或 `ALL`) | 是       |
+| `--mode`            | -     | `batch` / `realtime` / `batch-multi` / `realtime-multi` | 可选 |
+| `--algorithms`      | `-a` | 算法列表 (如 `PSO,WOA` 或 `ALL`) | 与 `--preset` 二选一 |
+| `--preset`          | -     | 使用配置文件中的预设算法集合         | 与 `--algorithms` 二选一 |
+| `--profile`         | `-p` | 选择配置文件中的 profile            | 配置文件存在时推荐 |
 | `--tasks`           | `-t` | 任务数列表 (仅限 multi 模式)         | 仅 multi |
 | `--seed`            | `-s` | 随机数种子 (默认 0)                  | 否       |
 | `--runs`            | `-r` | 每个配置的试验次数 (默认 1)          | 否       |
-| [^1]:`--sequential` | `-S` | 禁用并行，切换到顺序执行模式         | 否       |
+| `--sequential`      | `-S` | 禁用并行，切换到顺序执行模式         | 否       |
 | `--concurrency`     | `-C` | 限制并发协程数量 (默认 CPU 核心数)   | 否       |
+| `--config`          | `-c` | TOML 配置文件路径                    | 否       |
+| `--output`          | `-o` | 结果输出目录                         | 否       |
+| `--dry-run`         | -     | 打印最终合并后的配置，不创建结果目录 | 否       |
 | `--help`            | `-h` | 显示详细帮助信息                     | 否       |
 
 ---
@@ -146,15 +165,23 @@ cd CloudSim-Benchmark
 
 ## ⚙️ 配置说明
 
-项目支持**分层配置系统**，加载优先级：命令行参数 > 环境变量 > `configs/*.toml` > 代码默认值。
+项目支持**分层配置系统**，运行时优先级为：命令行参数 > 配置文件 > 代码默认值。系统配置仍支持环境变量加载；命令行参数会覆盖配置文件中的同名实验设置。
 
 ### 外部配置文件 (TOML)
 
 推荐通过 `configs/experiments/` 下的配置文件进行大规模实验：
 
 ```bash
-./run.cmd batch --config configs/experiments/performance_test.toml
+./run.cmd run --config configs/experiments/performance_test.toml --profile batch_compare
 ```
+
+也可以通过配置文件提供默认值，再用 CLI 覆盖少量参数：
+
+```bash
+./run.cmd run --config configs/examples/batch_test.toml --profile batch_test -a RANDOM -r 1 -o tmp-runs
+```
+
+上例会使用 profile 中定义的模式、任务数和默认算法，但 CLI 会覆盖算法、运行次数和输出目录。实际优先级为：**CLI > profile > 配置文件全局项 > 代码默认值**。
 
 ### 配置分离
 
@@ -165,53 +192,29 @@ cd CloudSim-Benchmark
 
 ### 实验模式配置
 
-可以在配置文件中直接设置实验模式，支持批处理模式和实时调度模式：
+单个 TOML 文件现在通过 `defaultProfile` + `[profiles.NAME]` 定义实验：
 
-```
-# 设置实验模式 (batch, realtime, batch_multi, realtime_multi)
+```toml
+defaultProfile = "batch_test"
+
+[profiles.batch_test]
 mode = "batch"
-
-# 系统配置部分
-outputDir = "./runs"
-logLevel = "INFO"
-maxHeapSize = "4g"
-
-# 批处理实验配置
-[batch]
-cloudletCount = 500
-algorithmTypes = ["PSO", "WOA", "GWO", "HHO"]
-runs = 5
-seed = 42
-
-# 实时调度实验配置
-[realtime]
-cloudletCount = 200
-algorithmTypes = ["PSO_REALTIME", "WOA_REALTIME"]
+algorithms = ["PSO", "WOA"]
 runs = 3
-seed = 42
 
-# 多任务数扩展性实验
-[batch_multi]
-cloudletCounts = [50, 100, 200, 500]
-algorithmTypes = ["PSO", "WOA"]
-runs = 3
-seed = 42
-
-# 多任务数实时调度实验
-[realtime_multi]
-cloudletCounts = [50, 100, 200]
-algorithmTypes = ["PSO_REALTIME", "WOA_REALTIME"]
-runs = 3
-seed = 42
+[profiles.batch_test.batch]
+cloudletCount = 100
+population = 30
+maxIter = 50
 ```
 
-这种方式允许用户通过单一配置文件定义完整的实验环境，包括实验类型和相关参数。
+这种方式允许用户在一个文件里定义多个实验档案，并通过 `--profile NAME` 选择。每次真实运行会在实验目录中保存 `resolved_config.json`。
 
 ### 测试配置文件示例
 
 项目提供了四种模式的测试配置文件示例，位于 `configs/examples/` 目录下：
 
-1. **批处理模式测试配置** ([batch_test.toml](file:///e:/code_obj/kotlin/cloudsim-b/configs/examples/batch_test.toml)):
+1. **批处理模式测试配置** ([batch_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/batch_test.toml)):
 
 ```toml
 # 实验模式
@@ -219,7 +222,7 @@ mode = "batch"
 # 其他批处理相关配置...
 ```
 
-2. **实时调度模式测试配置** ([realtime_test.toml](file:///e:/code_obj/kotlin/cloudsim-b/configs/examples/realtime_test.toml)):
+2. **实时调度模式测试配置** ([realtime_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/realtime_test.toml)):
 
 ```toml
 # 实验模式
@@ -227,7 +230,7 @@ mode = "realtime"
 # 其他实时调度相关配置...
 ```
 
-3. **批处理多任务数模式测试配置** ([batch_multi_test.toml](file:///e:/code_obj/kotlin/cloudsim-b/configs/examples/batch_multi_test.toml)):
+3. **批处理多任务数模式测试配置** ([batch_multi_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/batch_multi_test.toml)):
 
 ```toml
 # 实验模式
@@ -235,7 +238,7 @@ mode = "batch_multi"
 # 其他多任务数批处理相关配置...
 ```
 
-4. **实时多任务数模式测试配置** ([realtime_multi_test.toml](file:///e:/code_obj/kotlin/cloudsim-b/configs/examples/realtime_multi_test.toml)):
+4. **实时多任务数模式测试配置** ([realtime_multi_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/realtime_multi_test.toml)):
 
 ```toml
 # 实验模式

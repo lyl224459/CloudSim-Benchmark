@@ -53,124 +53,65 @@ class ConfigurationManager {
                 throw IllegalArgumentException("无法读取配置文件内容: ${e.message}", e)
             }
             
-            // 首先尝试解析为混合配置（同时包含系统配置和实验配置）
-            val mixedConfigResult = tryParseMixedConfig(content)
-            if (mixedConfigResult != null) {
-                return mixedConfigResult
-            }
-            
-            // 如果不是混合配置，尝试作为纯实验配置加载
-            val experimentConfig = tryParseExperimentConfig(content)
-            if (experimentConfig != null) {
-                return LoadedConfigs(
-                    systemConfig = SystemConfig.createDefault(),
-                    experimentConfig = experimentConfig
-                )
-            }
-            
-            throw IllegalArgumentException("配置文件格式无效，既不是有效的实验配置也不是混合配置: $configPath")
+            val (systemContent, experimentContent) = splitMixedConfig(content)
+            val systemConfig = parseSystemContent(systemContent) ?: SystemConfig.createDefault()
+            val experimentConfig = parseExperimentContent(experimentContent)
+                ?: throw IllegalArgumentException("配置文件格式无效，无法解析实验配置: $configPath")
+
+            return LoadedConfigs(systemConfig, experimentConfig)
         }
-        
-        /**
-         * 尝试解析混合配置（同时包含系统配置和实验配置的文件）
-         *
-         * @param content 配置文件内容
-         * @return 解析成功的配置对象，如果解析失败则返回null
-         */
-        private fun tryParseMixedConfig(content: String): LoadedConfigs? {
-            return try {
-                // 验证内容是否为空
-                if (content.isBlank()) {
-                    Logger.debug("配置内容为空，无法解析为混合配置")
-                    return null
-                }
-                
-                // 尝试解析整个文件为TOML格式，检查是否存在系统配置部分
-                // 我们只是简单地检查文本内容，而不实际解析整个文件
-                val hasSystemPart = content.contains("[output]") || 
-                                  content.contains("[logging]") || 
-                                  content.contains("[experiment]") ||
-                                  content.contains("[jvm]")
-                
-                if (hasSystemPart) {
-                    // 创建临时文件分别加载系统配置和实验配置
-                    val tempFile = File.createTempFile("temp_mixed_config", ".toml")
-                    tempFile.writeText(content)
-                    try {
-                        val systemConfig = SystemConfig.load(tempFile.absolutePath)
-                        
-                        // 为实验配置创建单独的临时文件
-                        val expTempFile = File.createTempFile("temp_exp_config", ".toml")
-                        expTempFile.writeText(content)
-                        try {
-                            val experimentConfig = ExperimentConfig.load(expTempFile.absolutePath)
-                            
-                            LoadedConfigs(
-                                systemConfig = systemConfig,
-                                experimentConfig = experimentConfig
-                            )
-                        } catch (e: Exception) {
-                            Logger.debug("解析实验配置失败: ${e.message}")
-                            null
-                        } finally {
-                            expTempFile.delete()
-                        }
-                    } catch (e: Exception) {
-                        Logger.debug("解析系统配置失败: ${e.message}")
-                        null
-                    } finally {
-                        tempFile.delete()
-                    }
+
+        private fun splitMixedConfig(content: String): Pair<String, String> {
+            val systemSections = setOf("output", "output.csv", "output.logging", "logging", "experiment", "jvm")
+            val systemLines = mutableListOf<String>()
+            val experimentLines = mutableListOf<String>()
+            var currentTarget = experimentLines
+
+            for (line in content.lineSequence()) {
+                val trimmed = line.trim()
+                val sectionName = if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                    trimmed.trim('[', ']').trim()
                 } else {
-                    // 如果没有系统配置部分，尝试解析为纯实验配置
-                    val expTempFile = File.createTempFile("temp_exp_config", ".toml")
-                    expTempFile.writeText(content)
-                    try {
-                        val experimentConfig = ExperimentConfig.load(expTempFile.absolutePath)
-                        
-                        // 返回默认系统配置和加载的实验配置
-                        LoadedConfigs(
-                            systemConfig = SystemConfig.createDefault(),
-                            experimentConfig = experimentConfig
-                        )
-                    } catch (e: Exception) {
-                        Logger.debug("解析实验配置失败: ${e.message}")
-                        null
-                    } finally {
-                        expTempFile.delete()
+                    null
+                }
+
+                if (sectionName != null) {
+                    currentTarget = when {
+                        sectionName in systemSections -> systemLines
+                        else -> experimentLines
                     }
                 }
+                currentTarget.add(line)
+            }
+
+            return systemLines.joinToString("\n") to experimentLines.joinToString("\n")
+        }
+
+        private fun parseSystemContent(content: String): SystemConfig? {
+            if (content.isBlank()) return SystemConfig.createDefault()
+            val tempFile = File.createTempFile("temp_system_config", ".toml")
+            tempFile.writeText(content)
+            return try {
+                SystemConfig.load(tempFile.absolutePath)
             } catch (e: Exception) {
-                Logger.debug("解析混合配置失败: ${e.message}")
+                Logger.debug("解析系统配置失败: ${e.message}")
                 null
+            } finally {
+                tempFile.delete()
             }
         }
-        
-        /**
-         * 尝试解析为纯实验配置
-         *
-         * @param content 配置文件内容
-         * @return 解析成功的实验配置对象，如果解析失败则返回null
-         */
-        private fun tryParseExperimentConfig(content: String): ExperimentConfig? {
+
+        private fun parseExperimentContent(content: String): ExperimentConfig? {
+            if (content.isBlank()) {
+                return null
+            }
+
+            val tempFile = File.createTempFile("temp_exp_config", ".toml")
+            tempFile.writeText(content)
             return try {
-                // 验证内容是否为空
-                if (content.isBlank()) {
-                    Logger.debug("配置内容为空，无法解析为实验配置")
-                    return null
-                }
-                
-                // 创建临时文件进行实验配置解析
-                val tempFile = File.createTempFile("temp_exp_config", ".toml")
-                tempFile.writeText(content)
-                try {
-                    ExperimentConfig.load(tempFile.absolutePath)
-                } finally {
-                    tempFile.delete()
-                }
-            } catch (e: Exception) {
-                Logger.debug("解析实验配置失败: ${e.message}")
-                null
+                ExperimentConfig.load(tempFile.absolutePath)
+            } finally {
+                tempFile.delete()
             }
         }
         

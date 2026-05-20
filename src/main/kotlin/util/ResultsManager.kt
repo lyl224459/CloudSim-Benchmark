@@ -1,6 +1,7 @@
 package util
 
 import config.ExperimentConfig
+import config.SystemConfig
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -14,13 +15,24 @@ object ResultsManager {
     private val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
 
     private var resultsBaseDir = DEFAULT_RESULTS_DIR
+    private var csvEnabled = true
+    private var csvDelimiter = ","
 
     /**
      * 配置结果目录
      */
+    fun configure(config: SystemConfig) {
+        resultsBaseDir = config.output.resultsDir
+        csvEnabled = config.output.csv.enabled
+        csvDelimiter = config.output.csv.delimiter
+    }
+
+    /**
+     * @deprecated Use configure(SystemConfig) so output.resultsDir is honored.
+     */
+    @Deprecated("Use configure(SystemConfig)")
     fun configure(config: ExperimentConfig) {
-        // 从配置中获取结果目录，如果没有则使用默认值
-        resultsBaseDir = "runs" // 可以从config中读取
+        resultsBaseDir = DEFAULT_RESULTS_DIR
     }
 
     /**
@@ -89,6 +101,22 @@ object ResultsManager {
     fun getResultsDirectory(): File {
         return getBaseResultsDirectory()
     }
+
+    fun isCsvEnabled(): Boolean = csvEnabled
+
+    fun getCsvDelimiter(): String = csvDelimiter
+
+    fun csvLine(values: Iterable<Any?>): String {
+        return values.joinToString(csvDelimiter) { value ->
+            escapeCsv(value?.toString().orEmpty())
+        }
+    }
+
+    private fun escapeCsv(value: String): String {
+        val needsQuotes = value.contains(csvDelimiter) || value.contains('"') || value.contains('\n') || value.contains('\r')
+        if (!needsQuotes) return value
+        return "\"" + value.replace("\"", "\"\"") + "\""
+    }
     
     /**
      * 生成唯一的文件名（基于时间戳）
@@ -133,15 +161,18 @@ object ResultsManager {
         trial: Int,
         metrics: Map<String, Double>
     ) {
+        if (!csvEnabled) {
+            return
+        }
         val fileName = algorithmName.replace(" ", "_") + ".csv"
         val file = File(experimentDir, fileName)
         val isNew = !file.exists()
 
         java.io.FileOutputStream(file, true).bufferedWriter().use { writer ->
             if (isNew) {
-                writer.write("Trial," + metrics.keys.joinToString(",") + "\n")
+                writer.write(csvLine(listOf("Trial") + metrics.keys.toList()) + "\n")
             }
-            writer.write("$trial," + metrics.values.joinToString(",") { String.format("%.6f", it) } + "\n")
+            writer.write(csvLine(listOf(trial) + metrics.values.map { String.format("%.6f", it) }) + "\n")
         }
     }
 
@@ -153,16 +184,24 @@ object ResultsManager {
         summaryData: List<Map<String, Any>>,
         headers: List<String>
     ) {
+        if (!csvEnabled) {
+            return
+        }
         val summaryFile = File(experimentDir, "summary_avg.csv")
         summaryFile.bufferedWriter().use { writer ->
-            writer.write(headers.joinToString(",") + "\n")
+            writer.write(csvLine(headers) + "\n")
             for (row in summaryData) {
-                writer.write(headers.joinToString(",") { header ->
+                writer.write(csvLine(headers.map { header ->
                     val value = row[header]
                     if (value is Double) String.format("%.6f", value) else value.toString()
-                } + "\n")
+                }) + "\n")
             }
         }
+    }
+
+    fun saveResolvedConfig(experimentDir: File, content: String) {
+        val file = File(experimentDir, "resolved_config.json")
+        file.writeText(content)
     }
 
     /**

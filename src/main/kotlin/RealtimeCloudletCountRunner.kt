@@ -1,13 +1,12 @@
 package datacenter
 
-import config.RealtimeAlgorithmType
 import config.CloudletGeneratorType
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
+import util.ExperimentConcurrency
+import util.ExperimentOutputContext
 import util.Logger
-import util.StatisticalValue
-import util.ResultsManager
-import java.io.File
 import java.text.DecimalFormat
+import scheduler.ResolvedAlgorithm
+import kotlinx.coroutines.runBlocking
 
 /**
  * 实时调度批量任务数实验运行器
@@ -46,9 +45,9 @@ class RealtimeCloudletCountRunner(
     private val randomSeed: Long = 0L,
     
     /**
-     * 要运行的算法列表（空列表表示运行所有算法）
+     * 已解析的算法定义
      */
-    private val algorithms: List<RealtimeAlgorithmType> = emptyList(),
+    private val resolvedAlgorithms: List<ResolvedAlgorithm>,
     
     /**
      * 每个任务数的运行次数（用于计算平均值）
@@ -61,16 +60,30 @@ class RealtimeCloudletCountRunner(
     private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
 
     /**
+     * 实时到达配置
+     */
+    private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(),
+
+    /**
+     * 实时调度配置
+     */
+    private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(),
+
+    /**
      * 实验目录
      */
-    private val experimentDir: java.io.File? = null
+    private val experimentDir: java.io.File? = null,
+    private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir),
+    private val useCoroutines: Boolean = true,
+    private val maxConcurrency: Int = 0,
+    private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency)
 ) {
     private val dft = DecimalFormat("###.##")
     
     /**
      * 运行批量任务数实验
      */
-    fun runBatchExperiment() {
+    suspend fun runBatchExperiment() {
         Logger.info("\n${"=".repeat(80)}")
         Logger.info("开始实时调度批量任务数实验")
         Logger.info("${"=".repeat(80)}")
@@ -81,61 +94,21 @@ class RealtimeCloudletCountRunner(
         Logger.info("随机数种子: {}", randomSeed)
         Logger.info("${"=".repeat(80)}\n")
 
-        // 保存实验信息
-        experimentDir?.let { dir ->
-            ResultsManager.saveExperimentInfo(dir, mapOf(
-                "运行模式" to "实时调度批量任务数 (Realtime Multi)",
-                "任务数列表" to cloudletCounts.joinToString(", "),
-                "每个任务数运行次数" to runs,
-                "仿真持续时间" to simulationDuration,
-                "到达率" to arrivalRate,
-                "种群大小" to population,
-                "最大迭代次数" to maxIter,
-                "随机数种子" to randomSeed,
-                "任务生成器" to generatorType.name
-            ))
-        }
-        
-        // 存储所有任务数的结果
-        val allResults = mutableMapOf<Int, List<RealtimeAlgorithmStatistics>>()
-        
-        // 对每个任务数进行实验
-        for ((index, cloudletCount) in cloudletCounts.withIndex()) {
-            Logger.info("\n${"#".repeat(80)}")
-            Logger.info("任务数: {} ({}/{})", cloudletCount, index + 1, cloudletCounts.size)
-            Logger.info("${"#".repeat(80)}")
-            
-            // 运行对比实验（使用统计模式）
-            val runner = RealtimeComparisonRunner(
-                cloudletCount = cloudletCount,
-                simulationDuration = simulationDuration,
-                arrivalRate = arrivalRate,
-                population = population,
-                maxIter = maxIter,
-                randomSeed = randomSeed,
-                algorithms = algorithms,
-                runs = runs,
-                generatorType = generatorType
-            )
-            
-            // 获取统计结果
-            val statistics = runner.runComparisonWithStatistics()
-            allResults[cloudletCount] = statistics
-            
-            Logger.info("\n任务数 {} 的统计结果:", cloudletCount)
-            for (stat in statistics) {
-                Logger.info("  {}: Makespan={}±{}, Fitness={}±{}, AvgWaitingTime={}±{}", 
-                    stat.algorithmName, 
-                    dft.format(stat.makespan.mean), 
-                    dft.format(stat.makespan.stdDev),
-                    dft.format(stat.fitness.mean), 
-                    dft.format(stat.fitness.stdDev),
-                    dft.format(stat.averageWaitingTime.mean),
-                    dft.format(stat.averageWaitingTime.stdDev))
-            }
-            
-            Logger.info("\n任务数 {} 的实验完成", cloudletCount)
-        }
+        outputContext.saveExperimentInfo(mapOf(
+            "运行模式" to "实时调度批量任务数 (Realtime Multi)",
+            "任务数列表" to cloudletCounts.joinToString(", "),
+            "每个任务数运行次数" to runs,
+            "仿真持续时间" to simulationDuration,
+            "到达率" to arrivalRate,
+            "种群大小" to population,
+            "最大迭代次数" to maxIter,
+            "随机数种子" to randomSeed,
+            "任务生成器" to generatorType.name
+        ))
+
+        val allResults = concurrency.map(cloudletCounts.withIndex().toList()) { indexed ->
+            runCloudletCount(indexed.index, indexed.value)
+        }.toMap()
         
         // 导出汇总结果
         exportBatchResults(allResults)
@@ -144,27 +117,85 @@ class RealtimeCloudletCountRunner(
         Logger.info("实时调度批量任务数实验完成！")
         Logger.info("${"=".repeat(80)}")
     }
+
+    fun runBatchExperimentSync() = runBlocking {
+        runBatchExperiment()
+    }
+
+    private suspend fun runCloudletCount(index: Int, cloudletCount: Int): Pair<Int, List<RealtimeAlgorithmStatistics>> {
+        Logger.info("\n${"#".repeat(80)}")
+        Logger.info("任务数: {} ({}/{})", cloudletCount, index + 1, cloudletCounts.size)
+        Logger.info("${"#".repeat(80)}")
+
+        val childOutputContext = outputContext.child("cloudlets_$cloudletCount")
+        val runner = RealtimeComparisonRunner(
+            cloudletCount = cloudletCount,
+            simulationDuration = simulationDuration,
+            arrivalRate = arrivalRate,
+            population = population,
+            maxIter = maxIter,
+            randomSeed = randomSeed,
+            resolvedAlgorithms = resolvedAlgorithms,
+            runs = runs,
+            generatorType = generatorType,
+            arrival = arrival,
+            scheduling = scheduling,
+            experimentDir = childOutputContext.experimentDir,
+            outputContext = childOutputContext,
+            concurrency = concurrency
+        )
+
+        val statistics = runner.runComparisonWithStatistics()
+
+        Logger.info("\n任务数 {} 的统计结果:", cloudletCount)
+        for (stat in statistics) {
+            Logger.info(
+                "  {}: Makespan={}±{}, Fitness={}±{}, AvgWaitingTime={}±{}",
+                stat.algorithmName,
+                dft.format(stat.makespan.mean),
+                dft.format(stat.makespan.stdDev),
+                dft.format(stat.fitness.mean),
+                dft.format(stat.fitness.stdDev),
+                dft.format(stat.averageWaitingTime.mean),
+                dft.format(stat.averageWaitingTime.stdDev)
+            )
+        }
+
+        Logger.info("\n任务数 {} 的实验完成", cloudletCount)
+        return cloudletCount to statistics
+    }
     
     /**
      * 导出批量实验结果到 CSV
      */
     private fun exportBatchResults(results: Map<Int, List<RealtimeAlgorithmStatistics>>) {
-        val csvFile = if (experimentDir != null) {
-            File(experimentDir, "realtime_cloudlet_count_summary.csv")
-        } else {
-            ResultsManager.generateFileName("realtime_cloudlet_count_comparison")
+        if (!outputContext.csvEnabled) {
+            Logger.info("CSV 输出已禁用，跳过实时批量任务数结果导出")
+            printSummaryTable(results)
+            return
         }
+        val csvFile = outputContext.generateResultFileName("realtime_cloudlet_count_summary")
         
         csvFile.bufferedWriter().use { writer ->
             // 写入表头
-            writer.write("CloudletCount,Algorithm,")
-            writer.write("Makespan_Mean,Makespan_StdDev,")
-            writer.write("LoadBalance_Mean,LoadBalance_StdDev,")
-            writer.write("Cost_Mean,Cost_StdDev,")
-            writer.write("TotalTime_Mean,TotalTime_StdDev,")
-            writer.write("Fitness_Mean,Fitness_StdDev,")
-            writer.write("AvgWaitingTime_Mean,AvgWaitingTime_StdDev,")
-            writer.write("AvgResponseTime_Mean,AvgResponseTime_StdDev,Runs\n")
+            writer.write(
+                outputContext.csvLine(
+                    listOf(
+                        "CloudletCount", "Algorithm",
+                        "Makespan_Mean", "Makespan_StdDev",
+                        "LoadBalance_Mean", "LoadBalance_StdDev",
+                        "Cost_Mean", "Cost_StdDev",
+                        "TotalTime_Mean", "TotalTime_StdDev",
+                        "Fitness_Mean", "Fitness_StdDev",
+                        "AvgWaitingTime_Mean", "AvgWaitingTime_StdDev",
+                        "AvgResponseTime_Mean", "AvgResponseTime_StdDev",
+                        "RejectedCount_Mean", "RejectedCount_StdDev",
+                        "TimeoutCount_Mean", "TimeoutCount_StdDev",
+                        "FailedCount_Mean", "FailedCount_StdDev",
+                        "Runs"
+                    )
+                ) + "\n"
+            )
             
             // 写入数据（按任务数排序）
             val sortedCounts = results.keys.sorted()
@@ -172,40 +203,47 @@ class RealtimeCloudletCountRunner(
                 val algorithmStats = results[cloudletCount] ?: continue
                 
                 for (stat in algorithmStats) {
-                    writer.write("$cloudletCount,${stat.algorithmName},")
-                    writer.write("${stat.makespan.mean},${stat.makespan.stdDev},")
-                    writer.write("${stat.loadBalance.mean},${stat.loadBalance.stdDev},")
-                    writer.write("${stat.cost.mean},${stat.cost.stdDev},")
-                    writer.write("${stat.totalTime.mean},${stat.totalTime.stdDev},")
-                    writer.write("${stat.fitness.mean},${stat.fitness.stdDev},")
-                    writer.write("${stat.averageWaitingTime.mean},${stat.averageWaitingTime.stdDev},")
-                    writer.write("${stat.averageResponseTime.mean},${stat.averageResponseTime.stdDev},$runs\n")
+                    writer.write(
+                        outputContext.csvLine(
+                            listOf(
+                                cloudletCount, stat.algorithmName,
+                                stat.makespan.mean, stat.makespan.stdDev,
+                                stat.loadBalance.mean, stat.loadBalance.stdDev,
+                                stat.cost.mean, stat.cost.stdDev,
+                                stat.totalTime.mean, stat.totalTime.stdDev,
+                                stat.fitness.mean, stat.fitness.stdDev,
+                                stat.averageWaitingTime.mean, stat.averageWaitingTime.stdDev,
+                                stat.averageResponseTime.mean, stat.averageResponseTime.stdDev,
+                                stat.rejectedCount.mean, stat.rejectedCount.stdDev,
+                                stat.timeoutCount.mean, stat.timeoutCount.stdDev,
+                                stat.failedCount.mean, stat.failedCount.stdDev,
+                                runs
+                            )
+                        ) + "\n"
+                    )
                 }
             }
         }
         
         Logger.info("\n批量实验结果已导出到: {}", csvFile.absolutePath)
         
-        // 如果有 experimentDir，还可以保存更详细的汇总
-        experimentDir?.let { dir ->
-            val summaryHeaders = listOf("CloudletCount", "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness", "AvgWaitingTime", "AvgResponseTime")
-            val summaryData = results.flatMap { (count, stats) ->
-                stats.map { stat ->
-                    mapOf(
-                        "CloudletCount" to count,
-                        "Algorithm" to stat.algorithmName,
-                        "AvgMakespan" to stat.makespan.mean,
-                        "AvgLoadBalance" to stat.loadBalance.mean,
-                        "AvgCost" to stat.cost.mean,
-                        "AvgTotalTime" to stat.totalTime.mean,
-                        "AvgFitness" to stat.fitness.mean,
-                        "AvgWaitingTime" to stat.averageWaitingTime.mean,
-                        "AvgResponseTime" to stat.averageResponseTime.mean
-                    )
-                }
+        val summaryHeaders = listOf("CloudletCount", "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness", "AvgWaitingTime", "AvgResponseTime")
+        val summaryData = results.flatMap { (count, stats) ->
+            stats.map { stat ->
+                mapOf(
+                    "CloudletCount" to count,
+                    "Algorithm" to stat.algorithmName,
+                    "AvgMakespan" to stat.makespan.mean,
+                    "AvgLoadBalance" to stat.loadBalance.mean,
+                    "AvgCost" to stat.cost.mean,
+                    "AvgTotalTime" to stat.totalTime.mean,
+                    "AvgFitness" to stat.fitness.mean,
+                    "AvgWaitingTime" to stat.averageWaitingTime.mean,
+                    "AvgResponseTime" to stat.averageResponseTime.mean
+                )
             }
-            ResultsManager.saveSummaryResults(dir, summaryData, summaryHeaders)
         }
+        outputContext.saveSummaryResults(summaryData, summaryHeaders)
 
         // 打印汇总表格
         printSummaryTable(results)

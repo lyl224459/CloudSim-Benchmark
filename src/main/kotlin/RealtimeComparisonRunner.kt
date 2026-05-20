@@ -1,21 +1,22 @@
 package datacenter
 
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import broker.RealtimeBroker
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.runBlocking
+import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.cloudsimplus.core.CloudSimPlus
-import scheduler.*
+import scheduler.RealtimeScheduler
+import scheduler.ResolvedAlgorithm
+import util.ExperimentConcurrency
+import util.ExperimentOutputContext
 import util.Logger
 import util.StatisticalValue
-import util.ResultsManager
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
 import java.text.DecimalFormat
-import java.util.*
+import java.util.Random
+import kotlin.math.roundToInt
 import kotlin.system.measureTimeMillis
 
-/**
- * 实时调度算法对比结果
- */
 data class RealtimeAlgorithmResult(
     val algorithmName: String,
     val makespan: Double,
@@ -24,12 +25,12 @@ data class RealtimeAlgorithmResult(
     val totalTime: Double,
     val fitness: Double,
     val averageWaitingTime: Double,
-    val averageResponseTime: Double
+    val averageResponseTime: Double,
+    val rejectedCount: Int,
+    val timeoutCount: Int,
+    val failedCount: Int
 )
 
-/**
- * 实时调度算法统计结果（多次运行的平均值和标准差）
- */
 data class RealtimeAlgorithmStatistics(
     val algorithmName: String,
     val makespan: StatisticalValue,
@@ -38,705 +39,538 @@ data class RealtimeAlgorithmStatistics(
     val totalTime: StatisticalValue,
     val fitness: StatisticalValue,
     val averageWaitingTime: StatisticalValue,
-    val averageResponseTime: StatisticalValue
+    val averageResponseTime: StatisticalValue,
+    val rejectedCount: StatisticalValue,
+    val timeoutCount: StatisticalValue,
+    val failedCount: StatisticalValue
 )
 
-
-/**
- * 实时调度对比运行器
- */
 class RealtimeComparisonRunner(
     private val cloudletCount: Int = 100,
     private val simulationDuration: Double = 1000.0,
-    private val arrivalRate: Double = 10.0,  // 每秒到达的任务数
+    private val arrivalRate: Double = 10.0,
     private val population: Int = 20,
     private val maxIter: Int = 20,
     private val randomSeed: Long = 0L,
-    private val algorithms: List<config.RealtimeAlgorithmType> = emptyList(),  // 空列表 = 运行所有算法
-    private val runs: Int = 1,  // 运行次数，默认1次
+    private val runs: Int = 1,
     private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
     private val googleTraceConfig: config.GoogleTraceConfig? = null,
     private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
+    private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(),
+    private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(),
+    private val resolvedAlgorithms: List<ResolvedAlgorithm>,
     private val experimentDir: java.io.File? = null,
+    private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir),
     private val useCoroutines: Boolean = true,
-    private val maxConcurrency: Int = 0
+    private val maxConcurrency: Int = 0,
+    private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency)
 ) {
-    private val random = Random(randomSeed)
     private val dft = DecimalFormat("###.##")
 
-    // 协程上下文：如果限制并发则使用固定线程池
-    private val coroutineContext = if (maxConcurrency > 0) {
-        newFixedThreadPoolContext(maxConcurrency, "RealtimeRunner")
-    } else {
-        Dispatchers.Default
-    }
-    
-    private val coroutineScope = CoroutineScope(coroutineContext + SupervisorJob())
+    private data class RealtimeMetrics(
+        val makespan: Double,
+        val loadBalance: Double,
+        val cost: Double,
+        val averageWaitingTime: Double,
+        val averageResponseTime: Double,
+        val rejectedCount: Int,
+        val timeoutCount: Int,
+        val failedCount: Int
+    )
 
-    /**
-     * 运行单个实时调度算法
-     */
+    private fun executionModeDescription(): String {
+        return concurrency.description
+    }
+
     private fun runRealtimeAlgorithm(
         algorithmName: String,
+        runSeed: Long,
         schedulerFactory: (List<org.cloudsimplus.vms.Vm>) -> RealtimeScheduler
     ): RealtimeAlgorithmResult {
         Logger.info("\n${"=".repeat(60)}")
         Logger.info("运行实时调度算法: {}", algorithmName)
         Logger.info("${"=".repeat(60)}")
-        
-        // 创建仿真环境
+
         val simulation = CloudSimPlus()
-        
-        // 创建数据中心
-        val datacenter0 = DatacenterCreator.createDatacenter(simulation, "Datacenter0", DatacenterType.LOW)
-        val datacenter1 = DatacenterCreator.createDatacenter(simulation, "Datacenter1", DatacenterType.MEDIUM)
-        val datacenter2 = DatacenterCreator.createDatacenter(simulation, "Datacenter2", DatacenterType.HIGH)
-        
-        // 创建虚拟机列表
+        DatacenterCreator.createDatacenter(simulation, "Datacenter0", DatacenterType.LOW)
+        DatacenterCreator.createDatacenter(simulation, "Datacenter1", DatacenterType.MEDIUM)
+        DatacenterCreator.createDatacenter(simulation, "Datacenter2", DatacenterType.HIGH)
+
         val vmList = DatacenterCreator.createVms()
-        
-        // 创建实时调度器
         val scheduler = schedulerFactory(vmList)
-        
-        // 创建实时代理
-        val broker = RealtimeBroker(simulation, scheduler, vmList)
+        val broker = RealtimeBroker(simulation, scheduler, vmList, scheduling)
         broker.submitVmList(vmList)
-        
-        // 生成实时任务（带到达时间）
-        val cloudletGenerator = RealtimeCloudletGenerator(random, arrivalRate, generatorType, googleTraceConfig)
+
+        val random = Random(runSeed)
+        val cloudletGenerator = RealtimeCloudletGenerator(random, arrivalRate, generatorType, arrival, googleTraceConfig)
         val cloudletList = cloudletGenerator.createRealtimeCloudlets(0, cloudletCount, simulationDuration)
-        
-        // 提交任务（按到达时间）
         broker.submitCloudletListRealtime(cloudletList)
-        
+
         Logger.info("已生成 {} 个实时任务", cloudletList.size)
         Logger.info("仿真持续时间: {} 秒", simulationDuration)
-        
-        // 开始仿真
         simulation.start()
-        
-        // 获取完成的云任务
+
         val finishedCloudlets = broker.getCloudletFinishedList<org.cloudsimplus.cloudlets.Cloudlet>()
-        
-        // 计算指标
-        val (makespan, loadBalance, cost, avgWaitingTime, avgResponseTime) = 
-            calculateRealtimeMetrics(finishedCloudlets, vmList.size)
-        
-        // 计算总时间和适应度
+        val metrics = calculateRealtimeMetrics(finishedCloudlets, vmList.size, broker)
+
         val cloudletToVm = IntArray(cloudletList.size) { i ->
             finishedCloudlets.find { it.id == cloudletList[i].id }?.vm?.id?.toInt() ?: 0
         }
         val objFunc = SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
         val totalTime = objFunc.estimateTotalTime(cloudletToVm)
         val fitness = objFunc.calculate(cloudletToVm)
-        
+
         Logger.info("\n结果:")
-        Logger.info("  最大完成时间 (Makespan): {}", dft.format(makespan))
-        Logger.info("  负载均衡度 (LB): {}", dft.format(loadBalance))
-        Logger.info("  总成本 (Cost): {}", dft.format(cost))
-        Logger.info("  平均等待时间: {}", dft.format(avgWaitingTime))
-        Logger.info("  平均响应时间: {}", dft.format(avgResponseTime))
+        Logger.info("  最大完成时间 (Makespan): {}", dft.format(metrics.makespan))
+        Logger.info("  负载均衡度 (LB): {}", dft.format(metrics.loadBalance))
+        Logger.info("  总成本 (Cost): {}", dft.format(metrics.cost))
+        Logger.info("  平均等待时间: {}", dft.format(metrics.averageWaitingTime))
+        Logger.info("  平均响应时间: {}", dft.format(metrics.averageResponseTime))
+        Logger.info("  Reject/Timeout/Failed: {}/{}/{}", metrics.rejectedCount, metrics.timeoutCount, metrics.failedCount)
         Logger.info("  适应度 (Fitness): {}", dft.format(fitness))
-        
+
         return RealtimeAlgorithmResult(
-            algorithmName, makespan, loadBalance, cost, totalTime, fitness,
-            avgWaitingTime, avgResponseTime
+            algorithmName = algorithmName,
+            makespan = metrics.makespan,
+            loadBalance = metrics.loadBalance,
+            cost = metrics.cost,
+            totalTime = totalTime,
+            fitness = fitness,
+            averageWaitingTime = metrics.averageWaitingTime,
+            averageResponseTime = metrics.averageResponseTime,
+            rejectedCount = metrics.rejectedCount,
+            timeoutCount = metrics.timeoutCount,
+            failedCount = metrics.failedCount
         )
     }
-    
-    /**
-     * 计算实时调度指标
-     */
+
     private fun calculateRealtimeMetrics(
         cloudletList: List<org.cloudsimplus.cloudlets.Cloudlet>,
-        vmNum: Int
-    ): Quintuple<Double, Double, Double, Double, Double> {
+        vmNum: Int,
+        broker: RealtimeBroker
+    ): RealtimeMetrics {
         var makespan = 0.0
         val executeTimeOfVM = DoubleArray(vmNum)
         var cost = 0.0
         var totalWaitingTime = 0.0
         var totalResponseTime = 0.0
         var completedCount = 0
-        
+        var failedCount = 0
+
         for (cloudlet in cloudletList) {
-            if (cloudlet.status == org.cloudsimplus.cloudlets.Cloudlet.Status.SUCCESS) {
-                val finishTime = cloudlet.finishTime
-                if (finishTime > makespan) {
-                    makespan = finishTime
+            when (cloudlet.status) {
+                org.cloudsimplus.cloudlets.Cloudlet.Status.SUCCESS -> {
+                    val finishTime = cloudlet.finishTime
+                    if (finishTime > makespan) {
+                        makespan = finishTime
+                    }
+
+                    val vmId = cloudlet.vm.id.toInt()
+                    val actualCPUTime = cloudlet.getTotalExecutionTime()
+                    executeTimeOfVM[vmId] += actualCPUTime
+
+                    val costPerSec = when {
+                        cloudlet.vm.mips == config.DatacenterConfig.L_MIPS.toDouble() -> config.DatacenterConfig.L_PRICE
+                        cloudlet.vm.mips == config.DatacenterConfig.M_MIPS.toDouble() -> config.DatacenterConfig.M_PRICE
+                        cloudlet.vm.mips == config.DatacenterConfig.H_MIPS.toDouble() -> config.DatacenterConfig.H_PRICE
+                        else -> config.DatacenterConfig.L_PRICE
+                    }
+                    cost += actualCPUTime * costPerSec
+
+                    val arrivalTime = broker.getArrivalTime(cloudlet)
+                    val startTime = cloudlet.getStartTime()
+                    val waitingTime = if (startTime > 0) startTime - arrivalTime else 0.0
+                    val responseTime = finishTime - arrivalTime
+
+                    totalWaitingTime += waitingTime
+                    totalResponseTime += responseTime
+                    completedCount++
                 }
-                
-                val vmId = cloudlet.vm.id.toInt()
-                // CloudSim Plus 8.5.5 API: 使用 getTotalExecutionTime() 方法
-                val actualCPUTime = cloudlet.getTotalExecutionTime()
-                executeTimeOfVM[vmId] += actualCPUTime
-                
-                // 计算成本
-                val vm = cloudlet.vm
-                val costPerSec = when {
-                    vm.mips == config.DatacenterConfig.L_MIPS.toDouble() -> config.DatacenterConfig.L_PRICE
-                    vm.mips == config.DatacenterConfig.M_MIPS.toDouble() -> config.DatacenterConfig.M_PRICE
-                    vm.mips == config.DatacenterConfig.H_MIPS.toDouble() -> config.DatacenterConfig.H_PRICE
-                    else -> config.DatacenterConfig.L_PRICE
-                }
-                cost += actualCPUTime * costPerSec
-                
-                // 计算等待时间和响应时间
-                val arrivalTime = cloudlet.submissionDelay
-                // CloudSim Plus 8.5.5 API: 使用 getStartTime() 方法
-                val startTime = cloudlet.getStartTime()
-                val waitingTime = if (startTime > 0) startTime - arrivalTime else 0.0
-                val responseTime = finishTime - arrivalTime
-                
-                totalWaitingTime += waitingTime
-                totalResponseTime += responseTime
-                completedCount++
+                org.cloudsimplus.cloudlets.Cloudlet.Status.FAILED -> failedCount++
+                else -> Unit
             }
         }
-        
-        // 计算负载均衡度
+
         val avgExecuteTime = executeTimeOfVM.average()
-        var LB = 0.0
+        var lb = 0.0
         for (i in 0 until vmNum) {
-            LB += Math.pow(executeTimeOfVM[i] - avgExecuteTime, 2.0)
+            lb += Math.pow(executeTimeOfVM[i] - avgExecuteTime, 2.0)
         }
-        LB = Math.sqrt(LB / vmNum)
-        
+        lb = Math.sqrt(lb / vmNum)
+
         val avgWaitingTime = if (completedCount > 0) totalWaitingTime / completedCount else 0.0
         val avgResponseTime = if (completedCount > 0) totalResponseTime / completedCount else 0.0
-        
-        return Quintuple(makespan, LB, cost, avgWaitingTime, avgResponseTime)
+        val timeoutCount = broker.getTimeoutCount(scheduling.taskTimeout)
+
+        return RealtimeMetrics(
+            makespan = makespan,
+            loadBalance = lb,
+            cost = cost,
+            averageWaitingTime = avgWaitingTime,
+            averageResponseTime = avgResponseTime,
+            rejectedCount = broker.getRejectedCount(),
+            timeoutCount = timeoutCount,
+            failedCount = failedCount
+        )
     }
-    
-    /**
-     * 运行所有实时调度算法并对比
-     */
+
     suspend fun runComparison(): List<RealtimeAlgorithmResult> = coroutineScope {
         Logger.info("\n${"=".repeat(60)}")
-        Logger.info("开始实时调度算法对比实验（协程优化）")
+        Logger.info("开始实时调度算法对比实验")
         Logger.info("任务数量: {}", cloudletCount)
         Logger.info("仿真持续时间: {} 秒", simulationDuration)
         Logger.info("到达率: {} 任务/秒", arrivalRate)
+        Logger.info("到达分布: {}", arrival.distribution)
+        Logger.info("调度策略: {}", scheduling.strategy)
         Logger.info("运行次数: {}", runs)
         Logger.info("随机数种子: {}", randomSeed)
+        Logger.info("执行模式: {}", executionModeDescription())
         Logger.info("${"=".repeat(60)}")
 
-        // 保存实验信息
-        experimentDir?.let { dir ->
-            ResultsManager.saveExperimentInfo(dir, mapOf(
-                "运行模式" to "实时调度 (Realtime)",
-                "任务数量" to cloudletCount,
-                "仿真持续时间" to simulationDuration,
-                "到达率" to arrivalRate,
-                "随机数种子" to randomSeed,
-                "运行次数" to runs,
-                "任务生成器" to generatorType.name
-            ))
-        }
+        outputContext.saveExperimentInfo(mapOf(
+            "运行模式" to "实时调度 (Realtime)",
+            "任务数量" to cloudletCount,
+            "仿真持续时间" to simulationDuration,
+            "到达率" to arrivalRate,
+            "到达分布" to arrival.distribution,
+            "调度策略" to scheduling.strategy,
+            "最大队列" to scheduling.maxQueueSize,
+            "任务超时" to scheduling.taskTimeout,
+            "资源预留" to scheduling.resourceReservation,
+            "随机数种子" to randomSeed,
+            "运行次数" to runs,
+            "任务生成器" to generatorType.name
+        ))
 
-        // 确定要运行的算法列表（如果配置为空，则运行所有算法）
-        val algorithmsToRun = if (algorithms.isEmpty()) {
-            config.RealtimeAlgorithmType.entries
-        } else {
-            algorithms
-        }
-
+        val algorithmsToRun = algorithmsToRun()
         Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
 
+        val results = mutableListOf<RealtimeAlgorithmResult>()
         val executionTime = measureTimeMillis {
-            // 创建结果通道
-            val resultsChannel = Channel<RealtimeAlgorithmResult>(algorithmsToRun.size)
+            results.addAll(executeRealtimeAlgorithms(algorithmsToRun).sortedBy { it.algorithmName })
+            Logger.info("所有实时算法执行完成")
+            printRealtimeComparisonResults(results)
+            exportRealtimeToCSV(results)
 
-            // 并行执行所有算法
-            val algorithmJobs = algorithmsToRun.map { algorithmType ->
-                async(Dispatchers.Default) {
-                    try {
-                        Logger.debug("开始执行实时算法: {}", algorithmType.name)
-                        val result = executeRealtimeAlgorithmAsync(algorithmType)
-                        Logger.debug("实时算法 {} 执行完成", algorithmType.name)
-                        resultsChannel.send(result)
-                    } catch (e: Exception) {
-                        Logger.error("实时算法 {} 执行失败: {}", e, algorithmType.name, e.message)
-                        // 发送错误结果
-                        resultsChannel.send(RealtimeAlgorithmResult(
-                            algorithmName = algorithmType.name,
-                            makespan = Double.NaN,
-                            loadBalance = Double.NaN,
-                            cost = Double.NaN,
-                            totalTime = Double.NaN,
-                            fitness = Double.NaN,
-                            averageWaitingTime = Double.NaN,
-                            averageResponseTime = Double.NaN
-                        ))
-                    }
-                }
-            }
-
-            // 等待所有算法完成并收集结果
-            val results = mutableListOf<RealtimeAlgorithmResult>()
-            repeat(algorithmsToRun.size) {
-                results.add(resultsChannel.receive())
-            }
-
-            // 等待所有协程完成
-            algorithmJobs.forEach { it.join() }
-            resultsChannel.close()
-
-            Logger.info("所有实时算法并行执行完成")
-            printRealtimeComparisonResults(results.sortedBy { it.algorithmName })
-            exportRealtimeToCSV(results.sortedBy { it.algorithmName })
-
-            // 保存汇总结果
-            experimentDir?.let { dir ->
-                val summaryData = results.sortedBy { it.algorithmName }.map { r ->
-                    mapOf(
-                        "Algorithm" to r.algorithmName,
-                        "AvgMakespan" to r.makespan,
-                        "AvgLoadBalance" to r.loadBalance,
-                        "AvgCost" to r.cost,
-                        "AvgTotalTime" to r.totalTime,
-                        "AvgFitness" to r.fitness,
-                        "AvgWaitingTime" to r.averageWaitingTime,
-                        "AvgResponseTime" to r.averageResponseTime
-                    )
-                }
-                ResultsManager.saveSummaryResults(
-                    dir, summaryData,
-                    listOf("Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness", "AvgWaitingTime", "AvgResponseTime")
+            val summaryData = results.map { r ->
+                mapOf(
+                    "Algorithm" to r.algorithmName,
+                    "AvgMakespan" to r.makespan,
+                    "AvgLoadBalance" to r.loadBalance,
+                    "AvgCost" to r.cost,
+                    "AvgTotalTime" to r.totalTime,
+                    "AvgFitness" to r.fitness,
+                    "AvgWaitingTime" to r.averageWaitingTime,
+                    "AvgResponseTime" to r.averageResponseTime,
+                    "RejectedCount" to r.rejectedCount,
+                    "TimeoutCount" to r.timeoutCount,
+                    "FailedCount" to r.failedCount
                 )
             }
+            outputContext.saveSummaryResults(
+                summaryData,
+                listOf(
+                    "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness",
+                    "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount"
+                )
+            )
         }
 
         Logger.info("实时调度算法对比实验完成，总耗时: {}ms", executionTime)
-
-        // 返回空列表，因为结果已经通过通道处理并保存
-        emptyList()
+        results
     }
 
-    /**
-     * 异步执行单个实时算法
-     */
-    private suspend fun executeRealtimeAlgorithmAsync(algorithmType: config.RealtimeAlgorithmType): RealtimeAlgorithmResult = coroutineScope {
-        if (runs > 1) {
-            // 多次运行，使用协程并行执行
-            val runJobs = (1..runs).map { run ->
-                async(Dispatchers.Default) {
-                    Logger.debug("实时算法 {} 开始第 {}/{} 次运行", algorithmType.name, run, runs)
-                    val result = executeRealtimeSingleRunAsync(algorithmType, run)
-                    Logger.debug("实时算法 {} 第 {} 次运行完成", algorithmType.name, run)
-                    result
-                }
-            }
-
-            // 收集所有运行结果
-            val runResults = runJobs.map { it.await() }
-
-            // 计算统计结果
-            RealtimeAlgorithmResult(
-                algorithmName = runResults[0].algorithmName,
-                makespan = runResults.map { it.makespan }.average(),
-                loadBalance = runResults.map { it.loadBalance }.average(),
-                cost = runResults.map { it.cost }.average(),
-                totalTime = runResults.map { it.totalTime }.average(),
-                fitness = runResults.map { it.fitness }.average(),
-                averageWaitingTime = runResults.map { it.averageWaitingTime }.average(),
-                averageResponseTime = runResults.map { it.averageResponseTime }.average()
-            )
-        } else {
-            // 单次运行
-            executeRealtimeSingleRunAsync(algorithmType, 1)
+    private fun algorithmsToRun(): List<ResolvedAlgorithm> {
+        if (resolvedAlgorithms.isEmpty()) {
+            throw IllegalArgumentException("RealtimeComparisonRunner 需要已解析的算法列表")
         }
+        return resolvedAlgorithms
     }
 
-    /**
-     * 异步执行单次实时算法运行
-     */
-    private suspend fun executeRealtimeSingleRunAsync(algorithmType: config.RealtimeAlgorithmType, run: Int): RealtimeAlgorithmResult =
-        withContext(Dispatchers.Default) {
-            val result = when (algorithmType) {
-                config.RealtimeAlgorithmType.MIN_LOAD -> {
-                    runRealtimeAlgorithm("MinLoad") { vms ->
-                        RealtimeMinLoadScheduler(vms)
-                    }
-                }
-                config.RealtimeAlgorithmType.RANDOM -> {
-                    runRealtimeAlgorithm("Random") { vms ->
-                        RealtimeRandomScheduler(vms, Random(randomSeed + run))
-                    }
-                }
-                config.RealtimeAlgorithmType.PSO_REALTIME -> {
-                    runRealtimeAlgorithm("PSO-Realtime") { vms ->
-                        RealtimePSOScheduler(vms, population, maxIter, Random(randomSeed + run))
-                    }
-                }
-                config.RealtimeAlgorithmType.WOA_REALTIME -> {
-                    runRealtimeAlgorithm("WOA-Realtime") { vms ->
-                        RealtimeWOAScheduler(vms, population, maxIter, Random(randomSeed + run))
-                    }
-                }
-            }
+    private suspend fun executeRealtimeAlgorithms(
+        algorithmsToRun: List<ResolvedAlgorithm>
+    ): List<RealtimeAlgorithmResult> {
+        return concurrency.map(algorithmsToRun) { executeRealtimeAlgorithmSafely(it) }
+    }
 
-            // 保存单次试验结果
-            experimentDir?.let { dir ->
-                ResultsManager.saveAlgorithmTrialResult(
-                    dir, result.algorithmName, run,
-                    mapOf(
-                        "Makespan" to result.makespan,
-                        "LoadBalance" to result.loadBalance,
-                        "Cost" to result.cost,
-                        "TotalTime" to result.totalTime,
-                        "Fitness" to result.fitness,
-                        "WaitingTime" to result.averageWaitingTime,
-                        "ResponseTime" to result.averageResponseTime
-                    )
-                )
-            }
+    private suspend fun executeRealtimeAlgorithmSafely(
+        algorithm: ResolvedAlgorithm
+    ): RealtimeAlgorithmResult {
+        return try {
+            Logger.debug("开始执行实时算法: {}", algorithm.name)
+            val result = executeRealtimeAlgorithmAsync(algorithm)
+            Logger.debug("实时算法 {} 执行完成", algorithm.name)
             result
-        }
-
-    /**
-     * 运行实时调度算法对比实验（同步版本 - 兼容性方法）
-     * @deprecated 使用协程版本 runComparison() 获得更好的性能
-     */
-    fun runComparisonSync(): List<RealtimeAlgorithmResult> {
-        return runBlocking {
-            runComparison()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Logger.error("实时算法 {} 执行失败: {}", e, algorithm.name, e.message)
+            RealtimeAlgorithmResult(
+                algorithmName = algorithm.name,
+                makespan = Double.NaN,
+                loadBalance = Double.NaN,
+                cost = Double.NaN,
+                totalTime = Double.NaN,
+                fitness = Double.NaN,
+                averageWaitingTime = Double.NaN,
+                averageResponseTime = Double.NaN,
+                rejectedCount = Int.MAX_VALUE,
+                timeoutCount = Int.MAX_VALUE,
+                failedCount = Int.MAX_VALUE
+            )
         }
     }
 
+    private suspend fun executeRealtimeAlgorithmAsync(
+        algorithm: ResolvedAlgorithm
+    ): RealtimeAlgorithmResult = coroutineScope {
+        averageRealtimeResults(executeRealtimeAlgorithmRuns(algorithm))
+    }
 
-    /**
-     * 运行所有实时调度算法并对比，返回统计结果（平均值和标准差）
-     */
-    fun runComparisonWithStatistics(): List<RealtimeAlgorithmStatistics> {
+    private suspend fun executeRealtimeAlgorithmRuns(algorithm: ResolvedAlgorithm): List<RealtimeAlgorithmResult> {
+        return concurrency.map(1..runs) { run ->
+            executeRealtimeSingleRunAsync(algorithm, run)
+        }
+    }
+
+    private fun averageRealtimeResults(runResults: List<RealtimeAlgorithmResult>): RealtimeAlgorithmResult {
+        return RealtimeAlgorithmResult(
+            algorithmName = runResults[0].algorithmName,
+            makespan = runResults.map { it.makespan }.average(),
+            loadBalance = runResults.map { it.loadBalance }.average(),
+            cost = runResults.map { it.cost }.average(),
+            totalTime = runResults.map { it.totalTime }.average(),
+            fitness = runResults.map { it.fitness }.average(),
+            averageWaitingTime = runResults.map { it.averageWaitingTime }.average(),
+            averageResponseTime = runResults.map { it.averageResponseTime }.average(),
+            rejectedCount = runResults.map { it.rejectedCount }.average().roundToInt(),
+            timeoutCount = runResults.map { it.timeoutCount }.average().roundToInt(),
+            failedCount = runResults.map { it.failedCount }.average().roundToInt()
+        )
+    }
+
+    private suspend fun executeRealtimeSingleRunAsync(
+        algorithm: ResolvedAlgorithm,
+        run: Int
+    ): RealtimeAlgorithmResult = concurrency.run {
+        val runSeed = randomSeed + run
+        val result = runRealtimeAlgorithm(algorithm.displayName, runSeed) { vms ->
+            algorithm.definition.realtimeFactory!!.invoke(vms, algorithm.settings, runSeed)
+        }
+
+        outputContext.saveAlgorithmTrialResult(
+            result.algorithmName,
+            run,
+            mapOf(
+                "Makespan" to result.makespan,
+                "LoadBalance" to result.loadBalance,
+                "Cost" to result.cost,
+                "TotalTime" to result.totalTime,
+                "Fitness" to result.fitness,
+                "WaitingTime" to result.averageWaitingTime,
+                "ResponseTime" to result.averageResponseTime,
+                "RejectedCount" to result.rejectedCount.toDouble(),
+                "TimeoutCount" to result.timeoutCount.toDouble(),
+                "FailedCount" to result.failedCount.toDouble()
+            )
+        )
+        result
+    }
+
+    fun runComparisonSync(): List<RealtimeAlgorithmResult> = runBlocking { runComparison() }
+
+    suspend fun runComparisonWithStatistics(): List<RealtimeAlgorithmStatistics> {
         Logger.info("\n${"=".repeat(60)}")
         Logger.info("开始实时调度算法对比实验 ({} 次运行)", runs)
         Logger.info("任务数量: {}", cloudletCount)
         Logger.info("仿真持续时间: {} 秒", simulationDuration)
         Logger.info("到达率: {} 任务/秒", arrivalRate)
+        Logger.info("到达分布: {}", arrival.distribution)
+        Logger.info("调度策略: {}", scheduling.strategy)
         Logger.info("初始随机数种子: {}", randomSeed)
+        Logger.info("执行模式: {}", executionModeDescription())
         Logger.info("${"=".repeat(60)}")
 
-        val algorithmsToRun = if (algorithms.isEmpty()) {
-            config.RealtimeAlgorithmType.entries
-        } else {
-            algorithms
-        }
-
+        val algorithmsToRun = algorithmsToRun()
         Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
 
-        val statistics = mutableListOf<RealtimeAlgorithmStatistics>()
-
-        // 对每个算法进行多次运行
-        for (algorithmType in algorithmsToRun) {
-            val algorithmName = when (algorithmType) {
-                config.RealtimeAlgorithmType.MIN_LOAD -> "MinLoad"
-                config.RealtimeAlgorithmType.RANDOM -> "Random"
-                config.RealtimeAlgorithmType.PSO_REALTIME -> "PSO-Realtime"
-                config.RealtimeAlgorithmType.WOA_REALTIME -> "WOA-Realtime"
-            }
-
-            Logger.info("\n--- 算法: {} ---", algorithmName)
-            val runResults = mutableListOf<RealtimeAlgorithmResult>()
-
-            for (i in 0 until runs) {
-                Logger.info("  运行第 {}/{} 次...", i + 1, runs)
-                // 每次运行使用不同的随机种子
-                val currentRandomSeed = randomSeed + i
-                val currentRandom = Random(currentRandomSeed)
-
-                val result = when (algorithmType) {
-                    config.RealtimeAlgorithmType.MIN_LOAD -> {
-                        runRealtimeAlgorithm("MinLoad") { vms ->
-                            RealtimeMinLoadScheduler(vms)
-                        }
-                    }
-                    config.RealtimeAlgorithmType.RANDOM -> {
-                        runRealtimeAlgorithm("Random") { vms ->
-                            RealtimeRandomScheduler(vms, currentRandom)
-                        }
-                    }
-                    config.RealtimeAlgorithmType.PSO_REALTIME -> {
-                        runRealtimeAlgorithm("PSO-Realtime") { vms ->
-                            RealtimePSOScheduler(vms, population, maxIter, currentRandom)
-                        }
-                    }
-                    config.RealtimeAlgorithmType.WOA_REALTIME -> {
-                        runRealtimeAlgorithm("WOA-Realtime") { vms ->
-                            RealtimeWOAScheduler(vms, population, maxIter, currentRandom)
-                        }
-                    }
-                }
-                runResults.add(result)
-            }
-
-            // 计算统计值
-            val stats = calculateRealtimeStatistics(algorithmName, runResults)
-            statistics.add(stats)
-        }
+        val statistics = concurrency.map(algorithmsToRun) { algorithm ->
+            calculateRealtimeStatistics(algorithm.displayName, executeRealtimeAlgorithmRuns(algorithm))
+        }.sortedBy { it.algorithmName }
 
         printRealtimeStatisticsResults(statistics)
         exportStatisticsToCSV(statistics)
-
         return statistics
     }
-    
-    /**
-     * 导出统计结果到 CSV 文件
-     */
-    private fun exportStatisticsToCSV(statistics: List<RealtimeAlgorithmStatistics>) {
-        val csvFile = ResultsManager.generateRealtimeResultFileName()
-        csvFile.bufferedWriter().use { writer ->
-            // 写入表头
-            writer.write("Algorithm,Makespan_Mean,Makespan_StdDev,LoadBalance_Mean,LoadBalance_StdDev," +
-                    "Cost_Mean,Cost_StdDev,TotalTime_Mean,TotalTime_StdDev,Fitness_Mean,Fitness_StdDev," +
-                    "AvgWaitingTime_Mean,AvgWaitingTime_StdDev,AvgResponseTime_Mean,AvgResponseTime_StdDev,Runs\n")
 
-            // 写入数据
-            for (stat in statistics) {
-                writer.write("${stat.algorithmName}," +
-                        "${stat.makespan.mean},${stat.makespan.stdDev}," +
-                        "${stat.loadBalance.mean},${stat.loadBalance.stdDev}," +
-                        "${stat.cost.mean},${stat.cost.stdDev}," +
-                        "${stat.totalTime.mean},${stat.totalTime.stdDev}," +
-                        "${stat.fitness.mean},${stat.fitness.stdDev}," +
-                        "${stat.averageWaitingTime.mean},${stat.averageWaitingTime.stdDev}," +
-                        "${stat.averageResponseTime.mean},${stat.averageResponseTime.stdDev}," +
-                        "${runs}\n")
-            }
-        }
-        Logger.info("结果已导出到: {}", csvFile.absolutePath)
-        Logger.info("注: 导出值为 {} 次运行的平均值和标准差", runs)
+    fun runComparisonWithStatisticsSync(): List<RealtimeAlgorithmStatistics> = runBlocking {
+        runComparisonWithStatistics()
     }
 
-    /**
-     * 计算多次运行的统计值
-     */
     private fun calculateRealtimeStatistics(
         algorithmName: String,
         results: List<RealtimeAlgorithmResult>
     ): RealtimeAlgorithmStatistics {
-        val makespanStats = DescriptiveStatistics()
-        val loadBalanceStats = DescriptiveStatistics()
-        val costStats = DescriptiveStatistics()
-        val totalTimeStats = DescriptiveStatistics()
-        val fitnessStats = DescriptiveStatistics()
-        val avgWaitingTimeStats = DescriptiveStatistics()
-        val avgResponseTimeStats = DescriptiveStatistics()
-        
-        for (result in results) {
-            makespanStats.addValue(result.makespan)
-            loadBalanceStats.addValue(result.loadBalance)
-            costStats.addValue(result.cost)
-            totalTimeStats.addValue(result.totalTime)
-            fitnessStats.addValue(result.fitness)
-            avgWaitingTimeStats.addValue(result.averageWaitingTime)
-            avgResponseTimeStats.addValue(result.averageResponseTime)
+        fun stats(values: List<Double>): StatisticalValue {
+            val ds = DescriptiveStatistics()
+            values.forEach(ds::addValue)
+            return StatisticalValue(ds.mean, ds.standardDeviation, ds.min, ds.max)
         }
-        
+
         return RealtimeAlgorithmStatistics(
             algorithmName = algorithmName,
-            makespan = StatisticalValue(
-                mean = makespanStats.mean,
-                stdDev = makespanStats.standardDeviation,
-                min = makespanStats.min,
-                max = makespanStats.max
-            ),
-            loadBalance = StatisticalValue(
-                mean = loadBalanceStats.mean,
-                stdDev = loadBalanceStats.standardDeviation,
-                min = loadBalanceStats.min,
-                max = loadBalanceStats.max
-            ),
-            cost = StatisticalValue(
-                mean = costStats.mean,
-                stdDev = costStats.standardDeviation,
-                min = costStats.min,
-                max = costStats.max
-            ),
-            totalTime = StatisticalValue(
-                mean = totalTimeStats.mean,
-                stdDev = totalTimeStats.standardDeviation,
-                min = totalTimeStats.min,
-                max = totalTimeStats.max
-            ),
-            fitness = StatisticalValue(
-                mean = fitnessStats.mean,
-                stdDev = fitnessStats.standardDeviation,
-                min = fitnessStats.min,
-                max = fitnessStats.max
-            ),
-            averageWaitingTime = StatisticalValue(
-                mean = avgWaitingTimeStats.mean,
-                stdDev = avgWaitingTimeStats.standardDeviation,
-                min = avgWaitingTimeStats.min,
-                max = avgWaitingTimeStats.max
-            ),
-            averageResponseTime = StatisticalValue(
-                mean = avgResponseTimeStats.mean,
-                stdDev = avgResponseTimeStats.standardDeviation,
-                min = avgResponseTimeStats.min,
-                max = avgResponseTimeStats.max
-            )
+            makespan = stats(results.map { it.makespan }),
+            loadBalance = stats(results.map { it.loadBalance }),
+            cost = stats(results.map { it.cost }),
+            totalTime = stats(results.map { it.totalTime }),
+            fitness = stats(results.map { it.fitness }),
+            averageWaitingTime = stats(results.map { it.averageWaitingTime }),
+            averageResponseTime = stats(results.map { it.averageResponseTime }),
+            rejectedCount = stats(results.map { it.rejectedCount.toDouble() }),
+            timeoutCount = stats(results.map { it.timeoutCount.toDouble() }),
+            failedCount = stats(results.map { it.failedCount.toDouble() })
         )
     }
-    
-    /**
-     * 打印统计结果（多次运行的平均值和标准差）
-     */
+
+    private fun exportStatisticsToCSV(statistics: List<RealtimeAlgorithmStatistics>) {
+        if (!outputContext.csvEnabled) {
+            Logger.info("CSV 输出已禁用，跳过实时统计结果导出")
+            return
+        }
+        val csvFile = outputContext.generateResultFileName("realtime_comparison")
+        csvFile.bufferedWriter().use { writer ->
+            writer.write(
+                outputContext.csvLine(
+                    listOf(
+                        "Algorithm", "Makespan_Mean", "Makespan_StdDev", "LoadBalance_Mean", "LoadBalance_StdDev",
+                        "Cost_Mean", "Cost_StdDev", "TotalTime_Mean", "TotalTime_StdDev", "Fitness_Mean", "Fitness_StdDev",
+                        "AvgWaitingTime_Mean", "AvgWaitingTime_StdDev", "AvgResponseTime_Mean", "AvgResponseTime_StdDev",
+                        "RejectedCount_Mean", "RejectedCount_StdDev", "TimeoutCount_Mean", "TimeoutCount_StdDev",
+                        "FailedCount_Mean", "FailedCount_StdDev", "Runs"
+                    )
+                ) + "\n"
+            )
+            for (stat in statistics) {
+                writer.write(
+                    outputContext.csvLine(
+                        listOf(
+                            stat.algorithmName,
+                            stat.makespan.mean, stat.makespan.stdDev,
+                            stat.loadBalance.mean, stat.loadBalance.stdDev,
+                            stat.cost.mean, stat.cost.stdDev,
+                            stat.totalTime.mean, stat.totalTime.stdDev,
+                            stat.fitness.mean, stat.fitness.stdDev,
+                            stat.averageWaitingTime.mean, stat.averageWaitingTime.stdDev,
+                            stat.averageResponseTime.mean, stat.averageResponseTime.stdDev,
+                            stat.rejectedCount.mean, stat.rejectedCount.stdDev,
+                            stat.timeoutCount.mean, stat.timeoutCount.stdDev,
+                            stat.failedCount.mean, stat.failedCount.stdDev,
+                            runs
+                        )
+                    ) + "\n"
+                )
+            }
+        }
+        Logger.info("结果已导出到: {}", csvFile.absolutePath)
+    }
+
     private fun printRealtimeStatisticsResults(statistics: List<RealtimeAlgorithmStatistics>) {
         Logger.result("\n${"=".repeat(120)}")
-        Logger.result("实时调度算法统计结果（{} 次运行的平均值 ± 标准差）", runs)
+        Logger.result("实时调度算法统计结果（{} 次运行）", runs)
         Logger.result("${"=".repeat(120)}")
-        Logger.result(String.format("%-15s %-18s %-18s %-18s %-18s %-18s %-18s %-18s",
-            "算法", "Makespan", "Load Balance", "Cost", "Total Time", "Fitness", "Avg Wait Time", "Avg Resp Time"))
-        Logger.result("-".repeat(120))
-        
         for (stat in statistics) {
-            Logger.result(String.format("%-15s %-18s %-18s %-18s %-18s %-18s %-18s %-18s",
+            Logger.result(
+                "{} -> makespan={}, fitness={}, wait={}, reject={}",
                 stat.algorithmName,
                 stat.makespan.toString(),
-                stat.loadBalance.toString(),
-                stat.cost.toString(),
-                stat.totalTime.toString(),
                 stat.fitness.toString(),
                 stat.averageWaitingTime.toString(),
-                stat.averageResponseTime.toString()))
+                stat.rejectedCount.toString()
+            )
         }
-        
-        Logger.result("-".repeat(120))
-        
-        // 找出最优值（基于平均值）
-        val bestMakespan = statistics.minByOrNull { it.makespan.mean }
-        val bestLB = statistics.minByOrNull { it.loadBalance.mean }
-        val bestCost = statistics.minByOrNull { it.cost.mean }
-        val bestFitness = statistics.minByOrNull { it.fitness.mean }
-        val bestWaitTime = statistics.minByOrNull { it.averageWaitingTime.mean }
-        val bestRespTime = statistics.minByOrNull { it.averageResponseTime.mean }
-        
-        Logger.result("\n最优值（基于平均值）:")
-        bestMakespan?.let { 
-            Logger.result("  最小 Makespan: {} ({})", it.algorithmName, it.makespan.toString())
-        }
-        bestLB?.let { 
-            Logger.result("  最小 Load Balance: {} ({})", it.algorithmName, it.loadBalance.toString())
-        }
-        bestCost?.let { 
-            Logger.result("  最小 Cost: {} ({})", it.algorithmName, it.cost.toString())
-        }
-        bestFitness?.let { 
-            Logger.result("  最小 Fitness: {} ({})", it.algorithmName, it.fitness.toString())
-        }
-        bestWaitTime?.let { 
-            Logger.result("  最小平均等待时间: {} ({})", it.algorithmName, it.averageWaitingTime.toString())
-        }
-        bestRespTime?.let { 
-            Logger.result("  最小平均响应时间: {} ({})", it.algorithmName, it.averageResponseTime.toString())
-        }
-        Logger.result("${"=".repeat(120)}\n")
+        Logger.result("${"=".repeat(120)}")
     }
-    
-    /**
-     * 打印实时调度对比结果
-     */
+
     private fun printRealtimeComparisonResults(results: List<RealtimeAlgorithmResult>) {
-        Logger.result("\n${"=".repeat(90)}")
+        Logger.result("\n${"=".repeat(100)}")
         Logger.result("实时调度算法对比结果汇总")
-        Logger.result("${"=".repeat(90)}")
-        Logger.result(String.format("%-15s %-12s %-15s %-12s %-12s %-15s %-15s",
-            "算法", "Makespan", "Load Balance", "Cost", "Avg Wait", "Avg Response", "Fitness"))
-        Logger.result("-".repeat(90))
-        
+        Logger.result("${"=".repeat(100)}")
+        Logger.result(String.format("%-15s %-12s %-12s %-12s %-12s %-12s %-8s %-8s %-8s",
+            "算法", "Makespan", "LB", "Cost", "AvgWait", "Fitness", "Reject", "Timeout", "Failed"))
+        Logger.result("-".repeat(100))
+
         for (result in results) {
-            Logger.result(String.format("%-15s %-12s %-15s %-12s %-12s %-15s %-15s",
+            Logger.result(String.format("%-15s %-12s %-12s %-12s %-12s %-12s %-8d %-8d %-8d",
                 result.algorithmName,
                 dft.format(result.makespan),
                 dft.format(result.loadBalance),
                 dft.format(result.cost),
                 dft.format(result.averageWaitingTime),
-                dft.format(result.averageResponseTime),
-                dft.format(result.fitness)))
+                dft.format(result.fitness),
+                result.rejectedCount,
+                result.timeoutCount,
+                result.failedCount))
         }
-        
-        Logger.result("-".repeat(90))
-        
-        // 找出最优值
-        val bestMakespan = results.minByOrNull { it.makespan }
-        val bestLB = results.minByOrNull { it.loadBalance }
-        val bestCost = results.minByOrNull { it.cost }
-        val bestWaitTime = results.minByOrNull { it.averageWaitingTime }
-        val bestResponseTime = results.minByOrNull { it.averageResponseTime }
-        val bestFitness = results.minByOrNull { it.fitness }
-        
-        Logger.result("\n最优值:")
-        Logger.result("  最小 Makespan: {} ({})", bestMakespan?.algorithmName, dft.format(bestMakespan?.makespan))
-        Logger.result("  最小 Load Balance: {} ({})", bestLB?.algorithmName, dft.format(bestLB?.loadBalance))
-        Logger.result("  最小 Cost: {} ({})", bestCost?.algorithmName, dft.format(bestCost?.cost))
-        Logger.result("  最小平均等待时间: {} ({})", bestWaitTime?.algorithmName, dft.format(bestWaitTime?.averageWaitingTime))
-        Logger.result("  最小平均响应时间: {} ({})", bestResponseTime?.algorithmName, dft.format(bestResponseTime?.averageResponseTime))
-        Logger.result("  最小 Fitness: {} ({})", bestFitness?.algorithmName, dft.format(bestFitness?.fitness))
-        Logger.result("${"=".repeat(90)}\n")
-        
-        // 导出 CSV 文件
-        exportRealtimeToCSV(results)
+        Logger.result("${"=".repeat(100)}")
     }
-    
-    /**
-     * 导出实时调度结果到 CSV 文件
-     */
+
     private fun exportRealtimeToCSV(results: List<RealtimeAlgorithmResult>) {
-        val csvFile = ResultsManager.generateRealtimeResultFileName()
+        if (!outputContext.csvEnabled) {
+            Logger.info("CSV 输出已禁用，跳过实时结果导出")
+            return
+        }
+        val csvFile = outputContext.generateResultFileName("realtime_comparison")
         csvFile.bufferedWriter().use { writer ->
-            // 写入表头
-            if (runs > 1) {
-                writer.write("Algorithm,Makespan_Mean,Makespan_StdDev,LoadBalance_Mean,LoadBalance_StdDev," +
-                        "Cost_Mean,Cost_StdDev,TotalTime_Mean,TotalTime_StdDev,Fitness_Mean,Fitness_StdDev," +
-                        "AvgWaitingTime_Mean,AvgWaitingTime_StdDev,AvgResponseTime_Mean,AvgResponseTime_StdDev,Runs\n")
+            val headers = if (runs > 1) {
+                listOf(
+                    "Algorithm", "Makespan_Mean", "Makespan_StdDev", "LoadBalance_Mean", "LoadBalance_StdDev",
+                    "Cost_Mean", "Cost_StdDev", "TotalTime_Mean", "TotalTime_StdDev", "Fitness_Mean", "Fitness_StdDev",
+                    "AvgWaitingTime_Mean", "AvgWaitingTime_StdDev", "AvgResponseTime_Mean", "AvgResponseTime_StdDev",
+                    "RejectedCount_Mean", "RejectedCount_StdDev", "TimeoutCount_Mean", "TimeoutCount_StdDev",
+                    "FailedCount_Mean", "FailedCount_StdDev", "Runs"
+                )
             } else {
-                writer.write("Algorithm,Makespan,LoadBalance,Cost,TotalTime,Fitness,AvgWaitingTime,AvgResponseTime\n")
+                listOf(
+                    "Algorithm", "Makespan", "LoadBalance", "Cost", "TotalTime", "Fitness",
+                    "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount"
+                )
             }
-            
-            // 写入数据
+            writer.write(outputContext.csvLine(headers) + "\n")
+
             for (result in results) {
-                if (runs > 1) {
-                    // 多次运行：导出平均值和标准差
-                    writer.write("${result.algorithmName}," +
-                            "${result.makespan},0.0," +
-                            "${result.loadBalance},0.0," +
-                            "${result.cost},0.0," +
-                            "${result.totalTime},0.0," +
-                            "${result.fitness},0.0," +
-                            "${result.averageWaitingTime},0.0," +
-                            "${result.averageResponseTime},0.0," +
-                            "${runs}\n")
+                val row = if (runs > 1) {
+                    listOf(
+                        result.algorithmName,
+                        result.makespan, 0.0,
+                        result.loadBalance, 0.0,
+                        result.cost, 0.0,
+                        result.totalTime, 0.0,
+                        result.fitness, 0.0,
+                        result.averageWaitingTime, 0.0,
+                        result.averageResponseTime, 0.0,
+                        result.rejectedCount, 0.0,
+                        result.timeoutCount, 0.0,
+                        result.failedCount, 0.0,
+                        runs
+                    )
                 } else {
-                    // 单次运行：导出原始值
-                    writer.write("${result.algorithmName}," +
-                            "${result.makespan}," +
-                            "${result.loadBalance}," +
-                            "${result.cost}," +
-                            "${result.totalTime}," +
-                            "${result.fitness}," +
-                            "${result.averageWaitingTime}," +
-                            "${result.averageResponseTime}\n")
+                    listOf(
+                        result.algorithmName,
+                        result.makespan,
+                        result.loadBalance,
+                        result.cost,
+                        result.totalTime,
+                        result.fitness,
+                        result.averageWaitingTime,
+                        result.averageResponseTime,
+                        result.rejectedCount,
+                        result.timeoutCount,
+                        result.failedCount
+                    )
                 }
+                writer.write(outputContext.csvLine(row) + "\n")
             }
         }
         Logger.info("实时调度结果已导出到: {}", csvFile.absolutePath)
-        if (runs > 1) {
-            Logger.info("注: 导出值为 {} 次运行的平均值", runs)
-        }
     }
-    
 }
-
-/**
- * 五元组类
- */
-private data class Quintuple<A, B, C, D, E>(
-    val first: A,
-    val second: B,
-    val third: C,
-    val fourth: D,
-    val fifth: E
-)
-
