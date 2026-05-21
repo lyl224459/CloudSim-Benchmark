@@ -1,6 +1,6 @@
 package scheduler
 
-import datacenter.SchedulerObjectiveFunction
+import config.RealtimeQueuePolicy
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import java.util.*
@@ -75,11 +75,35 @@ abstract class RealtimeSchedulerBase(
     }
 
     protected fun findLeastLoadedVm(context: RealtimeSchedulingContext): Int {
-        return context.nodeStates.minWithOrNull(
-            compareBy<RealtimeNodeState> { it.estimatedLoad }
+        val base = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        return base.minWithOrNull(
+            compareBy<RealtimeNodeState> { !it.acceptingWork }
+                .thenBy { it.availableTime }
+                .thenBy { it.estimatedLoad }
                 .thenBy { it.queueDepth }
                 .thenBy { it.vmIndex }
         )?.vmIndex ?: 0
+    }
+
+    protected fun orderedCandidateStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> {
+        val base = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        val policyComparator = when (context.queuePolicy) {
+            RealtimeQueuePolicy.PRIORITY -> compareByDescending<RealtimeNodeState> { it.availableSlots }
+                .thenBy { it.availableTime }
+                .thenBy { it.estimatedLoad }
+            RealtimeQueuePolicy.DEADLINE -> compareBy<RealtimeNodeState> { projectedFinishTime(context.newCloudlet, it) }
+                .thenBy { it.availableTime }
+                .thenBy { it.queueDepth }
+            RealtimeQueuePolicy.FIFO -> compareBy<RealtimeNodeState> { it.availableTime }
+                .thenBy { it.estimatedLoad }
+                .thenBy { it.queueDepth }
+        }
+        return base.sortedWith(policyComparator.thenBy { it.vmIndex })
+    }
+
+    private fun projectedFinishTime(cloudlet: Cloudlet, state: RealtimeNodeState): Double {
+        val vm = vmList[state.vmIndex]
+        return state.availableTime + cloudlet.length.toDouble() / vm.mips
     }
 }
 
@@ -92,7 +116,8 @@ class RealtimeRandomScheduler(
 ) : RealtimeSchedulerBase(vmList) {
     
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-        return random.nextInt(vmNum)
+        val candidates = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        return candidates[random.nextInt(candidates.size)].vmIndex
     }
 }
 
@@ -103,7 +128,7 @@ class RealtimeMinLoadScheduler(vmList: List<Vm>)
     : RealtimeSchedulerBase(vmList) {
     
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-        return findLeastLoadedVm(context)
+        return orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
     }
 }
 
@@ -129,7 +154,7 @@ class RealtimePSOScheduler(
         }
         
         // 如果没有等待任务，使用最小负载策略
-        return findLeastLoadedVm(context)
+        return orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
     }
 }
 
@@ -152,7 +177,7 @@ class RealtimeWOAScheduler(
             val allocation = woa.execute()
             return allocation[allCloudlets.size - 1]
         }
-        return findLeastLoadedVm(context)
+        return orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
     }
 }
 

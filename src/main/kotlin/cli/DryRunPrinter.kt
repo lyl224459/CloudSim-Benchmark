@@ -73,7 +73,7 @@ object DryRunPrinter {
         }
         if (resolved.mode.startsWith("realtime")) {
             Logger.result(
-                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}",
+                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}, queuePolicy={}, priorityLevels={}, highPriorityRatio={}, deadlineFactor={}, vmQueueCapacity={}, overloadFailureMultiplier={}",
                 resolved.realtime.arrival.distribution,
                 resolved.realtime.scheduling.strategy,
                 resolved.realtime.scheduling.maxQueueSize,
@@ -84,7 +84,13 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.failureRate,
                 resolved.realtime.scheduling.retryLimit,
                 resolved.realtime.scheduling.retryDelay,
-                resolved.realtime.scheduling.retryBackoffMultiplier
+                resolved.realtime.scheduling.retryBackoffMultiplier,
+                resolved.realtime.scheduling.queuePolicy,
+                resolved.realtime.scheduling.priorityLevels,
+                resolved.realtime.scheduling.highPriorityRatio,
+                resolved.realtime.scheduling.deadlineFactor,
+                resolved.realtime.scheduling.vmQueueCapacity,
+                resolved.realtime.scheduling.overloadFailureMultiplier
             )
         }
         Logger.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
@@ -151,6 +157,12 @@ object DryRunPrinter {
                     put("retryLimit", config.realtime.scheduling.retryLimit)
                     put("retryDelay", config.realtime.scheduling.retryDelay)
                     put("retryBackoffMultiplier", config.realtime.scheduling.retryBackoffMultiplier)
+                    put("queuePolicy", config.realtime.scheduling.queuePolicy)
+                    put("priorityLevels", config.realtime.scheduling.priorityLevels)
+                    put("highPriorityRatio", config.realtime.scheduling.highPriorityRatio)
+                    put("deadlineFactor", config.realtime.scheduling.deadlineFactor)
+                    put("vmQueueCapacity", config.realtime.scheduling.vmQueueCapacity)
+                    put("overloadFailureMultiplier", config.realtime.scheduling.overloadFailureMultiplier)
                 }
             }
             putJsonObject("csv") {

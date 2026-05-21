@@ -83,7 +83,13 @@ class ConfigValidationTest {
                     failureRate = 1.2,
                     retryLimit = -1,
                     retryDelay = -2.0,
-                    retryBackoffMultiplier = 0.5
+                    retryBackoffMultiplier = 0.5,
+                    queuePolicy = "fastest",
+                    priorityLevels = 0,
+                    highPriorityRatio = 1.1,
+                    deadlineFactor = -0.1,
+                    vmQueueCapacity = -1,
+                    overloadFailureMultiplier = -0.2
                 )
             )
         )
@@ -98,6 +104,12 @@ class ConfigValidationTest {
             assertThat(e.errors.any { it.field == "realtime.scheduling.retryLimit" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.retryDelay" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.retryBackoffMultiplier" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.queuePolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.priorityLevels" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.highPriorityRatio" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.deadlineFactor" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.vmQueueCapacity" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.overloadFailureMultiplier" }).isTrue()
         }
     }
 

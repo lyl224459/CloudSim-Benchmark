@@ -101,6 +101,12 @@ class RealtimeCloudletCountRunner(
             "到达率" to arrivalRate,
             "种群大小" to population,
             "最大迭代次数" to maxIter,
+            "队列策略" to scheduling.queuePolicy,
+            "优先级层级" to scheduling.priorityLevels,
+            "高优先级比例" to scheduling.highPriorityRatio,
+            "SLA deadline 系数" to scheduling.deadlineFactor,
+            "单 VM 队列容量" to scheduling.vmQueueCapacity,
+            "过载失败倍率" to scheduling.overloadFailureMultiplier,
             "随机数种子" to randomSeed,
             "任务生成器" to generatorType.name
         ))
@@ -192,6 +198,12 @@ class RealtimeCloudletCountRunner(
                         "AvgDecisionDelay_Mean", "AvgDecisionDelay_StdDev",
                         "CompletedCount_Mean", "CompletedCount_StdDev",
                         "SubmittedCount_Mean", "SubmittedCount_StdDev",
+                        "SlaViolationCount_Mean", "SlaViolationCount_StdDev",
+                        "SlaViolationRate_Mean", "SlaViolationRate_StdDev",
+                        "CapacityRejectedCount_Mean", "CapacityRejectedCount_StdDev",
+                        "AvgQueueDepth_Mean", "AvgQueueDepth_StdDev",
+                        "MaxQueueDepth_Mean", "MaxQueueDepth_StdDev",
+                        "P95ResponseTime_Mean", "P95ResponseTime_StdDev",
                         "Runs"
                     )
                 ) + "\n"
@@ -222,6 +234,12 @@ class RealtimeCloudletCountRunner(
                                 stat.averageDecisionDelay.mean, stat.averageDecisionDelay.stdDev,
                                 stat.completedCount.mean, stat.completedCount.stdDev,
                                 stat.submittedCount.mean, stat.submittedCount.stdDev,
+                                stat.slaViolationCount.mean, stat.slaViolationCount.stdDev,
+                                stat.slaViolationRate.mean, stat.slaViolationRate.stdDev,
+                                stat.capacityRejectedCount.mean, stat.capacityRejectedCount.stdDev,
+                                stat.averageQueueDepth.mean, stat.averageQueueDepth.stdDev,
+                                stat.maxQueueDepth.mean, stat.maxQueueDepth.stdDev,
+                                stat.p95ResponseTime.mean, stat.p95ResponseTime.stdDev,
                                 runs
                             )
                         ) + "\n"
@@ -246,7 +264,13 @@ class RealtimeCloudletCountRunner(
             "PermanentFailedCount",
             "AvgDecisionDelay",
             "CompletedCount",
-            "SubmittedCount"
+            "SubmittedCount",
+            "SlaViolationCount",
+            "SlaViolationRate",
+            "CapacityRejectedCount",
+            "AvgQueueDepth",
+            "MaxQueueDepth",
+            "P95ResponseTime"
         )
         val summaryData = results.flatMap { (count, stats) ->
             stats.map { stat ->
@@ -264,7 +288,13 @@ class RealtimeCloudletCountRunner(
                     "PermanentFailedCount" to stat.permanentFailedCount.mean,
                     "AvgDecisionDelay" to stat.averageDecisionDelay.mean,
                     "CompletedCount" to stat.completedCount.mean,
-                    "SubmittedCount" to stat.submittedCount.mean
+                    "SubmittedCount" to stat.submittedCount.mean,
+                    "SlaViolationCount" to stat.slaViolationCount.mean,
+                    "SlaViolationRate" to stat.slaViolationRate.mean,
+                    "CapacityRejectedCount" to stat.capacityRejectedCount.mean,
+                    "AvgQueueDepth" to stat.averageQueueDepth.mean,
+                    "MaxQueueDepth" to stat.maxQueueDepth.mean,
+                    "P95ResponseTime" to stat.p95ResponseTime.mean
                 )
             }
         }

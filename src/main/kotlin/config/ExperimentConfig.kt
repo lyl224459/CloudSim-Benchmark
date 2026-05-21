@@ -150,8 +150,30 @@ data class RealtimeSchedulingConfig(
     val failureRate: Double = 0.0,
     val retryLimit: Int = 0,
     val retryDelay: Double = 0.0,
-    val retryBackoffMultiplier: Double = 1.0
-)
+    val retryBackoffMultiplier: Double = 1.0,
+    val queuePolicy: String = "fifo",
+    val priorityLevels: Int = 1,
+    val highPriorityRatio: Double = 0.0,
+    val deadlineFactor: Double = 0.0,
+    val vmQueueCapacity: Int = 0,
+    val overloadFailureMultiplier: Double = 0.0
+) {
+    fun normalizedQueuePolicy(): RealtimeQueuePolicy = RealtimeQueuePolicy.parse(queuePolicy)
+}
+
+enum class RealtimeQueuePolicy(val configValue: String) {
+    FIFO("fifo"),
+    PRIORITY("priority"),
+    DEADLINE("deadline");
+
+    companion object {
+        fun parse(value: String): RealtimeQueuePolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时队列策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
 
 @Serializable
 data class GoogleTraceConfig(
@@ -481,7 +503,13 @@ data class ExperimentConfig(
                     "failureRate",
                     "retryLimit",
                     "retryDelay",
-                    "retryBackoffMultiplier"
+                    "retryBackoffMultiplier",
+                    "queuePolicy",
+                    "priorityLevels",
+                    "highPriorityRatio",
+                    "deadlineFactor",
+                    "vmQueueCapacity",
+                    "overloadFailureMultiplier"
                 )
             )
             val current = base ?: TomlRealtimeConfig()
@@ -497,7 +525,17 @@ data class ExperimentConfig(
                 retryDelay = properties["retryDelay"]?.let { parseRequiredDouble("realtime.scheduling.retryDelay", it) } ?: current.scheduling.retryDelay,
                 retryBackoffMultiplier = properties["retryBackoffMultiplier"]?.let {
                     parseRequiredDouble("realtime.scheduling.retryBackoffMultiplier", it)
-                } ?: current.scheduling.retryBackoffMultiplier
+                } ?: current.scheduling.retryBackoffMultiplier,
+                queuePolicy = properties["queuePolicy"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.queuePolicy,
+                priorityLevels = properties["priorityLevels"]?.let { parseRequiredInt("realtime.scheduling.priorityLevels", it) } ?: current.scheduling.priorityLevels,
+                highPriorityRatio = properties["highPriorityRatio"]?.let {
+                    parseRequiredDouble("realtime.scheduling.highPriorityRatio", it)
+                } ?: current.scheduling.highPriorityRatio,
+                deadlineFactor = properties["deadlineFactor"]?.let { parseRequiredDouble("realtime.scheduling.deadlineFactor", it) } ?: current.scheduling.deadlineFactor,
+                vmQueueCapacity = properties["vmQueueCapacity"]?.let { parseRequiredInt("realtime.scheduling.vmQueueCapacity", it) } ?: current.scheduling.vmQueueCapacity,
+                overloadFailureMultiplier = properties["overloadFailureMultiplier"]?.let {
+                    parseRequiredDouble("realtime.scheduling.overloadFailureMultiplier", it)
+                } ?: current.scheduling.overloadFailureMultiplier
             )
             return current.copy(scheduling = scheduling)
         }
@@ -812,6 +850,31 @@ data class ExperimentConfig(
             if (realtime.scheduling.retryBackoffMultiplier < 1.0) {
                 errors.add(ValidationError("realtime.scheduling.retryBackoffMultiplier", realtime.scheduling.retryBackoffMultiplier.toString(),
                     "重试退避倍数必须大于等于 1"))
+            }
+            val queuePolicies = RealtimeQueuePolicy.valuesForConfig()
+            if (realtime.scheduling.queuePolicy.lowercase() !in queuePolicies) {
+                errors.add(ValidationError("realtime.scheduling.queuePolicy", realtime.scheduling.queuePolicy,
+                    "实时队列策略必须是以下值之一: ${queuePolicies.joinToString(", ")}"))
+            }
+            if (realtime.scheduling.priorityLevels < 1) {
+                errors.add(ValidationError("realtime.scheduling.priorityLevels", realtime.scheduling.priorityLevels.toString(),
+                    "优先级层级必须大于等于 1"))
+            }
+            if (realtime.scheduling.highPriorityRatio < 0.0 || realtime.scheduling.highPriorityRatio > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.highPriorityRatio", realtime.scheduling.highPriorityRatio.toString(),
+                    "高优先级任务比例必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.deadlineFactor < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.deadlineFactor", realtime.scheduling.deadlineFactor.toString(),
+                    "SLA deadline 系数不能为负数"))
+            }
+            if (realtime.scheduling.vmQueueCapacity < 0) {
+                errors.add(ValidationError("realtime.scheduling.vmQueueCapacity", realtime.scheduling.vmQueueCapacity.toString(),
+                    "单 VM 队列容量不能为负数"))
+            }
+            if (realtime.scheduling.overloadFailureMultiplier < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.overloadFailureMultiplier", realtime.scheduling.overloadFailureMultiplier.toString(),
+                    "过载失败倍率不能为负数"))
             }
             val reservations = setOf("none", "partial", "full")
             if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {

@@ -96,6 +96,12 @@ class ConfigurationManagerTest {
             retryLimit = 2
             retryDelay = 1.5
             retryBackoffMultiplier = 2.0
+            queuePolicy = "priority"
+            priorityLevels = 4
+            highPriorityRatio = 0.25
+            deadlineFactor = 1.5
+            vmQueueCapacity = 3
+            overloadFailureMultiplier = 0.2
         """.trimIndent())
 
         try {
@@ -120,6 +126,12 @@ class ConfigurationManagerTest {
             assertEquals(2, realtime?.scheduling?.retryLimit)
             assertEquals(1.5, realtime?.scheduling?.retryDelay)
             assertEquals(2.0, realtime?.scheduling?.retryBackoffMultiplier)
+            assertEquals("priority", realtime?.scheduling?.queuePolicy)
+            assertEquals(4, realtime?.scheduling?.priorityLevels)
+            assertEquals(0.25, realtime?.scheduling?.highPriorityRatio)
+            assertEquals(1.5, realtime?.scheduling?.deadlineFactor)
+            assertEquals(3, realtime?.scheduling?.vmQueueCapacity)
+            assertEquals(0.2, realtime?.scheduling?.overloadFailureMultiplier)
         } finally {
             configFile.delete()
         }

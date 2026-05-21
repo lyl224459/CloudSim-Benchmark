@@ -9,7 +9,10 @@ import org.cloudsimplus.vms.Vm
 import scheduler.RealtimeNodeStateTracker
 import scheduler.RealtimeScheduler
 import scheduler.RealtimeSchedulingContext
+import scheduler.RealtimeTaskLifecycle
+import scheduler.RealtimeTaskMetadata
 import java.util.Random
+import kotlin.math.ceil
 import kotlin.math.pow
 
 /**
@@ -35,23 +38,34 @@ class RealtimeBroker(
     private val arrivalTimes = mutableMapOf<Long, Double>()
     private val preassignedVmIds = mutableMapOf<Long, Int>()
     private val attempts = mutableMapOf<Long, Int>()
-    private val nodeStateTracker = RealtimeNodeStateTracker(vmList)
+    private val metadataByCloudletId = mutableMapOf<Long, RealtimeTaskMetadata>()
+    private val vmReservations = mutableMapOf<Long, Int>()
+    private val nodeStateTracker = RealtimeNodeStateTracker(vmList, schedulingConfig.vmQueueCapacity)
     private val failureRandom = Random(0L)
     private var rejectedCount = 0
+    private var capacityRejectedCount = 0
     private var submittedCount = 0
     private var retryCount = 0
     private var permanentFailedCount = 0
     private var decisionDelayTotal = 0.0
     private var decisionCount = 0
+    private var queueDepthSampleTotal = 0
+    private var queueDepthSampleCount = 0
+    private var maxQueueDepth = 0
 
     private data class PendingSubmission(
         val cloudlet: Cloudlet,
         val vmIndex: Int,
-        val decisionDelay: Double
+        val decisionDelay: Double,
+        val failurePressure: Double
     )
 
     fun submitCloudletListRealtime(cloudletList: List<Cloudlet>) {
-        val sortedCloudlets = cloudletList.sortedBy { it.submissionDelay }
+        for (cloudlet in cloudletList) {
+            arrivalTimes[cloudlet.id] = cloudlet.submissionDelay
+            metadataByCloudletId[cloudlet.id] = createMetadata(cloudlet)
+        }
+        val sortedCloudlets = cloudletList.sortedWith(cloudletArrivalComparator())
         if (schedulingConfig.strategy.equals("static", ignoreCase = true)) {
             val previewWaiting = mutableListOf<Cloudlet>()
             for (cloudlet in sortedCloudlets) {
@@ -61,9 +75,6 @@ class RealtimeBroker(
             }
         }
 
-        for (cloudlet in sortedCloudlets) {
-            arrivalTimes[cloudlet.id] = cloudlet.submissionDelay
-        }
         realtimeCloudlets.addAll(sortedCloudlets)
     }
 
@@ -71,10 +82,16 @@ class RealtimeBroker(
         it.status != Cloudlet.Status.SUCCESS && it.status != Cloudlet.Status.FAILED
     }
 
-    private fun getActiveCloudlets(): List<Cloudlet> =
-        (pendingCloudlets + getWaitingCloudlets()).distinctBy { it.id }
+    private fun getActiveCloudlets(): List<Cloudlet> {
+        pruneCompletedReservations()
+        return (pendingCloudlets + getWaitingCloudlets())
+            .distinctBy { it.id }
+            .filter { it.status != Cloudlet.Status.FAILED }
+    }
 
     fun getRejectedCount(): Int = rejectedCount
+
+    fun getCapacityRejectedCount(): Int = capacityRejectedCount
 
     fun getSubmittedCount(): Int = submittedCount
 
@@ -84,6 +101,22 @@ class RealtimeBroker(
 
     fun getAverageDecisionDelay(): Double {
         return if (decisionCount > 0) decisionDelayTotal / decisionCount else 0.0
+    }
+
+    fun getAverageQueueDepth(): Double {
+        return if (queueDepthSampleCount > 0) queueDepthSampleTotal.toDouble() / queueDepthSampleCount.toDouble() else 0.0
+    }
+
+    fun getMaxQueueDepth(): Int = maxQueueDepth
+
+    fun getTaskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = metadataByCloudletId[cloudlet.id]
+
+    fun getSlaViolationCount(cloudlets: List<Cloudlet>): Int {
+        if (schedulingConfig.deadlineFactor <= 0.0) return 0
+        return cloudlets.count { cloudlet ->
+            cloudlet.status == Cloudlet.Status.SUCCESS &&
+                metadataByCloudletId[cloudlet.id]?.deadline?.let { deadline -> cloudlet.finishTime > deadline } == true
+        }
     }
 
     fun getArrivalTime(cloudlet: Cloudlet): Double = arrivalTimes[cloudlet.id] ?: cloudlet.submissionDelay
@@ -128,30 +161,55 @@ class RealtimeBroker(
     private fun onCloudletArrival(cloudlet: Cloudlet, arrivalTime: Double) {
         val activeCloudlets = getActiveCloudlets()
         if (activeCloudlets.size >= schedulingConfig.maxQueueSize) {
-            rejectedCount++
+            rejectCloudlet(cloudlet, capacity = false)
             return
         }
 
-        val selectedVmId = selectVmId(cloudlet, activeCloudlets, arrivalTime)
+        val selection = selectVmId(cloudlet, activeCloudlets, arrivalTime)
+        if (selection == null) {
+            rejectCloudlet(cloudlet, capacity = true)
+            return
+        }
+
+        val (selectedVmId, failurePressure) = selection
         val delay = decisionDelay(cloudlet)
         decisionDelayTotal += delay
         decisionCount++
         cloudlet.setVm(vmList[selectedVmId.coerceIn(vmList.indices)])
+        vmReservations[cloudlet.id] = selectedVmId.coerceIn(vmList.indices)
         pendingCloudlets.add(cloudlet)
-        schedule(delay, SUBMIT_EVENT_TAG, PendingSubmission(cloudlet, selectedVmId.coerceIn(vmList.indices), delay))
+        updateMetadata(cloudlet) {
+            it.copy(
+                assignedVmIndex = selectedVmId.coerceIn(vmList.indices),
+                lastDecisionDelay = delay,
+                lifecycle = RealtimeTaskLifecycle.PENDING_DECISION
+            )
+        }
+        sampleQueueDepth(activeCloudlets, selectedVmId.coerceIn(vmList.indices), arrivalTime)
+        schedule(delay, SUBMIT_EVENT_TAG, PendingSubmission(cloudlet, selectedVmId.coerceIn(vmList.indices), delay, failurePressure))
     }
 
     private fun submitPendingCloudlet(submission: PendingSubmission) {
         val cloudlet = submission.cloudlet
         pendingCloudlets.removeIf { it.id == cloudlet.id }
-        if (shouldFailAttempt(cloudlet)) {
+        if (shouldFailAttempt(cloudlet, submission.failurePressure)) {
             val attempt = attempts.getOrDefault(cloudlet.id, 0)
             if (attempt < schedulingConfig.retryLimit) {
                 attempts[cloudlet.id] = attempt + 1
+                vmReservations.remove(cloudlet.id)
+                updateMetadata(cloudlet) {
+                    it.copy(
+                        attempt = attempt + 1,
+                        assignedVmIndex = null,
+                        lifecycle = RealtimeTaskLifecycle.ARRIVED
+                    )
+                }
                 retryCount++
                 schedule(retryDelay(attempt), ARRIVAL_EVENT_TAG, cloudlet)
             } else {
                 cloudlet.setStatus(Cloudlet.Status.FAILED)
+                vmReservations.remove(cloudlet.id)
+                updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.FAILED) }
                 permanentFailedCount++
             }
             return
@@ -160,19 +218,27 @@ class RealtimeBroker(
         cloudlet.setVm(vmList[submission.vmIndex])
         cloudlet.setSubmissionDelay(0.0)
         waitingCloudlets.add(cloudlet)
+        updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.SUBMITTED) }
         submittedCount++
         submitCloudlet(cloudlet)
     }
 
-    private fun selectVmId(cloudlet: Cloudlet, activeCloudlets: List<Cloudlet>, currentTime: Double): Int {
+    private fun selectVmId(cloudlet: Cloudlet, activeCloudlets: List<Cloudlet>, currentTime: Double): Pair<Int, Double>? {
         val strategy = schedulingConfig.strategy.lowercase()
+        val context = schedulingContext(cloudlet, activeCloudlets, currentTime)
+        if (context.hasCapacityLimit && context.candidateNodeStates.isEmpty()) return null
+
         val selected = if (strategy == "static") {
             preassignedVmIds[cloudlet.id] ?: scheduler.scheduleOnArrival(schedulingContext(cloudlet, activeCloudlets, currentTime))
         } else {
-            scheduler.scheduleOnArrival(schedulingContext(cloudlet, activeCloudlets, currentTime))
+            scheduler.scheduleOnArrival(context)
         }
 
-        return applyReservationPolicy(selected, cloudlet, activeCloudlets)
+        val reserved = applyReservationPolicy(selected, cloudlet, activeCloudlets)
+        val bounded = reserved.coerceIn(vmList.indices)
+        val state = context.nodeStates.getOrNull(bounded)
+        if (state != null && !state.acceptingWork) return null
+        return bounded to (state?.failurePressure ?: 0.0)
     }
 
     private fun schedulingContext(
@@ -185,7 +251,9 @@ class RealtimeBroker(
             activeCloudlets = activeCloudlets,
             vmList = vmList,
             currentTime = currentTime,
-            nodeStates = nodeStateTracker.snapshot(activeCloudlets, currentTime)
+            nodeStates = nodeStateTracker.snapshot(activeCloudlets, currentTime, vmReservations),
+            taskMetadata = metadataByCloudletId[cloudlet.id] ?: createMetadata(cloudlet),
+            queuePolicy = schedulingConfig.normalizedQueuePolicy()
         )
 
     private fun decisionDelay(cloudlet: Cloudlet): Double {
@@ -197,11 +265,13 @@ class RealtimeBroker(
         return schedulingConfig.decisionDelay + jitter
     }
 
-    private fun shouldFailAttempt(cloudlet: Cloudlet): Boolean {
-        if (schedulingConfig.failureRate <= 0.0) return false
-        if (schedulingConfig.failureRate >= 1.0) return true
+    private fun shouldFailAttempt(cloudlet: Cloudlet, failurePressure: Double): Boolean {
+        val effectiveFailureRate = (schedulingConfig.failureRate +
+            failurePressure * schedulingConfig.overloadFailureMultiplier).coerceIn(0.0, 1.0)
+        if (effectiveFailureRate <= 0.0) return false
+        if (effectiveFailureRate >= 1.0) return true
         val attempt = attempts.getOrDefault(cloudlet.id, 0)
-        return deterministicUnit(cloudlet.id, attempt, salt = 29) < schedulingConfig.failureRate
+        return deterministicUnit(cloudlet.id, attempt, salt = 29) < effectiveFailureRate
     }
 
     private fun retryDelay(attempt: Int): Double {
@@ -249,5 +319,82 @@ class RealtimeBroker(
             activeCloudlets.count { it.vm?.id?.toInt() == vmId }
         }
         return leastLoaded ?: selectedVmId
+    }
+
+    private fun createMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata {
+        val arrivalTime = arrivalTimes[cloudlet.id] ?: cloudlet.submissionDelay
+        return RealtimeTaskMetadata(
+            cloudletId = cloudlet.id,
+            originalArrivalTime = arrivalTime,
+            attempt = attempts.getOrDefault(cloudlet.id, 0),
+            priority = priorityFor(cloudlet),
+            deadline = deadlineFor(cloudlet, arrivalTime)
+        )
+    }
+
+    private fun updateMetadata(cloudlet: Cloudlet, transform: (RealtimeTaskMetadata) -> RealtimeTaskMetadata) {
+        val current = metadataByCloudletId[cloudlet.id] ?: createMetadata(cloudlet)
+        metadataByCloudletId[cloudlet.id] = transform(current)
+    }
+
+    private fun priorityFor(cloudlet: Cloudlet): Int {
+        val levels = schedulingConfig.priorityLevels.coerceAtLeast(1)
+        if (levels == 1) return 0
+        val highPriorityCutoff = ceil(levels * schedulingConfig.highPriorityRatio).toInt().coerceIn(0, levels)
+        if (highPriorityCutoff <= 0) return deterministicIndex(cloudlet.id, salt = 43, modulo = levels)
+        val highPriority = deterministicUnit(cloudlet.id, attempt = 0, salt = 41) < schedulingConfig.highPriorityRatio
+        return if (highPriority) {
+            deterministicIndex(cloudlet.id, salt = 43, modulo = highPriorityCutoff)
+        } else {
+            highPriorityCutoff + deterministicIndex(cloudlet.id, salt = 47, modulo = levels - highPriorityCutoff)
+        }.coerceIn(0, levels - 1)
+    }
+
+    private fun deadlineFor(cloudlet: Cloudlet, arrivalTime: Double): Double? {
+        if (schedulingConfig.deadlineFactor <= 0.0) return null
+        val fastestMips = vmList.maxOfOrNull { it.mips } ?: return null
+        val estimatedRuntime = cloudlet.length.toDouble() / fastestMips
+        return arrivalTime + estimatedRuntime * schedulingConfig.deadlineFactor
+    }
+
+    private fun deterministicIndex(cloudletId: Long, salt: Int, modulo: Int): Int {
+        if (modulo <= 1) return 0
+        return (deterministicUnit(cloudletId, attempt = 0, salt = salt) * modulo).toInt().coerceIn(0, modulo - 1)
+    }
+
+    private fun rejectCloudlet(cloudlet: Cloudlet, capacity: Boolean) {
+        rejectedCount++
+        if (capacity) capacityRejectedCount++
+        cloudlet.setStatus(Cloudlet.Status.FAILED)
+        vmReservations.remove(cloudlet.id)
+        updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.REJECTED) }
+    }
+
+    private fun sampleQueueDepth(activeCloudlets: List<Cloudlet>, selectedVmIndex: Int, currentTime: Double) {
+        val states = nodeStateTracker.snapshot(activeCloudlets, currentTime, vmReservations)
+        val selectedDepth = states.getOrNull(selectedVmIndex)?.queueDepth ?: 0
+        queueDepthSampleTotal += selectedDepth
+        queueDepthSampleCount++
+        if (selectedDepth > maxQueueDepth) maxQueueDepth = selectedDepth
+    }
+
+    private fun pruneCompletedReservations() {
+        vmReservations.keys.removeIf { cloudletId ->
+            val lifecycle = metadataByCloudletId[cloudletId]?.lifecycle
+            lifecycle == RealtimeTaskLifecycle.REJECTED || lifecycle == RealtimeTaskLifecycle.FAILED
+        }
+    }
+
+    private fun cloudletArrivalComparator(): Comparator<Cloudlet> {
+        val base = compareBy<Cloudlet> { it.submissionDelay }
+        return when (schedulingConfig.normalizedQueuePolicy()) {
+            config.RealtimeQueuePolicy.PRIORITY -> base
+                .thenBy { metadataByCloudletId[it.id]?.priority ?: Int.MAX_VALUE }
+                .thenBy { it.id }
+            config.RealtimeQueuePolicy.DEADLINE -> base
+                .thenBy { metadataByCloudletId[it.id]?.deadline ?: Double.POSITIVE_INFINITY }
+                .thenBy { it.id }
+            config.RealtimeQueuePolicy.FIFO -> base.thenBy { it.id }
+        }
     }
 }

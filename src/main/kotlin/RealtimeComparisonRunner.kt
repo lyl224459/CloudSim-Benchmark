@@ -32,7 +32,13 @@ data class RealtimeAlgorithmResult(
     val permanentFailedCount: Int,
     val averageDecisionDelay: Double,
     val completedCount: Int,
-    val submittedCount: Int
+    val submittedCount: Int,
+    val slaViolationCount: Int,
+    val slaViolationRate: Double,
+    val capacityRejectedCount: Int,
+    val averageQueueDepth: Double,
+    val maxQueueDepth: Int,
+    val p95ResponseTime: Double
 )
 
 data class RealtimeAlgorithmStatistics(
@@ -51,7 +57,13 @@ data class RealtimeAlgorithmStatistics(
     val permanentFailedCount: StatisticalValue,
     val averageDecisionDelay: StatisticalValue,
     val completedCount: StatisticalValue,
-    val submittedCount: StatisticalValue
+    val submittedCount: StatisticalValue,
+    val slaViolationCount: StatisticalValue,
+    val slaViolationRate: StatisticalValue,
+    val capacityRejectedCount: StatisticalValue,
+    val averageQueueDepth: StatisticalValue,
+    val maxQueueDepth: StatisticalValue,
+    val p95ResponseTime: StatisticalValue
 )
 
 private data class RealtimeRunSummary(
@@ -95,7 +107,13 @@ class RealtimeComparisonRunner(
         val permanentFailedCount: Int,
         val averageDecisionDelay: Double,
         val completedCount: Int,
-        val submittedCount: Int
+        val submittedCount: Int,
+        val slaViolationCount: Int,
+        val slaViolationRate: Double,
+        val capacityRejectedCount: Int,
+        val averageQueueDepth: Double,
+        val maxQueueDepth: Int,
+        val p95ResponseTime: Double
     )
 
     private fun executionModeDescription(): String {
@@ -153,6 +171,15 @@ class RealtimeComparisonRunner(
             metrics.permanentFailedCount
         )
         Logger.info("  平均调度决策延迟: {}", dft.format(metrics.averageDecisionDelay))
+        Logger.info(
+            "  SLA/容量/队列: violation={} ({}), capacityRejected={}, avgQueueDepth={}, maxQueueDepth={}, p95Response={}",
+            metrics.slaViolationCount,
+            dft.format(metrics.slaViolationRate),
+            metrics.capacityRejectedCount,
+            dft.format(metrics.averageQueueDepth),
+            metrics.maxQueueDepth,
+            dft.format(metrics.p95ResponseTime)
+        )
         Logger.info("  适应度 (Fitness): {}", dft.format(fitness))
 
         return RealtimeAlgorithmResult(
@@ -171,7 +198,13 @@ class RealtimeComparisonRunner(
             permanentFailedCount = metrics.permanentFailedCount,
             averageDecisionDelay = metrics.averageDecisionDelay,
             completedCount = metrics.completedCount,
-            submittedCount = metrics.submittedCount
+            submittedCount = metrics.submittedCount,
+            slaViolationCount = metrics.slaViolationCount,
+            slaViolationRate = metrics.slaViolationRate,
+            capacityRejectedCount = metrics.capacityRejectedCount,
+            averageQueueDepth = metrics.averageQueueDepth,
+            maxQueueDepth = metrics.maxQueueDepth,
+            p95ResponseTime = metrics.p95ResponseTime
         )
     }
 
@@ -185,6 +218,7 @@ class RealtimeComparisonRunner(
         var cost = 0.0
         var totalWaitingTime = 0.0
         var totalResponseTime = 0.0
+        val responseTimes = mutableListOf<Double>()
         var completedCount = 0
         var failedCount = 0
 
@@ -215,6 +249,7 @@ class RealtimeComparisonRunner(
 
                     totalWaitingTime += waitingTime
                     totalResponseTime += responseTime
+                    responseTimes.add(responseTime)
                     completedCount++
                 }
                 org.cloudsimplus.cloudlets.Cloudlet.Status.FAILED -> failedCount++
@@ -232,6 +267,12 @@ class RealtimeComparisonRunner(
         val avgWaitingTime = if (completedCount > 0) totalWaitingTime / completedCount else 0.0
         val avgResponseTime = if (completedCount > 0) totalResponseTime / completedCount else 0.0
         val timeoutCount = broker.getTimeoutCount(scheduling.taskTimeout)
+        val slaViolationCount = broker.getSlaViolationCount(cloudletList)
+        val slaViolationRate = if (completedCount > 0) {
+            slaViolationCount.toDouble() / completedCount.toDouble()
+        } else {
+            0.0
+        }
 
         return RealtimeMetrics(
             makespan = makespan,
@@ -246,7 +287,13 @@ class RealtimeComparisonRunner(
             permanentFailedCount = broker.getPermanentFailedCount(),
             averageDecisionDelay = broker.getAverageDecisionDelay(),
             completedCount = completedCount,
-            submittedCount = broker.getSubmittedCount()
+            submittedCount = broker.getSubmittedCount(),
+            slaViolationCount = slaViolationCount,
+            slaViolationRate = slaViolationRate,
+            capacityRejectedCount = broker.getCapacityRejectedCount(),
+            averageQueueDepth = broker.getAverageQueueDepth(),
+            maxQueueDepth = broker.getMaxQueueDepth(),
+            p95ResponseTime = responseTimes.percentile95()
         )
     }
 
@@ -279,6 +326,12 @@ class RealtimeComparisonRunner(
             "重试次数上限" to scheduling.retryLimit,
             "重试延迟" to scheduling.retryDelay,
             "重试退避倍数" to scheduling.retryBackoffMultiplier,
+            "队列策略" to scheduling.queuePolicy,
+            "优先级层级" to scheduling.priorityLevels,
+            "高优先级比例" to scheduling.highPriorityRatio,
+            "SLA deadline 系数" to scheduling.deadlineFactor,
+            "单 VM 队列容量" to scheduling.vmQueueCapacity,
+            "过载失败倍率" to scheduling.overloadFailureMultiplier,
             "随机数种子" to randomSeed,
             "运行次数" to runs,
             "任务生成器" to generatorType.name
@@ -312,7 +365,13 @@ class RealtimeComparisonRunner(
                     "PermanentFailedCount" to r.permanentFailedCount,
                     "AvgDecisionDelay" to r.averageDecisionDelay,
                     "CompletedCount" to r.completedCount,
-                    "SubmittedCount" to r.submittedCount
+                    "SubmittedCount" to r.submittedCount,
+                    "SlaViolationCount" to r.slaViolationCount,
+                    "SlaViolationRate" to r.slaViolationRate,
+                    "CapacityRejectedCount" to r.capacityRejectedCount,
+                    "AvgQueueDepth" to r.averageQueueDepth,
+                    "MaxQueueDepth" to r.maxQueueDepth,
+                    "P95ResponseTime" to r.p95ResponseTime
                 )
             }
             outputContext.saveSummaryResults(
@@ -320,7 +379,9 @@ class RealtimeComparisonRunner(
                 listOf(
                     "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness",
                     "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount",
-                    "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount"
+                    "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount",
+                    "SlaViolationCount", "SlaViolationRate", "CapacityRejectedCount", "AvgQueueDepth",
+                    "MaxQueueDepth", "P95ResponseTime"
                 )
             )
         }
@@ -383,7 +444,13 @@ class RealtimeComparisonRunner(
             permanentFailedCount = Int.MAX_VALUE,
             averageDecisionDelay = Double.NaN,
             completedCount = 0,
-            submittedCount = 0
+            submittedCount = 0,
+            slaViolationCount = Int.MAX_VALUE,
+            slaViolationRate = Double.NaN,
+            capacityRejectedCount = Int.MAX_VALUE,
+            averageQueueDepth = Double.NaN,
+            maxQueueDepth = Int.MAX_VALUE,
+            p95ResponseTime = Double.NaN
         )
         return RealtimeRunSummary(
             average = failedResult,
@@ -415,7 +482,13 @@ class RealtimeComparisonRunner(
             permanentFailedCount = runResults.map { it.permanentFailedCount }.average().roundToInt(),
             averageDecisionDelay = runResults.map { it.averageDecisionDelay }.average(),
             completedCount = runResults.map { it.completedCount }.average().roundToInt(),
-            submittedCount = runResults.map { it.submittedCount }.average().roundToInt()
+            submittedCount = runResults.map { it.submittedCount }.average().roundToInt(),
+            slaViolationCount = runResults.map { it.slaViolationCount }.average().roundToInt(),
+            slaViolationRate = runResults.map { it.slaViolationRate }.average(),
+            capacityRejectedCount = runResults.map { it.capacityRejectedCount }.average().roundToInt(),
+            averageQueueDepth = runResults.map { it.averageQueueDepth }.average(),
+            maxQueueDepth = runResults.map { it.maxQueueDepth }.average().roundToInt(),
+            p95ResponseTime = runResults.map { it.p95ResponseTime }.average()
         )
     }
 
@@ -446,7 +519,13 @@ class RealtimeComparisonRunner(
                 "PermanentFailedCount" to result.permanentFailedCount.toDouble(),
                 "AvgDecisionDelay" to result.averageDecisionDelay,
                 "CompletedCount" to result.completedCount.toDouble(),
-                "SubmittedCount" to result.submittedCount.toDouble()
+                "SubmittedCount" to result.submittedCount.toDouble(),
+                "SlaViolationCount" to result.slaViolationCount.toDouble(),
+                "SlaViolationRate" to result.slaViolationRate,
+                "CapacityRejectedCount" to result.capacityRejectedCount.toDouble(),
+                "AvgQueueDepth" to result.averageQueueDepth,
+                "MaxQueueDepth" to result.maxQueueDepth.toDouble(),
+                "P95ResponseTime" to result.p95ResponseTime
             )
         )
         result
@@ -495,7 +574,13 @@ class RealtimeComparisonRunner(
             permanentFailedCount = stats(results.map { it.permanentFailedCount.toDouble() }),
             averageDecisionDelay = stats(results.map { it.averageDecisionDelay }),
             completedCount = stats(results.map { it.completedCount.toDouble() }),
-            submittedCount = stats(results.map { it.submittedCount.toDouble() })
+            submittedCount = stats(results.map { it.submittedCount.toDouble() }),
+            slaViolationCount = stats(results.map { it.slaViolationCount.toDouble() }),
+            slaViolationRate = stats(results.map { it.slaViolationRate }),
+            capacityRejectedCount = stats(results.map { it.capacityRejectedCount.toDouble() }),
+            averageQueueDepth = stats(results.map { it.averageQueueDepth }),
+            maxQueueDepth = stats(results.map { it.maxQueueDepth.toDouble() }),
+            p95ResponseTime = stats(results.map { it.p95ResponseTime })
         )
     }
 
@@ -539,13 +624,22 @@ class RealtimeComparisonRunner(
                     "PermanentFailedCount_Mean", "PermanentFailedCount_StdDev",
                     "AvgDecisionDelay_Mean", "AvgDecisionDelay_StdDev",
                     "CompletedCount_Mean", "CompletedCount_StdDev",
-                    "SubmittedCount_Mean", "SubmittedCount_StdDev", "Runs"
+                    "SubmittedCount_Mean", "SubmittedCount_StdDev",
+                    "SlaViolationCount_Mean", "SlaViolationCount_StdDev",
+                    "SlaViolationRate_Mean", "SlaViolationRate_StdDev",
+                    "CapacityRejectedCount_Mean", "CapacityRejectedCount_StdDev",
+                    "AvgQueueDepth_Mean", "AvgQueueDepth_StdDev",
+                    "MaxQueueDepth_Mean", "MaxQueueDepth_StdDev",
+                    "P95ResponseTime_Mean", "P95ResponseTime_StdDev",
+                    "Runs"
                 )
             } else {
                 listOf(
                     "Algorithm", "Makespan", "LoadBalance", "Cost", "TotalTime", "Fitness",
                     "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount",
-                    "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount"
+                    "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount",
+                    "SlaViolationCount", "SlaViolationRate", "CapacityRejectedCount", "AvgQueueDepth",
+                    "MaxQueueDepth", "P95ResponseTime"
                 )
             }
             writer.write(outputContext.csvLine(headers) + "\n")
@@ -572,6 +666,12 @@ class RealtimeComparisonRunner(
                             stat.averageDecisionDelay.mean, stat.averageDecisionDelay.stdDev,
                             stat.completedCount.mean, stat.completedCount.stdDev,
                             stat.submittedCount.mean, stat.submittedCount.stdDev,
+                            stat.slaViolationCount.mean, stat.slaViolationCount.stdDev,
+                            stat.slaViolationRate.mean, stat.slaViolationRate.stdDev,
+                            stat.capacityRejectedCount.mean, stat.capacityRejectedCount.stdDev,
+                            stat.averageQueueDepth.mean, stat.averageQueueDepth.stdDev,
+                            stat.maxQueueDepth.mean, stat.maxQueueDepth.stdDev,
+                            stat.p95ResponseTime.mean, stat.p95ResponseTime.stdDev,
                             summary.runResults.size
                         )
                     } else {
@@ -592,6 +692,12 @@ class RealtimeComparisonRunner(
                             result.averageDecisionDelay, Double.NaN,
                             result.completedCount, Double.NaN,
                             result.submittedCount, Double.NaN,
+                            result.slaViolationCount, Double.NaN,
+                            result.slaViolationRate, Double.NaN,
+                            result.capacityRejectedCount, Double.NaN,
+                            result.averageQueueDepth, Double.NaN,
+                            result.maxQueueDepth, Double.NaN,
+                            result.p95ResponseTime, Double.NaN,
                             0
                         )
                     }
@@ -612,12 +718,25 @@ class RealtimeComparisonRunner(
                         result.permanentFailedCount,
                         result.averageDecisionDelay,
                         result.completedCount,
-                        result.submittedCount
+                        result.submittedCount,
+                        result.slaViolationCount,
+                        result.slaViolationRate,
+                        result.capacityRejectedCount,
+                        result.averageQueueDepth,
+                        result.maxQueueDepth,
+                        result.p95ResponseTime
                     )
                 }
                 writer.write(outputContext.csvLine(row) + "\n")
             }
         }
         Logger.info("实时调度结果已导出到: {}", csvFile.absolutePath)
+    }
+
+    private fun List<Double>.percentile95(): Double {
+        if (isEmpty()) return 0.0
+        val sorted = sorted()
+        val index = ((sorted.size - 1) * 0.95).roundToInt().coerceIn(sorted.indices)
+        return sorted[index]
     }
 }
