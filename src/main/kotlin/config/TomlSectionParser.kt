@@ -69,6 +69,12 @@ object TomlSectionParser {
                 ?: throw IllegalArgumentException("数组值必须是整数: $item")
         }
 
+    fun doubleList(value: String): List<Double> =
+        stringList(value).map { item ->
+            item.toDoubleOrNull()
+                ?: throw IllegalArgumentException("数组值必须是数字: $item")
+        }
+
     private fun splitArray(body: String): List<String> {
         val result = mutableListOf<String>()
         val current = StringBuilder()

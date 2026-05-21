@@ -161,3 +161,94 @@ vmColdStartDelay = 5.0
 scaleOutCost = 0.25
 scaleInProtectionTime = 15.0
 vmQueueCapacity = 3
+
+[profiles.realtime_preemptive_priority]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_preemptive_priority"
+
+[profiles.realtime_preemptive_priority.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_preemptive_priority.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 4
+highPriorityRatio = 0.35
+vmQueueCapacity = 1
+preemptionEnabled = true
+preemptionPolicy = "priority_then_deadline"
+preemptionMinPriorityGap = 1
+preemptionMaxPerTask = 1
+preemptionDelay = 0.2
+preemptionPenalty = 0.5
+retryLimit = 2
+checkpointInterval = 2.0
+
+[profiles.realtime_preemptive_deadline]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_preemptive_deadline"
+
+[profiles.realtime_preemptive_deadline.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_preemptive_deadline.realtime.scheduling]
+queuePolicy = "deadline"
+deadlineFactor = 1.1
+vmQueueCapacity = 1
+preemptionEnabled = true
+preemptionPolicy = "deadline_then_priority"
+preemptionMinPriorityGap = 1
+preemptionMaxPerTask = 1
+preemptionDelay = 0.2
+preemptionPenalty = 0.5
+retryLimit = 2
+checkpointInterval = 2.0
+
+[profiles.realtime_failure_migration]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_failure_migration"
+
+[profiles.realtime_failure_migration.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 6.0
+
+[profiles.realtime_failure_migration.realtime.scheduling]
+runtimeFailureRate = 0.08
+nodeFailureRate = 0.04
+retryLimit = 2
+retryDelay = 0.5
+checkpointInterval = 3.0
+migrationDelay = 0.5
+timeoutAction = "retry"
+
+[profiles.realtime_tenant_fairness]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_tenant_fairness"
+
+[profiles.realtime_tenant_fairness.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_tenant_fairness.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 3
+highPriorityRatio = 0.2
+vmQueueCapacity = 2
+multiTenantEnabled = true
+tenantCount = 3
+tenantQuota = [2, 1, 1]
+tenantWeights = [1.0, 2.0, 1.0]
+tenantFairnessPolicy = "weighted_fair"

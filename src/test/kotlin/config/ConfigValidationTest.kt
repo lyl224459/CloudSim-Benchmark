@@ -105,7 +105,16 @@ class ConfigValidationTest {
                     nodeFailureRate = -0.1,
                     checkpointInterval = -1.0,
                     migrationDelay = -1.0,
-                    timeoutAction = "pause"
+                    timeoutAction = "pause",
+                    preemptionPolicy = "random",
+                    preemptionMinPriorityGap = -1,
+                    preemptionMaxPerTask = -1,
+                    preemptionDelay = -0.1,
+                    preemptionPenalty = -0.1,
+                    tenantCount = 0,
+                    tenantQuota = listOf(1, -1),
+                    tenantWeights = listOf(1.0, 0.0),
+                    tenantFairnessPolicy = "lottery"
                 )
             )
         )
@@ -142,6 +151,17 @@ class ConfigValidationTest {
             assertThat(e.errors.any { it.field == "realtime.scheduling.checkpointInterval" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.migrationDelay" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.timeoutAction" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.preemptionPolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.preemptionMinPriorityGap" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.preemptionMaxPerTask" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.preemptionDelay" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.preemptionPenalty" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantCount" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantQuota" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantQuota[1]" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantWeights" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantWeights[1]" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantFairnessPolicy" }).isTrue()
         }
     }
 

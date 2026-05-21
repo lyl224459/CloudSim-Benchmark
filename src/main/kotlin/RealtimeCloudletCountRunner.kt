@@ -117,6 +117,17 @@ class RealtimeCloudletCountRunner(
             "运行中失败率" to scheduling.runtimeFailureRate,
             "节点失败率" to scheduling.nodeFailureRate,
             "超时动作" to scheduling.timeoutAction,
+            "抢占启用" to scheduling.preemptionEnabled,
+            "抢占策略" to scheduling.preemptionPolicy,
+            "抢占最小优先级差" to scheduling.preemptionMinPriorityGap,
+            "单任务最大抢占次数" to scheduling.preemptionMaxPerTask,
+            "抢占延迟" to scheduling.preemptionDelay,
+            "抢占惩罚" to scheduling.preemptionPenalty,
+            "多租户隔离" to scheduling.multiTenantEnabled,
+            "租户数量" to scheduling.tenantCount,
+            "租户配额" to scheduling.tenantQuota.joinToString(", "),
+            "租户权重" to scheduling.tenantWeights.joinToString(", "),
+            "租户公平策略" to scheduling.tenantFairnessPolicy,
             "随机数种子" to randomSeed,
             "任务生成器" to generatorType.name
         ))
@@ -227,6 +238,14 @@ class RealtimeCloudletCountRunner(
                         "CheckpointRecoveryCount_Mean", "CheckpointRecoveryCount_StdDev",
                         "RetrySuccessRate_Mean", "RetrySuccessRate_StdDev",
                         "SlaPenalty_Mean", "SlaPenalty_StdDev",
+                        "PreemptedCount_Mean", "PreemptedCount_StdDev",
+                        "PreemptionSuccessCount_Mean", "PreemptionSuccessCount_StdDev",
+                        "PreemptionFailedCount_Mean", "PreemptionFailedCount_StdDev",
+                        "AvgPreemptionDelay_Mean", "AvgPreemptionDelay_StdDev",
+                        "PreemptionPenalty_Mean", "PreemptionPenalty_StdDev",
+                        "CheckpointLossTotal_Mean", "CheckpointLossTotal_StdDev",
+                        "TenantQuotaRejectedCount_Mean", "TenantQuotaRejectedCount_StdDev",
+                        "TenantFairnessIndex_Mean", "TenantFairnessIndex_StdDev",
                         "Runs"
                     )
                 ) + "\n"
@@ -276,6 +295,14 @@ class RealtimeCloudletCountRunner(
                                 stat.checkpointRecoveryCount.mean, stat.checkpointRecoveryCount.stdDev,
                                 stat.retrySuccessRate.mean, stat.retrySuccessRate.stdDev,
                                 stat.slaPenalty.mean, stat.slaPenalty.stdDev,
+                                stat.preemptedCount.mean, stat.preemptedCount.stdDev,
+                                stat.preemptionSuccessCount.mean, stat.preemptionSuccessCount.stdDev,
+                                stat.preemptionFailedCount.mean, stat.preemptionFailedCount.stdDev,
+                                stat.averagePreemptionDelay.mean, stat.averagePreemptionDelay.stdDev,
+                                stat.preemptionPenalty.mean, stat.preemptionPenalty.stdDev,
+                                stat.checkpointLossTotal.mean, stat.checkpointLossTotal.stdDev,
+                                stat.tenantQuotaRejectedCount.mean, stat.tenantQuotaRejectedCount.stdDev,
+                                stat.tenantFairnessIndex.mean, stat.tenantFairnessIndex.stdDev,
                                 runs
                             )
                         ) + "\n"
@@ -319,7 +346,15 @@ class RealtimeCloudletCountRunner(
             "MigrationCount",
             "CheckpointRecoveryCount",
             "RetrySuccessRate",
-            "SlaPenalty"
+            "SlaPenalty",
+            "PreemptedCount",
+            "PreemptionSuccessCount",
+            "PreemptionFailedCount",
+            "AvgPreemptionDelay",
+            "PreemptionPenalty",
+            "CheckpointLossTotal",
+            "TenantQuotaRejectedCount",
+            "TenantFairnessIndex"
         )
         val summaryData = results.flatMap { (count, stats) ->
             stats.map { stat ->
@@ -356,7 +391,15 @@ class RealtimeCloudletCountRunner(
                     "MigrationCount" to stat.migrationCount.mean,
                     "CheckpointRecoveryCount" to stat.checkpointRecoveryCount.mean,
                     "RetrySuccessRate" to stat.retrySuccessRate.mean,
-                    "SlaPenalty" to stat.slaPenalty.mean
+                    "SlaPenalty" to stat.slaPenalty.mean,
+                    "PreemptedCount" to stat.preemptedCount.mean,
+                    "PreemptionSuccessCount" to stat.preemptionSuccessCount.mean,
+                    "PreemptionFailedCount" to stat.preemptionFailedCount.mean,
+                    "AvgPreemptionDelay" to stat.averagePreemptionDelay.mean,
+                    "PreemptionPenalty" to stat.preemptionPenalty.mean,
+                    "CheckpointLossTotal" to stat.checkpointLossTotal.mean,
+                    "TenantQuotaRejectedCount" to stat.tenantQuotaRejectedCount.mean,
+                    "TenantFairnessIndex" to stat.tenantFairnessIndex.mean
                 )
             }
         }

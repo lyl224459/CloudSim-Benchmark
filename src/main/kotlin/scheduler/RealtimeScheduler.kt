@@ -87,6 +87,7 @@ abstract class RealtimeSchedulerBase(
 
     protected fun orderedCandidateStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> {
         val base = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        val preemptableVmIndexes = context.preemptionCandidates.map { it.victimVmIndex.value }.toSet()
         val policyComparator = when (context.queuePolicy) {
             RealtimeQueuePolicy.PRIORITY -> compareByDescending<RealtimeNodeState> { it.availableSlots }
                 .thenBy { it.availableTime }
@@ -98,7 +99,11 @@ abstract class RealtimeSchedulerBase(
                 .thenBy { it.estimatedLoad }
                 .thenBy { it.queueDepth }
         }
-        return base.sortedWith(policyComparator.thenBy { it.vmIndex })
+        return base.sortedWith(
+            compareByDescending<RealtimeNodeState> { it.vmIndex in preemptableVmIndexes }
+                .then(policyComparator)
+                .thenBy { it.vmIndex }
+        )
     }
 
     private fun projectedFinishTime(context: RealtimeSchedulingContext, state: RealtimeNodeState): Double {

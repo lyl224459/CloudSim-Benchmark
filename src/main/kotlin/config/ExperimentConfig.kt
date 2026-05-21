@@ -174,11 +174,27 @@ data class RealtimeSchedulingConfig(
     val nodeFailureRate: Double = 0.0,
     val checkpointInterval: Double = 0.0,
     val migrationDelay: Double = 0.0,
-    val timeoutAction: String = "fail"
+    val timeoutAction: String = "fail",
+    val preemptionEnabled: Boolean = false,
+    val preemptionPolicy: String = "priority_then_deadline",
+    val preemptionMinPriorityGap: Int = 1,
+    val preemptionMaxPerTask: Int = 1,
+    val preemptionDelay: Double = 0.0,
+    val preemptionPenalty: Double = 0.0,
+    val multiTenantEnabled: Boolean = false,
+    val tenantCount: Int = 1,
+    val tenantQuota: List<Int> = emptyList(),
+    val tenantWeights: List<Double> = emptyList(),
+    val tenantFairnessPolicy: String = "quota_first"
 ) {
     fun normalizedQueuePolicy(): RealtimeQueuePolicy = RealtimeQueuePolicy.parse(queuePolicy)
 
     fun normalizedTimeoutAction(): RealtimeTimeoutAction = RealtimeTimeoutAction.parse(timeoutAction)
+
+    fun normalizedPreemptionPolicy(): RealtimePreemptionPolicy = RealtimePreemptionPolicy.parse(preemptionPolicy)
+
+    fun normalizedTenantFairnessPolicy(): RealtimeTenantFairnessPolicy =
+        RealtimeTenantFairnessPolicy.parse(tenantFairnessPolicy)
 }
 
 enum class RealtimeQueuePolicy(val configValue: String) {
@@ -205,6 +221,32 @@ enum class RealtimeTimeoutAction(val configValue: String) {
         fun parse(value: String): RealtimeTimeoutAction =
             entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
                 ?: throw IllegalArgumentException("未知实时超时动作: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
+enum class RealtimePreemptionPolicy(val configValue: String) {
+    PRIORITY_THEN_DEADLINE("priority_then_deadline"),
+    DEADLINE_THEN_PRIORITY("deadline_then_priority");
+
+    companion object {
+        fun parse(value: String): RealtimePreemptionPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时抢占策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
+enum class RealtimeTenantFairnessPolicy(val configValue: String) {
+    QUOTA_FIRST("quota_first"),
+    WEIGHTED_FAIR("weighted_fair");
+
+    companion object {
+        fun parse(value: String): RealtimeTenantFairnessPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时租户公平策略: $value")
 
         fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
     }
@@ -562,7 +604,18 @@ data class ExperimentConfig(
                     "nodeFailureRate",
                     "checkpointInterval",
                     "migrationDelay",
-                    "timeoutAction"
+                    "timeoutAction",
+                    "preemptionEnabled",
+                    "preemptionPolicy",
+                    "preemptionMinPriorityGap",
+                    "preemptionMaxPerTask",
+                    "preemptionDelay",
+                    "preemptionPenalty",
+                    "multiTenantEnabled",
+                    "tenantCount",
+                    "tenantQuota",
+                    "tenantWeights",
+                    "tenantFairnessPolicy"
                 )
             )
             val current = base ?: TomlRealtimeConfig()
@@ -618,7 +671,38 @@ data class ExperimentConfig(
                     parseRequiredDouble("realtime.scheduling.checkpointInterval", it)
                 } ?: current.scheduling.checkpointInterval,
                 migrationDelay = properties["migrationDelay"]?.let { parseRequiredDouble("realtime.scheduling.migrationDelay", it) } ?: current.scheduling.migrationDelay,
-                timeoutAction = properties["timeoutAction"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.timeoutAction
+                timeoutAction = properties["timeoutAction"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.timeoutAction,
+                preemptionEnabled = properties["preemptionEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.preemptionEnabled", it)
+                } ?: current.scheduling.preemptionEnabled,
+                preemptionPolicy = properties["preemptionPolicy"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.preemptionPolicy,
+                preemptionMinPriorityGap = properties["preemptionMinPriorityGap"]?.let {
+                    parseRequiredInt("realtime.scheduling.preemptionMinPriorityGap", it)
+                } ?: current.scheduling.preemptionMinPriorityGap,
+                preemptionMaxPerTask = properties["preemptionMaxPerTask"]?.let {
+                    parseRequiredInt("realtime.scheduling.preemptionMaxPerTask", it)
+                } ?: current.scheduling.preemptionMaxPerTask,
+                preemptionDelay = properties["preemptionDelay"]?.let {
+                    parseRequiredDouble("realtime.scheduling.preemptionDelay", it)
+                } ?: current.scheduling.preemptionDelay,
+                preemptionPenalty = properties["preemptionPenalty"]?.let {
+                    parseRequiredDouble("realtime.scheduling.preemptionPenalty", it)
+                } ?: current.scheduling.preemptionPenalty,
+                multiTenantEnabled = properties["multiTenantEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.multiTenantEnabled", it)
+                } ?: current.scheduling.multiTenantEnabled,
+                tenantCount = properties["tenantCount"]?.let {
+                    parseRequiredInt("realtime.scheduling.tenantCount", it)
+                } ?: current.scheduling.tenantCount,
+                tenantQuota = properties["tenantQuota"]?.let {
+                    parseIntArrayValue(it)
+                } ?: current.scheduling.tenantQuota,
+                tenantWeights = properties["tenantWeights"]?.let {
+                    parseDoubleArrayValue(it)
+                } ?: current.scheduling.tenantWeights,
+                tenantFairnessPolicy = properties["tenantFairnessPolicy"]?.let {
+                    TomlSectionParser.unquote(it)
+                } ?: current.scheduling.tenantFairnessPolicy
             )
             return current.copy(scheduling = scheduling)
         }
@@ -713,6 +797,9 @@ data class ExperimentConfig(
 
         private fun parseIntArrayValue(raw: String): List<Int> =
             TomlSectionParser.intList(raw)
+
+        private fun parseDoubleArrayValue(raw: String): List<Double> =
+            TomlSectionParser.doubleList(raw)
 
         private fun parseBoolArrayValue(raw: String): List<Boolean> =
             parseArrayValue(raw).mapNotNull { it.toBooleanStrictOrNull() }
@@ -1027,6 +1114,60 @@ data class ExperimentConfig(
             if (realtime.scheduling.timeoutAction.lowercase() !in timeoutActions) {
                 errors.add(ValidationError("realtime.scheduling.timeoutAction", realtime.scheduling.timeoutAction,
                     "超时动作必须是以下值之一: ${timeoutActions.joinToString(", ")}"))
+            }
+            val preemptionPolicies = RealtimePreemptionPolicy.valuesForConfig()
+            if (realtime.scheduling.preemptionPolicy.lowercase() !in preemptionPolicies) {
+                errors.add(ValidationError("realtime.scheduling.preemptionPolicy", realtime.scheduling.preemptionPolicy,
+                    "抢占策略必须是以下值之一: ${preemptionPolicies.joinToString(", ")}"))
+            }
+            if (realtime.scheduling.preemptionMinPriorityGap < 0) {
+                errors.add(ValidationError("realtime.scheduling.preemptionMinPriorityGap", realtime.scheduling.preemptionMinPriorityGap.toString(),
+                    "抢占优先级差不能为负数"))
+            }
+            if (realtime.scheduling.preemptionMaxPerTask < 0) {
+                errors.add(ValidationError("realtime.scheduling.preemptionMaxPerTask", realtime.scheduling.preemptionMaxPerTask.toString(),
+                    "单任务最大抢占次数不能为负数"))
+            }
+            if (realtime.scheduling.preemptionDelay < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.preemptionDelay", realtime.scheduling.preemptionDelay.toString(),
+                    "抢占延迟不能为负数"))
+            }
+            if (realtime.scheduling.preemptionPenalty < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.preemptionPenalty", realtime.scheduling.preemptionPenalty.toString(),
+                    "抢占惩罚不能为负数"))
+            }
+            if (realtime.scheduling.tenantCount < 1) {
+                errors.add(ValidationError("realtime.scheduling.tenantCount", realtime.scheduling.tenantCount.toString(),
+                    "租户数量必须大于等于 1"))
+            }
+            if (realtime.scheduling.tenantQuota.isNotEmpty() &&
+                realtime.scheduling.tenantQuota.size != realtime.scheduling.tenantCount
+            ) {
+                errors.add(ValidationError("realtime.scheduling.tenantQuota", realtime.scheduling.tenantQuota.joinToString(","),
+                    "租户配额数量必须等于 tenantCount"))
+            }
+            realtime.scheduling.tenantQuota.forEachIndexed { index, quota ->
+                if (quota < 0) {
+                    errors.add(ValidationError("realtime.scheduling.tenantQuota[$index]", quota.toString(),
+                        "租户配额不能为负数"))
+                }
+            }
+            if (realtime.scheduling.tenantWeights.isNotEmpty() &&
+                realtime.scheduling.tenantWeights.size != realtime.scheduling.tenantCount
+            ) {
+                errors.add(ValidationError("realtime.scheduling.tenantWeights", realtime.scheduling.tenantWeights.joinToString(","),
+                    "租户权重数量必须等于 tenantCount"))
+            }
+            realtime.scheduling.tenantWeights.forEachIndexed { index, weight ->
+                if (weight <= 0.0) {
+                    errors.add(ValidationError("realtime.scheduling.tenantWeights[$index]", weight.toString(),
+                        "租户权重必须大于 0"))
+                }
+            }
+            val tenantFairnessPolicies = RealtimeTenantFairnessPolicy.valuesForConfig()
+            if (realtime.scheduling.tenantFairnessPolicy.lowercase() !in tenantFairnessPolicies) {
+                errors.add(ValidationError("realtime.scheduling.tenantFairnessPolicy", realtime.scheduling.tenantFairnessPolicy,
+                    "租户公平策略必须是以下值之一: ${tenantFairnessPolicies.joinToString(", ")}"))
             }
             val reservations = setOf("none", "partial", "full")
             if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {

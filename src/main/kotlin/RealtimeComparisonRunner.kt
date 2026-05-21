@@ -51,7 +51,15 @@ data class RealtimeAlgorithmResult(
     val migrationCount: Int,
     val checkpointRecoveryCount: Int,
     val retrySuccessRate: Double,
-    val slaPenalty: Double
+    val slaPenalty: Double,
+    val preemptedCount: Int,
+    val preemptionSuccessCount: Int,
+    val preemptionFailedCount: Int,
+    val averagePreemptionDelay: Double,
+    val preemptionPenalty: Double,
+    val checkpointLossTotal: Long,
+    val tenantQuotaRejectedCount: Int,
+    val tenantFairnessIndex: Double
 )
 
 data class RealtimeAlgorithmStatistics(
@@ -89,7 +97,15 @@ data class RealtimeAlgorithmStatistics(
     val migrationCount: StatisticalValue,
     val checkpointRecoveryCount: StatisticalValue,
     val retrySuccessRate: StatisticalValue,
-    val slaPenalty: StatisticalValue
+    val slaPenalty: StatisticalValue,
+    val preemptedCount: StatisticalValue,
+    val preemptionSuccessCount: StatisticalValue,
+    val preemptionFailedCount: StatisticalValue,
+    val averagePreemptionDelay: StatisticalValue,
+    val preemptionPenalty: StatisticalValue,
+    val checkpointLossTotal: StatisticalValue,
+    val tenantQuotaRejectedCount: StatisticalValue,
+    val tenantFairnessIndex: StatisticalValue
 )
 
 private data class RealtimeRunSummary(
@@ -152,7 +168,15 @@ class RealtimeComparisonRunner(
         val migrationCount: Int,
         val checkpointRecoveryCount: Int,
         val retrySuccessRate: Double,
-        val slaPenalty: Double
+        val slaPenalty: Double,
+        val preemptedCount: Int,
+        val preemptionSuccessCount: Int,
+        val preemptionFailedCount: Int,
+        val averagePreemptionDelay: Double,
+        val preemptionPenalty: Double,
+        val checkpointLossTotal: Long,
+        val tenantQuotaRejectedCount: Int,
+        val tenantFairnessIndex: Double
     )
 
     private fun executionModeDescription(): String {
@@ -257,7 +281,15 @@ class RealtimeComparisonRunner(
             migrationCount = metrics.migrationCount,
             checkpointRecoveryCount = metrics.checkpointRecoveryCount,
             retrySuccessRate = metrics.retrySuccessRate,
-            slaPenalty = metrics.slaPenalty
+            slaPenalty = metrics.slaPenalty,
+            preemptedCount = metrics.preemptedCount,
+            preemptionSuccessCount = metrics.preemptionSuccessCount,
+            preemptionFailedCount = metrics.preemptionFailedCount,
+            averagePreemptionDelay = metrics.averagePreemptionDelay,
+            preemptionPenalty = metrics.preemptionPenalty,
+            checkpointLossTotal = metrics.checkpointLossTotal,
+            tenantQuotaRejectedCount = metrics.tenantQuotaRejectedCount,
+            tenantFairnessIndex = metrics.tenantFairnessIndex
         )
     }
 
@@ -365,7 +397,15 @@ class RealtimeComparisonRunner(
             migrationCount = broker.getMigrationCount(),
             checkpointRecoveryCount = broker.getCheckpointRecoveryCount(),
             retrySuccessRate = broker.getRetrySuccessRate(),
-            slaPenalty = slaPenalty
+            slaPenalty = slaPenalty + broker.getPreemptionPenalty(),
+            preemptedCount = broker.getPreemptedCount(),
+            preemptionSuccessCount = broker.getPreemptionSuccessCount(),
+            preemptionFailedCount = broker.getPreemptionFailedCount(),
+            averagePreemptionDelay = broker.getAveragePreemptionDelay(),
+            preemptionPenalty = broker.getPreemptionPenalty(),
+            checkpointLossTotal = broker.getCheckpointLossTotal(),
+            tenantQuotaRejectedCount = broker.getTenantQuotaRejectedCount(),
+            tenantFairnessIndex = broker.getTenantFairnessIndex(cloudletList)
         )
     }
 
@@ -422,6 +462,17 @@ class RealtimeComparisonRunner(
             "checkpoint 间隔" to scheduling.checkpointInterval,
             "迁移延迟" to scheduling.migrationDelay,
             "超时动作" to scheduling.timeoutAction,
+            "抢占启用" to scheduling.preemptionEnabled,
+            "抢占策略" to scheduling.preemptionPolicy,
+            "抢占最小优先级差" to scheduling.preemptionMinPriorityGap,
+            "单任务最大抢占次数" to scheduling.preemptionMaxPerTask,
+            "抢占延迟" to scheduling.preemptionDelay,
+            "抢占惩罚" to scheduling.preemptionPenalty,
+            "多租户隔离" to scheduling.multiTenantEnabled,
+            "租户数量" to scheduling.tenantCount,
+            "租户配额" to scheduling.tenantQuota.joinToString(", "),
+            "租户权重" to scheduling.tenantWeights.joinToString(", "),
+            "租户公平策略" to scheduling.tenantFairnessPolicy,
             "随机数种子" to randomSeed,
             "运行次数" to runs,
             "任务生成器" to generatorType.name
@@ -474,7 +525,15 @@ class RealtimeComparisonRunner(
                     "MigrationCount" to r.migrationCount,
                     "CheckpointRecoveryCount" to r.checkpointRecoveryCount,
                     "RetrySuccessRate" to r.retrySuccessRate,
-                    "SlaPenalty" to r.slaPenalty
+                    "SlaPenalty" to r.slaPenalty,
+                    "PreemptedCount" to r.preemptedCount,
+                    "PreemptionSuccessCount" to r.preemptionSuccessCount,
+                    "PreemptionFailedCount" to r.preemptionFailedCount,
+                    "AvgPreemptionDelay" to r.averagePreemptionDelay,
+                    "PreemptionPenalty" to r.preemptionPenalty,
+                    "CheckpointLossTotal" to r.checkpointLossTotal,
+                    "TenantQuotaRejectedCount" to r.tenantQuotaRejectedCount,
+                    "TenantFairnessIndex" to r.tenantFairnessIndex
                 )
             }
             outputContext.saveSummaryResults(
@@ -487,7 +546,9 @@ class RealtimeComparisonRunner(
                     "MaxQueueDepth", "P95ResponseTime", "P99ResponseTime", "ScaleOutCount", "ScaleInCount",
                     "ActiveVmPeak", "AutoscalingCost", "ColdStartDelayTotal", "ResourceRejectedCount",
                     "RuntimeFailureCount", "TimeoutCancelledCount", "MigrationCount", "CheckpointRecoveryCount",
-                    "RetrySuccessRate", "SlaPenalty"
+                    "RetrySuccessRate", "SlaPenalty", "PreemptedCount", "PreemptionSuccessCount",
+                    "PreemptionFailedCount", "AvgPreemptionDelay", "PreemptionPenalty", "CheckpointLossTotal",
+                    "TenantQuotaRejectedCount", "TenantFairnessIndex"
                 )
             )
         }
@@ -569,7 +630,15 @@ class RealtimeComparisonRunner(
             migrationCount = Int.MAX_VALUE,
             checkpointRecoveryCount = Int.MAX_VALUE,
             retrySuccessRate = Double.NaN,
-            slaPenalty = Double.NaN
+            slaPenalty = Double.NaN,
+            preemptedCount = Int.MAX_VALUE,
+            preemptionSuccessCount = Int.MAX_VALUE,
+            preemptionFailedCount = Int.MAX_VALUE,
+            averagePreemptionDelay = Double.NaN,
+            preemptionPenalty = Double.NaN,
+            checkpointLossTotal = Long.MAX_VALUE,
+            tenantQuotaRejectedCount = Int.MAX_VALUE,
+            tenantFairnessIndex = Double.NaN
         )
         return RealtimeRunSummary(
             average = failedResult,
@@ -620,7 +689,15 @@ class RealtimeComparisonRunner(
             migrationCount = runResults.map { it.migrationCount }.average().roundToInt(),
             checkpointRecoveryCount = runResults.map { it.checkpointRecoveryCount }.average().roundToInt(),
             retrySuccessRate = runResults.map { it.retrySuccessRate }.average(),
-            slaPenalty = runResults.map { it.slaPenalty }.average()
+            slaPenalty = runResults.map { it.slaPenalty }.average(),
+            preemptedCount = runResults.map { it.preemptedCount }.average().roundToInt(),
+            preemptionSuccessCount = runResults.map { it.preemptionSuccessCount }.average().roundToInt(),
+            preemptionFailedCount = runResults.map { it.preemptionFailedCount }.average().roundToInt(),
+            averagePreemptionDelay = runResults.map { it.averagePreemptionDelay }.average(),
+            preemptionPenalty = runResults.map { it.preemptionPenalty }.average(),
+            checkpointLossTotal = runResults.map { it.checkpointLossTotal }.average().roundToInt().toLong(),
+            tenantQuotaRejectedCount = runResults.map { it.tenantQuotaRejectedCount }.average().roundToInt(),
+            tenantFairnessIndex = runResults.map { it.tenantFairnessIndex }.average()
         )
     }
 
@@ -670,7 +747,15 @@ class RealtimeComparisonRunner(
                 "MigrationCount" to result.migrationCount.toDouble(),
                 "CheckpointRecoveryCount" to result.checkpointRecoveryCount.toDouble(),
                 "RetrySuccessRate" to result.retrySuccessRate,
-                "SlaPenalty" to result.slaPenalty
+                "SlaPenalty" to result.slaPenalty,
+                "PreemptedCount" to result.preemptedCount.toDouble(),
+                "PreemptionSuccessCount" to result.preemptionSuccessCount.toDouble(),
+                "PreemptionFailedCount" to result.preemptionFailedCount.toDouble(),
+                "AvgPreemptionDelay" to result.averagePreemptionDelay,
+                "PreemptionPenalty" to result.preemptionPenalty,
+                "CheckpointLossTotal" to result.checkpointLossTotal.toDouble(),
+                "TenantQuotaRejectedCount" to result.tenantQuotaRejectedCount.toDouble(),
+                "TenantFairnessIndex" to result.tenantFairnessIndex
             )
         )
         result
@@ -738,7 +823,15 @@ class RealtimeComparisonRunner(
             migrationCount = stats(results.map { it.migrationCount.toDouble() }),
             checkpointRecoveryCount = stats(results.map { it.checkpointRecoveryCount.toDouble() }),
             retrySuccessRate = stats(results.map { it.retrySuccessRate }),
-            slaPenalty = stats(results.map { it.slaPenalty })
+            slaPenalty = stats(results.map { it.slaPenalty }),
+            preemptedCount = stats(results.map { it.preemptedCount.toDouble() }),
+            preemptionSuccessCount = stats(results.map { it.preemptionSuccessCount.toDouble() }),
+            preemptionFailedCount = stats(results.map { it.preemptionFailedCount.toDouble() }),
+            averagePreemptionDelay = stats(results.map { it.averagePreemptionDelay }),
+            preemptionPenalty = stats(results.map { it.preemptionPenalty }),
+            checkpointLossTotal = stats(results.map { it.checkpointLossTotal.toDouble() }),
+            tenantQuotaRejectedCount = stats(results.map { it.tenantQuotaRejectedCount.toDouble() }),
+            tenantFairnessIndex = stats(results.map { it.tenantFairnessIndex })
         )
     }
 
@@ -802,6 +895,14 @@ class RealtimeComparisonRunner(
                     "CheckpointRecoveryCount_Mean", "CheckpointRecoveryCount_StdDev",
                     "RetrySuccessRate_Mean", "RetrySuccessRate_StdDev",
                     "SlaPenalty_Mean", "SlaPenalty_StdDev",
+                    "PreemptedCount_Mean", "PreemptedCount_StdDev",
+                    "PreemptionSuccessCount_Mean", "PreemptionSuccessCount_StdDev",
+                    "PreemptionFailedCount_Mean", "PreemptionFailedCount_StdDev",
+                    "AvgPreemptionDelay_Mean", "AvgPreemptionDelay_StdDev",
+                    "PreemptionPenalty_Mean", "PreemptionPenalty_StdDev",
+                    "CheckpointLossTotal_Mean", "CheckpointLossTotal_StdDev",
+                    "TenantQuotaRejectedCount_Mean", "TenantQuotaRejectedCount_StdDev",
+                    "TenantFairnessIndex_Mean", "TenantFairnessIndex_StdDev",
                     "Runs"
                 )
             } else {
@@ -813,7 +914,9 @@ class RealtimeComparisonRunner(
                     "MaxQueueDepth", "P95ResponseTime", "P99ResponseTime", "ScaleOutCount", "ScaleInCount",
                     "ActiveVmPeak", "AutoscalingCost", "ColdStartDelayTotal", "ResourceRejectedCount",
                     "RuntimeFailureCount", "TimeoutCancelledCount", "MigrationCount", "CheckpointRecoveryCount",
-                    "RetrySuccessRate", "SlaPenalty"
+                    "RetrySuccessRate", "SlaPenalty", "PreemptedCount", "PreemptionSuccessCount",
+                    "PreemptionFailedCount", "AvgPreemptionDelay", "PreemptionPenalty", "CheckpointLossTotal",
+                    "TenantQuotaRejectedCount", "TenantFairnessIndex"
                 )
             }
             writer.write(outputContext.csvLine(headers) + "\n")
@@ -859,6 +962,14 @@ class RealtimeComparisonRunner(
                             stat.checkpointRecoveryCount.mean, stat.checkpointRecoveryCount.stdDev,
                             stat.retrySuccessRate.mean, stat.retrySuccessRate.stdDev,
                             stat.slaPenalty.mean, stat.slaPenalty.stdDev,
+                            stat.preemptedCount.mean, stat.preemptedCount.stdDev,
+                            stat.preemptionSuccessCount.mean, stat.preemptionSuccessCount.stdDev,
+                            stat.preemptionFailedCount.mean, stat.preemptionFailedCount.stdDev,
+                            stat.averagePreemptionDelay.mean, stat.averagePreemptionDelay.stdDev,
+                            stat.preemptionPenalty.mean, stat.preemptionPenalty.stdDev,
+                            stat.checkpointLossTotal.mean, stat.checkpointLossTotal.stdDev,
+                            stat.tenantQuotaRejectedCount.mean, stat.tenantQuotaRejectedCount.stdDev,
+                            stat.tenantFairnessIndex.mean, stat.tenantFairnessIndex.stdDev,
                             summary.runResults.size
                         )
                     } else {
@@ -898,6 +1009,14 @@ class RealtimeComparisonRunner(
                             result.checkpointRecoveryCount, Double.NaN,
                             result.retrySuccessRate, Double.NaN,
                             result.slaPenalty, Double.NaN,
+                            result.preemptedCount, Double.NaN,
+                            result.preemptionSuccessCount, Double.NaN,
+                            result.preemptionFailedCount, Double.NaN,
+                            result.averagePreemptionDelay, Double.NaN,
+                            result.preemptionPenalty, Double.NaN,
+                            result.checkpointLossTotal, Double.NaN,
+                            result.tenantQuotaRejectedCount, Double.NaN,
+                            result.tenantFairnessIndex, Double.NaN,
                             0
                         )
                     }
@@ -937,7 +1056,15 @@ class RealtimeComparisonRunner(
                         result.migrationCount,
                         result.checkpointRecoveryCount,
                         result.retrySuccessRate,
-                        result.slaPenalty
+                        result.slaPenalty,
+                        result.preemptedCount,
+                        result.preemptionSuccessCount,
+                        result.preemptionFailedCount,
+                        result.averagePreemptionDelay,
+                        result.preemptionPenalty,
+                        result.checkpointLossTotal,
+                        result.tenantQuotaRejectedCount,
+                        result.tenantFairnessIndex
                     )
                 }
                 writer.write(outputContext.csvLine(row) + "\n")

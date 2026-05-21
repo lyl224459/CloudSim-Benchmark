@@ -277,19 +277,242 @@ class RealtimeBrokerCloudSemanticsTest {
         assertThat(broker.getRetryCount()).isEqualTo(1)
     }
 
+    @Test
+    fun `tenant quota rejects excess tenant work without retry`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 1,
+                tenantQuota = listOf(1),
+                decisionDelay = 10.0,
+                retryLimit = 2
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(listOf(createCloudlet(0), createCloudlet(1)))
+
+        simulation.start()
+
+        assertThat(broker.getTenantQuotaRejectedCount()).isEqualTo(1)
+        assertThat(broker.getRetryCount()).isEqualTo(0)
+    }
+
+    @Test
+    fun `tenant fairness index is reported in bounded range`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val cloudlets = listOf(createCloudlet(0), createCloudlet(1), createCloudlet(2), createCloudlet(3))
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 2,
+                tenantWeights = listOf(1.0, 2.0),
+                tenantFairnessPolicy = "weighted_fair"
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(cloudlets)
+
+        simulation.start()
+
+        assertThat(broker.getTenantFairnessIndex(cloudlets)).isBetween(0.0, 1.0)
+    }
+
+    @Test
+    fun `preemption disabled rejects when vm queue is full`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                vmQueueCapacity = 1,
+                decisionDelay = 10.0,
+                priorityLevels = 2,
+                highPriorityRatio = 1.0,
+                preemptionEnabled = false,
+                retryLimit = 1
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(
+            listOf(
+                createCloudlet(0, length = 20_000, submissionDelay = 0.1),
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2)
+            )
+        )
+
+        simulation.start()
+
+        assertThat(broker.getPreemptedCount()).isEqualTo(0)
+        assertThat(broker.getCapacityRejectedCount()).isEqualTo(1)
+    }
+
+    @Test
+    fun `preemption allows high priority task to displace lower priority task`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                vmQueueCapacity = 1,
+                decisionDelay = 10.0,
+                priorityLevels = 2,
+                highPriorityRatio = 1.0,
+                preemptionEnabled = true,
+                preemptionMinPriorityGap = 1,
+                preemptionMaxPerTask = 1,
+                preemptionDelay = 0.2,
+                preemptionPenalty = 0.5,
+                retryLimit = 2,
+                checkpointInterval = 1.0
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(
+            listOf(
+                createCloudlet(0, length = 20_000, submissionDelay = 0.1),
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2)
+            )
+        )
+
+        simulation.start()
+
+        assertThat(broker.getPreemptedCount()).isEqualTo(1)
+        assertThat(broker.getPreemptionSuccessCount()).isEqualTo(1)
+        assertThat(broker.getAveragePreemptionDelay()).isEqualTo(0.2)
+        assertThat(broker.getPreemptionPenalty()).isEqualTo(0.5)
+        assertThat(broker.getRetryCount()).isGreaterThanOrEqualTo(1)
+    }
+
+    @Test
+    fun `preemption respects minimum priority gap`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                vmQueueCapacity = 1,
+                decisionDelay = 10.0,
+                priorityLevels = 2,
+                highPriorityRatio = 1.0,
+                preemptionEnabled = true,
+                preemptionMinPriorityGap = 2,
+                retryLimit = 1
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(
+            listOf(
+                createCloudlet(0, length = 20_000, submissionDelay = 0.1),
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2)
+            )
+        )
+
+        simulation.start()
+
+        assertThat(broker.getPreemptedCount()).isEqualTo(0)
+        assertThat(broker.getCapacityRejectedCount()).isEqualTo(1)
+    }
+
+    @Test
+    fun `preemption max per task limits repeated displacement`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                vmQueueCapacity = 1,
+                decisionDelay = 10.0,
+                priorityLevels = 3,
+                highPriorityRatio = 1.0,
+                preemptionEnabled = true,
+                preemptionMinPriorityGap = 1,
+                preemptionMaxPerTask = 1,
+                retryLimit = 3
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(
+            listOf(
+                createCloudlet(5, length = 20_000, submissionDelay = 0.1),
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2),
+                createCloudlet(23, length = 20_000, submissionDelay = 0.3)
+            )
+        )
+
+        simulation.start()
+
+        assertThat(broker.getPreemptedCount()).isLessThanOrEqualTo(2)
+        assertThat(broker.getPreemptionFailedCount() + broker.getCapacityRejectedCount()).isGreaterThanOrEqualTo(1)
+    }
+
+    @Test
+    fun `deadline preemption policy favors earlier deadline`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                vmQueueCapacity = 1,
+                decisionDelay = 10.0,
+                deadlineFactor = 1.0,
+                preemptionEnabled = true,
+                preemptionPolicy = "deadline_then_priority",
+                preemptionMaxPerTask = 1,
+                retryLimit = 2
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(
+            listOf(
+                createCloudlet(20, length = 30_000, submissionDelay = 0.1),
+                createCloudlet(0, length = 1_000, submissionDelay = 0.2)
+            )
+        )
+
+        simulation.start()
+
+        assertThat(broker.getPreemptedCount()).isEqualTo(1)
+    }
+
     private fun createVm(): Vm =
         VmSimple(1000.0, 1)
             .setRam(1024)
             .setBw(1000)
             .setSize(10000)
 
-    private fun createCloudlet(id: Int = 0, length: Long = 1000): Cloudlet {
+    private fun createCloudlet(id: Int = 0, length: Long = 1000, submissionDelay: Double = 0.1): Cloudlet {
         val utilizationModel = UtilizationModelFull()
         val cloudlet = CloudletSimple(length, 1)
         cloudlet.setId(id.toLong())
         cloudlet.setFileSize(100)
         cloudlet.setOutputSize(100)
-        cloudlet.setSubmissionDelay(0.1)
+        cloudlet.setSubmissionDelay(submissionDelay)
         cloudlet.setUtilizationModelCpu(utilizationModel)
         cloudlet.setUtilizationModelRam(utilizationModel)
         cloudlet.setUtilizationModelBw(utilizationModel)

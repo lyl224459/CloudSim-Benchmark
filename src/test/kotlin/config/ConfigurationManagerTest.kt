@@ -120,6 +120,17 @@ class ConfigurationManagerTest {
             checkpointInterval = 5.0
             migrationDelay = 1.5
             timeoutAction = "retry"
+            preemptionEnabled = true
+            preemptionPolicy = "deadline_then_priority"
+            preemptionMinPriorityGap = 2
+            preemptionMaxPerTask = 3
+            preemptionDelay = 0.4
+            preemptionPenalty = 0.7
+            multiTenantEnabled = true
+            tenantCount = 3
+            tenantQuota = [2, 1, 1]
+            tenantWeights = [1.0, 2.0, 1.0]
+            tenantFairnessPolicy = "weighted_fair"
         """.trimIndent())
 
         try {
@@ -168,6 +179,17 @@ class ConfigurationManagerTest {
             assertEquals(5.0, realtime?.scheduling?.checkpointInterval)
             assertEquals(1.5, realtime?.scheduling?.migrationDelay)
             assertEquals("retry", realtime?.scheduling?.timeoutAction)
+            assertEquals(true, realtime?.scheduling?.preemptionEnabled)
+            assertEquals("deadline_then_priority", realtime?.scheduling?.preemptionPolicy)
+            assertEquals(2, realtime?.scheduling?.preemptionMinPriorityGap)
+            assertEquals(3, realtime?.scheduling?.preemptionMaxPerTask)
+            assertEquals(0.4, realtime?.scheduling?.preemptionDelay)
+            assertEquals(0.7, realtime?.scheduling?.preemptionPenalty)
+            assertEquals(true, realtime?.scheduling?.multiTenantEnabled)
+            assertEquals(3, realtime?.scheduling?.tenantCount)
+            assertEquals(listOf(2, 1, 1), realtime?.scheduling?.tenantQuota)
+            assertEquals(listOf(1.0, 2.0, 1.0), realtime?.scheduling?.tenantWeights)
+            assertEquals("weighted_fair", realtime?.scheduling?.tenantFairnessPolicy)
         } finally {
             configFile.delete()
         }
