@@ -27,6 +27,7 @@ typealias BatchSchedulerFactory = (
 
 typealias RealtimeSchedulerFactory = (
     vms: List<Vm>,
+    objectiveWeights: ObjectiveWeightsConfig,
     settings: ResolvedAlgorithmSettings,
     seed: Long
 ) -> RealtimeScheduler
@@ -149,7 +150,7 @@ object AlgorithmRegistry {
             displayName = "MinLoad",
             aliases = setOf("MINLOAD", "MinLoad", "MIN-LOAD"),
             legacyRealtimeType = RealtimeAlgorithmType.MIN_LOAD,
-            realtimeFactory = { vms, _, _ -> RealtimeMinLoadScheduler(vms) }
+            realtimeFactory = { vms, _, _, _ -> RealtimeMinLoadScheduler(vms) }
         ),
         AlgorithmDefinition(
             name = "RANDOM",
@@ -157,7 +158,7 @@ object AlgorithmRegistry {
             displayName = "Random",
             aliases = setOf("RAND"),
             legacyRealtimeType = RealtimeAlgorithmType.RANDOM,
-            realtimeFactory = { vms, _, seed -> RealtimeRandomScheduler(vms, Random(seed)) }
+            realtimeFactory = { vms, _, _, seed -> RealtimeRandomScheduler(vms, Random(seed)) }
         ),
         AlgorithmDefinition(
             name = "PSO_REALTIME",
@@ -167,8 +168,8 @@ object AlgorithmRegistry {
             supportsPopulation = true,
             supportsMaxIter = true,
             legacyRealtimeType = RealtimeAlgorithmType.PSO_REALTIME,
-            realtimeFactory = { vms, settings, seed ->
-                RealtimePSOScheduler(vms, settings.population, settings.maxIter, Random(seed))
+            realtimeFactory = { vms, objectiveWeights, settings, seed ->
+                RealtimePSOScheduler(vms, settings.population, settings.maxIter, objectiveWeights, Random(seed))
             }
         ),
         AlgorithmDefinition(
@@ -179,19 +180,34 @@ object AlgorithmRegistry {
             supportsPopulation = true,
             supportsMaxIter = true,
             legacyRealtimeType = RealtimeAlgorithmType.WOA_REALTIME,
-            realtimeFactory = { vms, settings, seed ->
-                RealtimeWOAScheduler(vms, settings.population, settings.maxIter, Random(seed))
+            realtimeFactory = { vms, objectiveWeights, settings, seed ->
+                RealtimeWOAScheduler(vms, settings.population, settings.maxIter, objectiveWeights, Random(seed))
             }
         )
     )
 
+    private val definitionsByMode: Map<AlgorithmMode, List<AlgorithmDefinition>> =
+        definitions.groupBy { it.mode }
+
+    private val lookupByMode: Map<AlgorithmMode, Map<String, AlgorithmDefinition>> =
+        definitionsByMode.mapValues { (mode, modeDefinitions) ->
+            val lookup = linkedMapOf<String, AlgorithmDefinition>()
+            for (definition in modeDefinitions) {
+                registerLookupName(lookup, mode, definition.name, definition)
+                for (alias in definition.aliases) {
+                    registerLookupName(lookup, mode, alias, definition)
+                }
+            }
+            lookup.toMap()
+        }
+
     fun all(): List<AlgorithmDefinition> = definitions.toList()
 
     fun forMode(mode: AlgorithmMode): List<AlgorithmDefinition> =
-        definitions.filter { it.mode == mode }
+        definitionsByMode[mode].orEmpty()
 
     fun resolve(mode: AlgorithmMode, name: String): AlgorithmDefinition {
-        val match = forMode(mode).firstOrNull { it.matches(name) }
+        val match = lookupByMode[mode].orEmpty()[normalizeName(name)]
         return match ?: throw IllegalArgumentException(
             "未知的${mode.displayLabel()}算法: $name。可用算法: ${forMode(mode).joinToString(", ") { it.name }}"
         )
@@ -212,6 +228,20 @@ object AlgorithmRegistry {
 
     fun isCompatible(mode: AlgorithmMode, name: String): Boolean =
         runCatching { resolve(mode, name) }.isSuccess
+
+    private fun registerLookupName(
+        lookup: MutableMap<String, AlgorithmDefinition>,
+        mode: AlgorithmMode,
+        candidate: String,
+        definition: AlgorithmDefinition
+    ) {
+        val normalized = normalizeName(candidate)
+        val existing = lookup[normalized]
+        require(existing == null || existing.name == definition.name) {
+            "算法名称或别名冲突: $normalized (${mode.displayLabel()}) 同时指向 ${existing?.name} 和 ${definition.name}"
+        }
+        lookup[normalized] = definition
+    }
 }
 
 fun normalizeName(name: String): String =

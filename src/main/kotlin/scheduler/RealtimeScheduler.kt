@@ -5,11 +5,15 @@ import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import java.util.*
 
+internal const val REALTIME_OPTIMIZATION_THRESHOLD = 3
+
 /**
  * 实时调度器接口
  * 处理动态到达的任务
  */
 interface RealtimeScheduler {
+    fun scheduleOnArrival(context: RealtimeSchedulingContext): Int
+
     /**
      * 当新任务到达时调用此方法进行调度
      * @param newCloudlet 新到达的任务
@@ -21,7 +25,18 @@ interface RealtimeScheduler {
         newCloudlet: Cloudlet,
         waitingCloudlets: List<Cloudlet>,
         vmList: List<Vm>
-    ): Int
+    ): Int {
+        val nodeStates = RealtimeNodeStateTracker(vmList).snapshot(waitingCloudlets, 0.0)
+        return scheduleOnArrival(
+            RealtimeSchedulingContext(
+                newCloudlet = newCloudlet,
+                activeCloudlets = waitingCloudlets,
+                vmList = vmList,
+                currentTime = 0.0,
+                nodeStates = nodeStates
+            )
+        )
+    }
 }
 
 /**
@@ -32,6 +47,13 @@ abstract class RealtimeSchedulerBase(
 ) : RealtimeScheduler {
     
     protected val vmNum = vmList.size
+
+    private val schedulerName: String
+        get() = javaClass.simpleName.ifBlank { "RealtimeScheduler" }
+
+    init {
+        SchedulerAllocationValidator.requireAvailableVms(vmNum, schedulerName)
+    }
     
     /**
      * 快速分配策略：将任务分配到当前负载最小的VM
@@ -51,6 +73,14 @@ abstract class RealtimeSchedulerBase(
         // 找到负载最小的VM
         return vmLoads.indices.minByOrNull { vmLoads[it] } ?: 0
     }
+
+    protected fun findLeastLoadedVm(context: RealtimeSchedulingContext): Int {
+        return context.nodeStates.minWithOrNull(
+            compareBy<RealtimeNodeState> { it.estimatedLoad }
+                .thenBy { it.queueDepth }
+                .thenBy { it.vmIndex }
+        )?.vmIndex ?: 0
+    }
 }
 
 /**
@@ -61,11 +91,7 @@ class RealtimeRandomScheduler(
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
 ) : RealtimeSchedulerBase(vmList) {
     
-    override fun scheduleOnArrival(
-        newCloudlet: Cloudlet,
-        waitingCloudlets: List<Cloudlet>,
-        vmList: List<Vm>
-    ): Int {
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
         return random.nextInt(vmNum)
     }
 }
@@ -76,12 +102,8 @@ class RealtimeRandomScheduler(
 class RealtimeMinLoadScheduler(vmList: List<Vm>) 
     : RealtimeSchedulerBase(vmList) {
     
-    override fun scheduleOnArrival(
-        newCloudlet: Cloudlet,
-        waitingCloudlets: List<Cloudlet>,
-        vmList: List<Vm>
-    ): Int {
-        return findLeastLoadedVm(waitingCloudlets)
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
+        return findLeastLoadedVm(context)
     }
 }
 
@@ -92,18 +114,14 @@ class RealtimePSOScheduler(
     vmList: List<Vm>,
     private val population: Int = 20,
     private val maxIter: Int = 20,
+    internal val objectiveWeights: config.ObjectiveWeightsConfig,
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
 ) : RealtimeSchedulerBase(vmList) {
-    
-    override fun scheduleOnArrival(
-        newCloudlet: Cloudlet,
-        waitingCloudlets: List<Cloudlet>,
-        vmList: List<Vm>
-    ): Int {
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
         // 如果有等待任务，使用PSO进行批量调度
-        if (waitingCloudlets.isNotEmpty()) {
-            val allCloudlets = waitingCloudlets + newCloudlet
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, vmList, config.ObjectiveWeightsConfig())
+        if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
+            val allCloudlets = context.activeCloudlets + context.newCloudlet
+            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, context.vmList, objectiveWeights)
             val pso = PSO(objFunc, population, 0.0, (vmNum - 1).toDouble(), 
                 allCloudlets.size, maxIter, random)
             val allocation = pso.execute()
@@ -111,7 +129,7 @@ class RealtimePSOScheduler(
         }
         
         // 如果没有等待任务，使用最小负载策略
-        return findLeastLoadedVm(listOf(newCloudlet))
+        return findLeastLoadedVm(context)
     }
 }
 
@@ -122,23 +140,19 @@ class RealtimeWOAScheduler(
     vmList: List<Vm>,
     private val population: Int = 20,
     private val maxIter: Int = 20,
+    internal val objectiveWeights: config.ObjectiveWeightsConfig,
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
 ) : RealtimeSchedulerBase(vmList) {
-    
-    override fun scheduleOnArrival(
-        newCloudlet: Cloudlet,
-        waitingCloudlets: List<Cloudlet>,
-        vmList: List<Vm>
-    ): Int {
-        if (waitingCloudlets.isNotEmpty()) {
-            val allCloudlets = waitingCloudlets + newCloudlet
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, vmList, config.ObjectiveWeightsConfig())
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
+        if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
+            val allCloudlets = context.activeCloudlets + context.newCloudlet
+            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, context.vmList, objectiveWeights)
             val woa = WOA(objFunc, population, 0.0, (vmNum - 1).toDouble(), 
                 allCloudlets.size, maxIter, random)
             val allocation = woa.execute()
             return allocation[allCloudlets.size - 1]
         }
-        return findLeastLoadedVm(listOf(newCloudlet))
+        return findLeastLoadedVm(context)
     }
 }
 

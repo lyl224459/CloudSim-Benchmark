@@ -73,12 +73,18 @@ object DryRunPrinter {
         }
         if (resolved.mode.startsWith("realtime")) {
             Logger.result(
-                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}",
+                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}",
                 resolved.realtime.arrival.distribution,
                 resolved.realtime.scheduling.strategy,
                 resolved.realtime.scheduling.maxQueueSize,
                 resolved.realtime.scheduling.taskTimeout,
-                resolved.realtime.scheduling.resourceReservation
+                resolved.realtime.scheduling.resourceReservation,
+                resolved.realtime.scheduling.decisionDelay,
+                resolved.realtime.scheduling.decisionJitter,
+                resolved.realtime.scheduling.failureRate,
+                resolved.realtime.scheduling.retryLimit,
+                resolved.realtime.scheduling.retryDelay,
+                resolved.realtime.scheduling.retryBackoffMultiplier
             )
         }
         Logger.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
@@ -139,6 +145,12 @@ object DryRunPrinter {
                     put("maxQueueSize", config.realtime.scheduling.maxQueueSize)
                     put("taskTimeout", config.realtime.scheduling.taskTimeout)
                     put("resourceReservation", config.realtime.scheduling.resourceReservation)
+                    put("decisionDelay", config.realtime.scheduling.decisionDelay)
+                    put("decisionJitter", config.realtime.scheduling.decisionJitter)
+                    put("failureRate", config.realtime.scheduling.failureRate)
+                    put("retryLimit", config.realtime.scheduling.retryLimit)
+                    put("retryDelay", config.realtime.scheduling.retryDelay)
+                    put("retryBackoffMultiplier", config.realtime.scheduling.retryBackoffMultiplier)
                 }
             }
             putJsonObject("csv") {

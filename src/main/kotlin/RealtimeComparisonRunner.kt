@@ -27,7 +27,12 @@ data class RealtimeAlgorithmResult(
     val averageResponseTime: Double,
     val rejectedCount: Int,
     val timeoutCount: Int,
-    val failedCount: Int
+    val failedCount: Int,
+    val retryCount: Int,
+    val permanentFailedCount: Int,
+    val averageDecisionDelay: Double,
+    val completedCount: Int,
+    val submittedCount: Int
 )
 
 data class RealtimeAlgorithmStatistics(
@@ -41,7 +46,12 @@ data class RealtimeAlgorithmStatistics(
     val averageResponseTime: StatisticalValue,
     val rejectedCount: StatisticalValue,
     val timeoutCount: StatisticalValue,
-    val failedCount: StatisticalValue
+    val failedCount: StatisticalValue,
+    val retryCount: StatisticalValue,
+    val permanentFailedCount: StatisticalValue,
+    val averageDecisionDelay: StatisticalValue,
+    val completedCount: StatisticalValue,
+    val submittedCount: StatisticalValue
 )
 
 private data class RealtimeRunSummary(
@@ -80,7 +90,12 @@ class RealtimeComparisonRunner(
         val averageResponseTime: Double,
         val rejectedCount: Int,
         val timeoutCount: Int,
-        val failedCount: Int
+        val failedCount: Int,
+        val retryCount: Int,
+        val permanentFailedCount: Int,
+        val averageDecisionDelay: Double,
+        val completedCount: Int,
+        val submittedCount: Int
     )
 
     private fun executionModeDescription(): String {
@@ -129,7 +144,15 @@ class RealtimeComparisonRunner(
         Logger.info("  总成本 (Cost): {}", dft.format(metrics.cost))
         Logger.info("  平均等待时间: {}", dft.format(metrics.averageWaitingTime))
         Logger.info("  平均响应时间: {}", dft.format(metrics.averageResponseTime))
-        Logger.info("  Reject/Timeout/Failed: {}/{}/{}", metrics.rejectedCount, metrics.timeoutCount, metrics.failedCount)
+        Logger.info(
+            "  Reject/Timeout/Failed/Retry/PermanentFailed: {}/{}/{}/{}/{}",
+            metrics.rejectedCount,
+            metrics.timeoutCount,
+            metrics.failedCount,
+            metrics.retryCount,
+            metrics.permanentFailedCount
+        )
+        Logger.info("  平均调度决策延迟: {}", dft.format(metrics.averageDecisionDelay))
         Logger.info("  适应度 (Fitness): {}", dft.format(fitness))
 
         return RealtimeAlgorithmResult(
@@ -143,7 +166,12 @@ class RealtimeComparisonRunner(
             averageResponseTime = metrics.averageResponseTime,
             rejectedCount = metrics.rejectedCount,
             timeoutCount = metrics.timeoutCount,
-            failedCount = metrics.failedCount
+            failedCount = metrics.failedCount,
+            retryCount = metrics.retryCount,
+            permanentFailedCount = metrics.permanentFailedCount,
+            averageDecisionDelay = metrics.averageDecisionDelay,
+            completedCount = metrics.completedCount,
+            submittedCount = metrics.submittedCount
         )
     }
 
@@ -213,7 +241,12 @@ class RealtimeComparisonRunner(
             averageResponseTime = avgResponseTime,
             rejectedCount = broker.getRejectedCount(),
             timeoutCount = timeoutCount,
-            failedCount = failedCount
+            failedCount = failedCount,
+            retryCount = broker.getRetryCount(),
+            permanentFailedCount = broker.getPermanentFailedCount(),
+            averageDecisionDelay = broker.getAverageDecisionDelay(),
+            completedCount = completedCount,
+            submittedCount = broker.getSubmittedCount()
         )
     }
 
@@ -240,6 +273,12 @@ class RealtimeComparisonRunner(
             "最大队列" to scheduling.maxQueueSize,
             "任务超时" to scheduling.taskTimeout,
             "资源预留" to scheduling.resourceReservation,
+            "调度决策延迟" to scheduling.decisionDelay,
+            "调度决策抖动" to scheduling.decisionJitter,
+            "任务失败率" to scheduling.failureRate,
+            "重试次数上限" to scheduling.retryLimit,
+            "重试延迟" to scheduling.retryDelay,
+            "重试退避倍数" to scheduling.retryBackoffMultiplier,
             "随机数种子" to randomSeed,
             "运行次数" to runs,
             "任务生成器" to generatorType.name
@@ -268,14 +307,20 @@ class RealtimeComparisonRunner(
                     "AvgResponseTime" to r.averageResponseTime,
                     "RejectedCount" to r.rejectedCount,
                     "TimeoutCount" to r.timeoutCount,
-                    "FailedCount" to r.failedCount
+                    "FailedCount" to r.failedCount,
+                    "RetryCount" to r.retryCount,
+                    "PermanentFailedCount" to r.permanentFailedCount,
+                    "AvgDecisionDelay" to r.averageDecisionDelay,
+                    "CompletedCount" to r.completedCount,
+                    "SubmittedCount" to r.submittedCount
                 )
             }
             outputContext.saveSummaryResults(
                 summaryData,
                 listOf(
                     "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness",
-                    "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount"
+                    "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount",
+                    "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount"
                 )
             )
         }
@@ -333,7 +378,12 @@ class RealtimeComparisonRunner(
             averageResponseTime = Double.NaN,
             rejectedCount = Int.MAX_VALUE,
             timeoutCount = Int.MAX_VALUE,
-            failedCount = Int.MAX_VALUE
+            failedCount = Int.MAX_VALUE,
+            retryCount = Int.MAX_VALUE,
+            permanentFailedCount = Int.MAX_VALUE,
+            averageDecisionDelay = Double.NaN,
+            completedCount = 0,
+            submittedCount = 0
         )
         return RealtimeRunSummary(
             average = failedResult,
@@ -360,7 +410,12 @@ class RealtimeComparisonRunner(
             averageResponseTime = runResults.map { it.averageResponseTime }.average(),
             rejectedCount = runResults.map { it.rejectedCount }.average().roundToInt(),
             timeoutCount = runResults.map { it.timeoutCount }.average().roundToInt(),
-            failedCount = runResults.map { it.failedCount }.average().roundToInt()
+            failedCount = runResults.map { it.failedCount }.average().roundToInt(),
+            retryCount = runResults.map { it.retryCount }.average().roundToInt(),
+            permanentFailedCount = runResults.map { it.permanentFailedCount }.average().roundToInt(),
+            averageDecisionDelay = runResults.map { it.averageDecisionDelay }.average(),
+            completedCount = runResults.map { it.completedCount }.average().roundToInt(),
+            submittedCount = runResults.map { it.submittedCount }.average().roundToInt()
         )
     }
 
@@ -370,7 +425,7 @@ class RealtimeComparisonRunner(
     ): RealtimeAlgorithmResult = concurrency.run {
         val runSeed = randomSeed + run
         val result = runRealtimeAlgorithm(algorithm.displayName, runSeed) { vms ->
-            algorithm.definition.realtimeFactory!!.invoke(vms, algorithm.settings, runSeed)
+            algorithm.definition.realtimeFactory!!.invoke(vms, objectiveWeights, algorithm.settings, runSeed)
         }
 
         outputContext.saveAlgorithmTrialResult(
@@ -386,7 +441,12 @@ class RealtimeComparisonRunner(
                 "ResponseTime" to result.averageResponseTime,
                 "RejectedCount" to result.rejectedCount.toDouble(),
                 "TimeoutCount" to result.timeoutCount.toDouble(),
-                "FailedCount" to result.failedCount.toDouble()
+                "FailedCount" to result.failedCount.toDouble(),
+                "RetryCount" to result.retryCount.toDouble(),
+                "PermanentFailedCount" to result.permanentFailedCount.toDouble(),
+                "AvgDecisionDelay" to result.averageDecisionDelay,
+                "CompletedCount" to result.completedCount.toDouble(),
+                "SubmittedCount" to result.submittedCount.toDouble()
             )
         )
         result
@@ -430,7 +490,12 @@ class RealtimeComparisonRunner(
             averageResponseTime = stats(results.map { it.averageResponseTime }),
             rejectedCount = stats(results.map { it.rejectedCount.toDouble() }),
             timeoutCount = stats(results.map { it.timeoutCount.toDouble() }),
-            failedCount = stats(results.map { it.failedCount.toDouble() })
+            failedCount = stats(results.map { it.failedCount.toDouble() }),
+            retryCount = stats(results.map { it.retryCount.toDouble() }),
+            permanentFailedCount = stats(results.map { it.permanentFailedCount.toDouble() }),
+            averageDecisionDelay = stats(results.map { it.averageDecisionDelay }),
+            completedCount = stats(results.map { it.completedCount.toDouble() }),
+            submittedCount = stats(results.map { it.submittedCount.toDouble() })
         )
     }
 
@@ -470,12 +535,17 @@ class RealtimeComparisonRunner(
                     "Cost_Mean", "Cost_StdDev", "TotalTime_Mean", "TotalTime_StdDev", "Fitness_Mean", "Fitness_StdDev",
                     "AvgWaitingTime_Mean", "AvgWaitingTime_StdDev", "AvgResponseTime_Mean", "AvgResponseTime_StdDev",
                     "RejectedCount_Mean", "RejectedCount_StdDev", "TimeoutCount_Mean", "TimeoutCount_StdDev",
-                    "FailedCount_Mean", "FailedCount_StdDev", "Runs"
+                    "FailedCount_Mean", "FailedCount_StdDev", "RetryCount_Mean", "RetryCount_StdDev",
+                    "PermanentFailedCount_Mean", "PermanentFailedCount_StdDev",
+                    "AvgDecisionDelay_Mean", "AvgDecisionDelay_StdDev",
+                    "CompletedCount_Mean", "CompletedCount_StdDev",
+                    "SubmittedCount_Mean", "SubmittedCount_StdDev", "Runs"
                 )
             } else {
                 listOf(
                     "Algorithm", "Makespan", "LoadBalance", "Cost", "TotalTime", "Fitness",
-                    "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount"
+                    "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount",
+                    "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount"
                 )
             }
             writer.write(outputContext.csvLine(headers) + "\n")
@@ -497,6 +567,11 @@ class RealtimeComparisonRunner(
                             stat.rejectedCount.mean, stat.rejectedCount.stdDev,
                             stat.timeoutCount.mean, stat.timeoutCount.stdDev,
                             stat.failedCount.mean, stat.failedCount.stdDev,
+                            stat.retryCount.mean, stat.retryCount.stdDev,
+                            stat.permanentFailedCount.mean, stat.permanentFailedCount.stdDev,
+                            stat.averageDecisionDelay.mean, stat.averageDecisionDelay.stdDev,
+                            stat.completedCount.mean, stat.completedCount.stdDev,
+                            stat.submittedCount.mean, stat.submittedCount.stdDev,
                             summary.runResults.size
                         )
                     } else {
@@ -512,6 +587,11 @@ class RealtimeComparisonRunner(
                             result.rejectedCount, Double.NaN,
                             result.timeoutCount, Double.NaN,
                             result.failedCount, Double.NaN,
+                            result.retryCount, Double.NaN,
+                            result.permanentFailedCount, Double.NaN,
+                            result.averageDecisionDelay, Double.NaN,
+                            result.completedCount, Double.NaN,
+                            result.submittedCount, Double.NaN,
                             0
                         )
                     }
@@ -527,7 +607,12 @@ class RealtimeComparisonRunner(
                         result.averageResponseTime,
                         result.rejectedCount,
                         result.timeoutCount,
-                        result.failedCount
+                        result.failedCount,
+                        result.retryCount,
+                        result.permanentFailedCount,
+                        result.averageDecisionDelay,
+                        result.completedCount,
+                        result.submittedCount
                     )
                 }
                 writer.write(outputContext.csvLine(row) + "\n")

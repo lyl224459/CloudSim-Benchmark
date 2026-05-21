@@ -27,6 +27,7 @@ internal class PSO(
     private val pBest = DoubleArray(population * dim)
     private val pBestScore = DoubleArray(population) { Double.POSITIVE_INFINITY }
     private val gBest = DoubleArray(dim)
+    private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     private var gBestScore = Double.POSITIVE_INFINITY
 
     companion object {
@@ -52,64 +53,12 @@ internal class PSO(
         }
     }
 
-    // 获取粒子i的第j维位置
-    private fun getPosition(particle: Int, dimension: Int): Double {
-        return positions[particle * dim + dimension]
-    }
-
-    // 设置粒子i的第j维位置
-    private fun setPosition(particle: Int, dimension: Int, value: Double) {
-        positions[particle * dim + dimension] = value
-    }
-
-    // 获取粒子i的第j维速度
-    private fun getVelocity(particle: Int, dimension: Int): Double {
-        return velocities[particle * dim + dimension]
-    }
-
-    // 设置粒子i的第j维速度
-    private fun setVelocity(particle: Int, dimension: Int, value: Double) {
-        velocities[particle * dim + dimension] = value
-    }
-
-    // 获取粒子i的第j维个体最优位置
-    private fun getPBest(particle: Int, dimension: Int): Double {
-        return pBest[particle * dim + dimension]
-    }
-
-    // 设置粒子i的第j维个体最优位置
-    private fun setPBest(particle: Int, dimension: Int, value: Double) {
-        pBest[particle * dim + dimension] = value
-    }
-    
     private fun adjustPositions(agentIndex: Int) {
-        for (j in 0 until dim) {
-            val index = agentIndex * dim + j
-            positions[index] = positions[index].round()
-            when {
-                positions[index] < lb -> positions[index] = lb
-                positions[index] > ub -> positions[index] = ub
-            }
-        }
+        codec.clampRoundInPlace(positions, agentIndex * dim)
     }
     
     private fun evaluate(particle: Int): Double {
-        // 直接使用一维数组，避免创建临时数组
-        val params = IntArray(dim)
-        val baseIndex = particle * dim
-        for (j in 0 until dim) {
-            params[j] = positions[baseIndex + j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
-
-    // 评估指定位置的适应度值
-    private fun evaluatePosition(position: DoubleArray): Double {
-        val params = IntArray(dim)
-        for (j in 0 until dim) {
-            params[j] = position[j].round().toInt()
-        }
-        return optFunction.calculate(params)
+        return codec.evaluate(positions, particle * dim, optFunction)
     }
     
     fun execute(): IntArray {
@@ -176,7 +125,7 @@ internal class PSO(
             }
         }
 
-        return gBest.map { it.round().toInt() }.toIntArray()
+        return codec.toAllocation(gBest)
     }
 }
 
@@ -212,5 +161,3 @@ class PSOScheduler(
         return pso.execute()
     }
 }
-
-private fun Double.round() = kotlin.math.round(this)

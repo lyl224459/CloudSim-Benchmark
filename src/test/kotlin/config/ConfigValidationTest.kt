@@ -74,6 +74,34 @@ class ConfigValidationTest {
     }
 
     @Test
+    fun `should validate realtime cloud semantics config parameters`() {
+        val invalidConfig = ExperimentConfig.createDefault().copy(
+            realtime = ExperimentConfig.createDefault().realtime.copy(
+                scheduling = RealtimeSchedulingConfig(
+                    decisionDelay = -1.0,
+                    decisionJitter = -0.1,
+                    failureRate = 1.2,
+                    retryLimit = -1,
+                    retryDelay = -2.0,
+                    retryBackoffMultiplier = 0.5
+                )
+            )
+        )
+
+        try {
+            ExperimentConfig.validate(invalidConfig)
+            fail("Expected ConfigValidationException")
+        } catch (e: ConfigValidationException) {
+            assertThat(e.errors.any { it.field == "realtime.scheduling.decisionDelay" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.decisionJitter" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.failureRate" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.retryLimit" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.retryDelay" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.retryBackoffMultiplier" }).isTrue()
+        }
+    }
+
+    @Test
     fun `should validate optimizer config parameters`() {
         // Given
         val invalidConfig = ExperimentConfig.createDefault().copy(

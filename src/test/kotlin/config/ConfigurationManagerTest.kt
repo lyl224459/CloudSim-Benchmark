@@ -90,6 +90,12 @@ class ConfigurationManagerTest {
             maxQueueSize = 10
             taskTimeout = 15.0
             resourceReservation = "partial"
+            decisionDelay = 0.5
+            decisionJitter = 0.2
+            failureRate = 0.1
+            retryLimit = 2
+            retryDelay = 1.5
+            retryBackoffMultiplier = 2.0
         """.trimIndent())
 
         try {
@@ -108,6 +114,12 @@ class ConfigurationManagerTest {
             assertEquals(10, realtime?.scheduling?.maxQueueSize)
             assertEquals(15.0, realtime?.scheduling?.taskTimeout)
             assertEquals("partial", realtime?.scheduling?.resourceReservation)
+            assertEquals(0.5, realtime?.scheduling?.decisionDelay)
+            assertEquals(0.2, realtime?.scheduling?.decisionJitter)
+            assertEquals(0.1, realtime?.scheduling?.failureRate)
+            assertEquals(2, realtime?.scheduling?.retryLimit)
+            assertEquals(1.5, realtime?.scheduling?.retryDelay)
+            assertEquals(2.0, realtime?.scheduling?.retryBackoffMultiplier)
         } finally {
             configFile.delete()
         }

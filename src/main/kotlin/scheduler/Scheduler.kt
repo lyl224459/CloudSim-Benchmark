@@ -16,6 +16,13 @@ abstract class Scheduler(
     protected val cloudletNum = cloudletList.size
     protected val vmNum = vmList.size
 
+    private val schedulerName: String
+        get() = javaClass.simpleName.ifBlank { "Scheduler" }
+
+    init {
+        SchedulerAllocationValidator.requireAvailableVms(vmNum, schedulerName)
+    }
+
     protected val objectiveFunction: ObjectiveFunction =
         datacenter.SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
     
@@ -30,6 +37,12 @@ abstract class Scheduler(
      */
     fun schedule() {
         val cloudletToVm = allocate()
+        SchedulerAllocationValidator.validateAllocation(
+            cloudletToVm,
+            cloudletNum,
+            vmNum,
+            schedulerName
+        )
         
         // 更新每个任务的虚拟机ID
         for (i in 0 until cloudletNum) {

@@ -187,6 +187,11 @@ class RealtimeCloudletCountRunner(
                         "RejectedCount_Mean", "RejectedCount_StdDev",
                         "TimeoutCount_Mean", "TimeoutCount_StdDev",
                         "FailedCount_Mean", "FailedCount_StdDev",
+                        "RetryCount_Mean", "RetryCount_StdDev",
+                        "PermanentFailedCount_Mean", "PermanentFailedCount_StdDev",
+                        "AvgDecisionDelay_Mean", "AvgDecisionDelay_StdDev",
+                        "CompletedCount_Mean", "CompletedCount_StdDev",
+                        "SubmittedCount_Mean", "SubmittedCount_StdDev",
                         "Runs"
                     )
                 ) + "\n"
@@ -212,6 +217,11 @@ class RealtimeCloudletCountRunner(
                                 stat.rejectedCount.mean, stat.rejectedCount.stdDev,
                                 stat.timeoutCount.mean, stat.timeoutCount.stdDev,
                                 stat.failedCount.mean, stat.failedCount.stdDev,
+                                stat.retryCount.mean, stat.retryCount.stdDev,
+                                stat.permanentFailedCount.mean, stat.permanentFailedCount.stdDev,
+                                stat.averageDecisionDelay.mean, stat.averageDecisionDelay.stdDev,
+                                stat.completedCount.mean, stat.completedCount.stdDev,
+                                stat.submittedCount.mean, stat.submittedCount.stdDev,
                                 runs
                             )
                         ) + "\n"
@@ -222,7 +232,22 @@ class RealtimeCloudletCountRunner(
         
         Logger.info("\n批量实验结果已导出到: {}", csvFile.absolutePath)
         
-        val summaryHeaders = listOf("CloudletCount", "Algorithm", "AvgMakespan", "AvgLoadBalance", "AvgCost", "AvgTotalTime", "AvgFitness", "AvgWaitingTime", "AvgResponseTime")
+        val summaryHeaders = listOf(
+            "CloudletCount",
+            "Algorithm",
+            "AvgMakespan",
+            "AvgLoadBalance",
+            "AvgCost",
+            "AvgTotalTime",
+            "AvgFitness",
+            "AvgWaitingTime",
+            "AvgResponseTime",
+            "RetryCount",
+            "PermanentFailedCount",
+            "AvgDecisionDelay",
+            "CompletedCount",
+            "SubmittedCount"
+        )
         val summaryData = results.flatMap { (count, stats) ->
             stats.map { stat ->
                 mapOf(
@@ -234,7 +259,12 @@ class RealtimeCloudletCountRunner(
                     "AvgTotalTime" to stat.totalTime.mean,
                     "AvgFitness" to stat.fitness.mean,
                     "AvgWaitingTime" to stat.averageWaitingTime.mean,
-                    "AvgResponseTime" to stat.averageResponseTime.mean
+                    "AvgResponseTime" to stat.averageResponseTime.mean,
+                    "RetryCount" to stat.retryCount.mean,
+                    "PermanentFailedCount" to stat.permanentFailedCount.mean,
+                    "AvgDecisionDelay" to stat.averageDecisionDelay.mean,
+                    "CompletedCount" to stat.completedCount.mean,
+                    "SubmittedCount" to stat.submittedCount.mean
                 )
             }
         }

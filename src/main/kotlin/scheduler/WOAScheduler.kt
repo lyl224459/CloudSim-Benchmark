@@ -23,6 +23,7 @@ internal class WOA(
     // 使用一维数组存储所有鲸鱼位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val optimalPos = DoubleArray(dim)
+    private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     private var optimalScore = Double.POSITIVE_INFINITY
     
     init {
@@ -47,45 +48,12 @@ internal class WOA(
         }
     }
 
-    // 获取鲸鱼i的第j维位置
-    private fun getPosition(whale: Int, dimension: Int): Double {
-        return positions[whale * dim + dimension]
-    }
-
-    // 设置鲸鱼i的第j维位置
-    private fun setPosition(whale: Int, dimension: Int, value: Double) {
-        positions[whale * dim + dimension] = value
-    }
-    
     private fun adjustPositions(agentIndex: Int) {
-        val baseIndex = agentIndex * dim
-        for (j in 0 until dim) {
-            val index = baseIndex + j
-            positions[index] = positions[index].round()
-            when {
-                positions[index] < lb -> positions[index] = lb
-                positions[index] > ub -> positions[index] = ub
-            }
-        }
+        codec.clampRoundInPlace(positions, agentIndex * dim)
     }
 
     private fun evaluate(whale: Int): Double {
-        // 直接使用一维数组，避免创建临时数组
-        val params = IntArray(dim)
-        val baseIndex = whale * dim
-        for (j in 0 until dim) {
-            params[j] = positions[baseIndex + j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
-
-    // 评估指定位置的适应度值
-    private fun evaluatePosition(position: DoubleArray): Double {
-        val params = IntArray(dim)
-        for (j in 0 until dim) {
-            params[j] = position[j].round().toInt()
-        }
-        return optFunction.calculate(params)
+        return codec.evaluate(positions, whale * dim, optFunction)
     }
     
     fun execute(): IntArray {
@@ -138,7 +106,7 @@ internal class WOA(
             }
         }
 
-        return optimalPos.map { it.round().toInt() }.toIntArray()
+        return codec.toAllocation(optimalPos)
     }
 }
 
@@ -174,5 +142,3 @@ class WOAScheduler(
         return woa.execute()
     }
 }
-
-private fun Double.round() = kotlin.math.round(this)

@@ -22,6 +22,7 @@ private class GWO(
 ) {
     // 使用一维数组存储所有狼的位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
+    private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     
     private val alphaPos = DoubleArray(dim)
     private var alphaScore = Double.POSITIVE_INFINITY
@@ -46,33 +47,10 @@ private class GWO(
         }
     }
 
-    // 获取狼i的第j维位置
-    private fun getPosition(wolf: Int, dimension: Int): Double {
-        return positions[wolf * dim + dimension]
-    }
-
-    // 设置狼i的第j维位置
-    private fun setPosition(wolf: Int, dimension: Int, value: Double) {
-        positions[wolf * dim + dimension] = value
-    }
-    
     private fun adjustAndEvaluate(agentIndex: Int) {
-        // 离散化为整数
         val baseIndex = agentIndex * dim
-        for (j in 0 until dim) {
-            val index = baseIndex + j
-            positions[index] = positions[index].round()
-            when {
-                positions[index] < lb -> positions[index] = lb
-                positions[index] > ub -> positions[index] = ub
-            }
-        }
-
-        val params = IntArray(dim)
-        for (j in 0 until dim) {
-            params[j] = positions[baseIndex + j].toInt()
-        }
-        val fitness = optFunction.calculate(params)
+        codec.clampRoundInPlace(positions, baseIndex)
+        val fitness = codec.evaluate(positions, baseIndex, optFunction)
 
         // 更新 Alpha, Beta, Delta
         when {
@@ -143,7 +121,7 @@ private class GWO(
             }
         }
 
-        return alphaPos.map { it.round().toInt() }.toIntArray()
+        return codec.toAllocation(alphaPos)
     }
 }
 
@@ -179,5 +157,3 @@ class GWOScheduler(
         return gwo.execute()
     }
 }
-
-private fun Double.round() = kotlin.math.round(this)

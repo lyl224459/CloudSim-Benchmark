@@ -144,7 +144,13 @@ data class RealtimeSchedulingConfig(
     val strategy: String = "dynamic",
     val maxQueueSize: Int = Int.MAX_VALUE,
     val taskTimeout: Double = 0.0,
-    val resourceReservation: String = "none"
+    val resourceReservation: String = "none",
+    val decisionDelay: Double = 0.0,
+    val decisionJitter: Double = 0.0,
+    val failureRate: Double = 0.0,
+    val retryLimit: Int = 0,
+    val retryDelay: Double = 0.0,
+    val retryBackoffMultiplier: Double = 1.0
 )
 
 @Serializable
@@ -462,13 +468,36 @@ data class ExperimentConfig(
         }
 
         private fun applyRealtimeScheduling(properties: Map<String, String>, base: TomlRealtimeConfig?): TomlRealtimeConfig {
-            validateKeys("profiles.*.realtime.scheduling", properties, setOf("strategy", "maxQueueSize", "taskTimeout", "resourceReservation"))
+            validateKeys(
+                "profiles.*.realtime.scheduling",
+                properties,
+                setOf(
+                    "strategy",
+                    "maxQueueSize",
+                    "taskTimeout",
+                    "resourceReservation",
+                    "decisionDelay",
+                    "decisionJitter",
+                    "failureRate",
+                    "retryLimit",
+                    "retryDelay",
+                    "retryBackoffMultiplier"
+                )
+            )
             val current = base ?: TomlRealtimeConfig()
             val scheduling = current.scheduling.copy(
                 strategy = properties["strategy"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.strategy,
                 maxQueueSize = properties["maxQueueSize"]?.let { parseRequiredInt("realtime.scheduling.maxQueueSize", it) } ?: current.scheduling.maxQueueSize,
                 taskTimeout = properties["taskTimeout"]?.let { parseRequiredDouble("realtime.scheduling.taskTimeout", it) } ?: current.scheduling.taskTimeout,
-                resourceReservation = properties["resourceReservation"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.resourceReservation
+                resourceReservation = properties["resourceReservation"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.resourceReservation,
+                decisionDelay = properties["decisionDelay"]?.let { parseRequiredDouble("realtime.scheduling.decisionDelay", it) } ?: current.scheduling.decisionDelay,
+                decisionJitter = properties["decisionJitter"]?.let { parseRequiredDouble("realtime.scheduling.decisionJitter", it) } ?: current.scheduling.decisionJitter,
+                failureRate = properties["failureRate"]?.let { parseRequiredDouble("realtime.scheduling.failureRate", it) } ?: current.scheduling.failureRate,
+                retryLimit = properties["retryLimit"]?.let { parseRequiredInt("realtime.scheduling.retryLimit", it) } ?: current.scheduling.retryLimit,
+                retryDelay = properties["retryDelay"]?.let { parseRequiredDouble("realtime.scheduling.retryDelay", it) } ?: current.scheduling.retryDelay,
+                retryBackoffMultiplier = properties["retryBackoffMultiplier"]?.let {
+                    parseRequiredDouble("realtime.scheduling.retryBackoffMultiplier", it)
+                } ?: current.scheduling.retryBackoffMultiplier
             )
             return current.copy(scheduling = scheduling)
         }
@@ -759,6 +788,30 @@ data class ExperimentConfig(
             if (realtime.scheduling.taskTimeout < 0.0) {
                 errors.add(ValidationError("realtime.scheduling.taskTimeout", realtime.scheduling.taskTimeout.toString(),
                     "任务超时时间不能为负数"))
+            }
+            if (realtime.scheduling.decisionDelay < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.decisionDelay", realtime.scheduling.decisionDelay.toString(),
+                    "调度决策延迟不能为负数"))
+            }
+            if (realtime.scheduling.decisionJitter < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.decisionJitter", realtime.scheduling.decisionJitter.toString(),
+                    "调度决策抖动不能为负数"))
+            }
+            if (realtime.scheduling.failureRate < 0.0 || realtime.scheduling.failureRate > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.failureRate", realtime.scheduling.failureRate.toString(),
+                    "任务失败率必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.retryLimit < 0) {
+                errors.add(ValidationError("realtime.scheduling.retryLimit", realtime.scheduling.retryLimit.toString(),
+                    "重试次数不能为负数"))
+            }
+            if (realtime.scheduling.retryDelay < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.retryDelay", realtime.scheduling.retryDelay.toString(),
+                    "重试延迟不能为负数"))
+            }
+            if (realtime.scheduling.retryBackoffMultiplier < 1.0) {
+                errors.add(ValidationError("realtime.scheduling.retryBackoffMultiplier", realtime.scheduling.retryBackoffMultiplier.toString(),
+                    "重试退避倍数必须大于等于 1"))
             }
             val reservations = setOf("none", "partial", "full")
             if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {

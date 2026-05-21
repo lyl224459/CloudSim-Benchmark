@@ -25,6 +25,7 @@ private class HHO(
     // 使用一维数组存储所有鹰的位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val rabbitLocation = DoubleArray(dim) { (lb + ub) / 2 } // 初始化为中间值
+    private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     private var rabbitEnergy = Double.POSITIVE_INFINITY
     
     init {
@@ -47,40 +48,12 @@ private class HHO(
         return positions[hawk * dim + dimension]
     }
 
-    // 设置鹰i的第j维位置
-    private fun setPosition(hawk: Int, dimension: Int, value: Double) {
-        positions[hawk * dim + dimension] = value
-    }
-    
     private fun adjustPositions(agentIndex: Int) {
-        val baseIndex = agentIndex * dim
-        for (j in 0 until dim) {
-            val index = baseIndex + j
-            positions[index] = positions[index].round()
-            when {
-                positions[index] < lb -> positions[index] = lb
-                positions[index] > ub -> positions[index] = ub
-            }
-        }
+        codec.clampRoundInPlace(positions, agentIndex * dim)
     }
 
     private fun evaluate(hawk: Int): Double {
-        // 直接使用一维数组，避免创建临时数组
-        val params = IntArray(dim)
-        val baseIndex = hawk * dim
-        for (j in 0 until dim) {
-            params[j] = positions[baseIndex + j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
-
-    // 评估指定位置的适应度值
-    private fun evaluatePosition(position: DoubleArray): Double {
-        val params = IntArray(dim)
-        for (j in 0 until dim) {
-            params[j] = position[j].round().toInt()
-        }
-        return optFunction.calculate(params)
+        return codec.evaluate(positions, hawk * dim, optFunction)
     }
     
     private fun updateRabbit() {
@@ -186,7 +159,7 @@ private class HHO(
         }
 
         // 确保返回的解在有效范围内
-        val result = rabbitLocation.map { it.round().toInt().coerceIn(lb.toInt(), ub.toInt()) }.toIntArray()
+        val result = codec.toAllocation(rabbitLocation)
         Logger.debug("HHO 最终解: {}", result.take(min(10, dim)))
         return result
     }
@@ -224,5 +197,3 @@ class HHOScheduler(
         return hho.execute()
     }
 }
-
-private fun Double.round() = kotlin.math.round(this)
