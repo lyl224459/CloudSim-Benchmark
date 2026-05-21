@@ -3,8 +3,6 @@ package datacenter
 import broker.RealtimeBroker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.cloudsimplus.core.CloudSimPlus
 import scheduler.RealtimeScheduler
 import scheduler.ResolvedAlgorithm
@@ -12,6 +10,7 @@ import util.ExperimentConcurrency
 import util.ExperimentOutputContext
 import util.Logger
 import util.StatisticalValue
+import util.mapCloudletsToVmIds
 import java.text.DecimalFormat
 import java.util.Random
 import kotlin.math.roundToInt
@@ -43,6 +42,12 @@ data class RealtimeAlgorithmStatistics(
     val rejectedCount: StatisticalValue,
     val timeoutCount: StatisticalValue,
     val failedCount: StatisticalValue
+)
+
+private data class RealtimeRunSummary(
+    val average: RealtimeAlgorithmResult,
+    val statistics: RealtimeAlgorithmStatistics?,
+    val runResults: List<RealtimeAlgorithmResult>
 )
 
 class RealtimeComparisonRunner(
@@ -113,9 +118,7 @@ class RealtimeComparisonRunner(
         val finishedCloudlets = broker.getCloudletFinishedList<org.cloudsimplus.cloudlets.Cloudlet>()
         val metrics = calculateRealtimeMetrics(finishedCloudlets, vmList.size, broker)
 
-        val cloudletToVm = IntArray(cloudletList.size) { i ->
-            finishedCloudlets.find { it.id == cloudletList[i].id }?.vm?.id?.toInt() ?: 0
-        }
+        val cloudletToVm = mapCloudletsToVmIds(cloudletList, finishedCloudlets)
         val objFunc = SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
         val totalTime = objFunc.estimateTotalTime(cloudletToVm)
         val fitness = objFunc.calculate(cloudletToVm)
@@ -247,10 +250,11 @@ class RealtimeComparisonRunner(
 
         val results = mutableListOf<RealtimeAlgorithmResult>()
         val executionTime = measureTimeMillis {
-            results.addAll(executeRealtimeAlgorithms(algorithmsToRun).sortedBy { it.algorithmName })
+            val summaries = executeRealtimeAlgorithmSummaries(algorithmsToRun).sortedBy { it.average.algorithmName }
+            results.addAll(summaries.map { it.average })
             Logger.info("所有实时算法执行完成")
             printRealtimeComparisonResults(results)
-            exportRealtimeToCSV(results)
+            exportRealtimeToCSV(summaries)
 
             val summaryData = results.map { r ->
                 mapOf(
@@ -287,44 +291,55 @@ class RealtimeComparisonRunner(
         return resolvedAlgorithms
     }
 
-    private suspend fun executeRealtimeAlgorithms(
+    private suspend fun executeRealtimeAlgorithmSummaries(
         algorithmsToRun: List<ResolvedAlgorithm>
-    ): List<RealtimeAlgorithmResult> {
-        return concurrency.map(algorithmsToRun) { executeRealtimeAlgorithmSafely(it) }
+    ): List<RealtimeRunSummary> {
+        return concurrency.map(algorithmsToRun) { executeRealtimeAlgorithmSummarySafely(it) }
     }
 
-    private suspend fun executeRealtimeAlgorithmSafely(
+    private suspend fun executeRealtimeAlgorithmSummarySafely(
         algorithm: ResolvedAlgorithm
-    ): RealtimeAlgorithmResult {
+    ): RealtimeRunSummary {
         return try {
             Logger.debug("开始执行实时算法: {}", algorithm.name)
-            val result = executeRealtimeAlgorithmAsync(algorithm)
+            val result = buildRealtimeSummary(executeRealtimeAlgorithmRuns(algorithm))
             Logger.debug("实时算法 {} 执行完成", algorithm.name)
             result
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Logger.error("实时算法 {} 执行失败: {}", e, algorithm.name, e.message)
-            RealtimeAlgorithmResult(
-                algorithmName = algorithm.name,
-                makespan = Double.NaN,
-                loadBalance = Double.NaN,
-                cost = Double.NaN,
-                totalTime = Double.NaN,
-                fitness = Double.NaN,
-                averageWaitingTime = Double.NaN,
-                averageResponseTime = Double.NaN,
-                rejectedCount = Int.MAX_VALUE,
-                timeoutCount = Int.MAX_VALUE,
-                failedCount = Int.MAX_VALUE
-            )
+            failedRealtimeSummary(algorithm.name)
         }
     }
 
-    private suspend fun executeRealtimeAlgorithmAsync(
-        algorithm: ResolvedAlgorithm
-    ): RealtimeAlgorithmResult = coroutineScope {
-        averageRealtimeResults(executeRealtimeAlgorithmRuns(algorithm))
+    private fun buildRealtimeSummary(runResults: List<RealtimeAlgorithmResult>): RealtimeRunSummary {
+        return RealtimeRunSummary(
+            average = averageRealtimeResults(runResults),
+            statistics = calculateRealtimeStatistics(runResults),
+            runResults = runResults
+        )
+    }
+
+    private fun failedRealtimeSummary(algorithmName: String): RealtimeRunSummary {
+        val failedResult = RealtimeAlgorithmResult(
+            algorithmName = algorithmName,
+            makespan = Double.NaN,
+            loadBalance = Double.NaN,
+            cost = Double.NaN,
+            totalTime = Double.NaN,
+            fitness = Double.NaN,
+            averageWaitingTime = Double.NaN,
+            averageResponseTime = Double.NaN,
+            rejectedCount = Int.MAX_VALUE,
+            timeoutCount = Int.MAX_VALUE,
+            failedCount = Int.MAX_VALUE
+        )
+        return RealtimeRunSummary(
+            average = failedResult,
+            statistics = null,
+            runResults = emptyList()
+        )
     }
 
     private suspend fun executeRealtimeAlgorithmRuns(algorithm: ResolvedAlgorithm): List<RealtimeAlgorithmResult> {
@@ -377,8 +392,6 @@ class RealtimeComparisonRunner(
         result
     }
 
-    fun runComparisonSync(): List<RealtimeAlgorithmResult> = runBlocking { runComparison() }
-
     suspend fun runComparisonWithStatistics(): List<RealtimeAlgorithmStatistics> {
         Logger.info("\n${"=".repeat(60)}")
         Logger.info("开始实时调度算法对比实验 ({} 次运行)", runs)
@@ -394,31 +407,20 @@ class RealtimeComparisonRunner(
         val algorithmsToRun = algorithmsToRun()
         Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
 
-        val statistics = concurrency.map(algorithmsToRun) { algorithm ->
-            calculateRealtimeStatistics(algorithm.displayName, executeRealtimeAlgorithmRuns(algorithm))
-        }.sortedBy { it.algorithmName }
-
-        printRealtimeStatisticsResults(statistics)
-        exportStatisticsToCSV(statistics)
-        return statistics
-    }
-
-    fun runComparisonWithStatisticsSync(): List<RealtimeAlgorithmStatistics> = runBlocking {
-        runComparisonWithStatistics()
+        return executeRealtimeAlgorithmSummaries(algorithmsToRun)
+            .sortedBy { it.average.algorithmName }
+            .mapNotNull { it.statistics }
     }
 
     private fun calculateRealtimeStatistics(
-        algorithmName: String,
         results: List<RealtimeAlgorithmResult>
     ): RealtimeAlgorithmStatistics {
         fun stats(values: List<Double>): StatisticalValue {
-            val ds = DescriptiveStatistics()
-            values.forEach(ds::addValue)
-            return StatisticalValue(ds.mean, ds.standardDeviation, ds.min, ds.max)
+            return StatisticalValue.fromArray(values.toDoubleArray())
         }
 
         return RealtimeAlgorithmStatistics(
-            algorithmName = algorithmName,
+            algorithmName = results[0].algorithmName,
             makespan = stats(results.map { it.makespan }),
             loadBalance = stats(results.map { it.loadBalance }),
             cost = stats(results.map { it.cost }),
@@ -430,65 +432,6 @@ class RealtimeComparisonRunner(
             timeoutCount = stats(results.map { it.timeoutCount.toDouble() }),
             failedCount = stats(results.map { it.failedCount.toDouble() })
         )
-    }
-
-    private fun exportStatisticsToCSV(statistics: List<RealtimeAlgorithmStatistics>) {
-        if (!outputContext.csvEnabled) {
-            Logger.info("CSV 输出已禁用，跳过实时统计结果导出")
-            return
-        }
-        val csvFile = outputContext.generateResultFileName("realtime_comparison")
-        csvFile.bufferedWriter().use { writer ->
-            writer.write(
-                outputContext.csvLine(
-                    listOf(
-                        "Algorithm", "Makespan_Mean", "Makespan_StdDev", "LoadBalance_Mean", "LoadBalance_StdDev",
-                        "Cost_Mean", "Cost_StdDev", "TotalTime_Mean", "TotalTime_StdDev", "Fitness_Mean", "Fitness_StdDev",
-                        "AvgWaitingTime_Mean", "AvgWaitingTime_StdDev", "AvgResponseTime_Mean", "AvgResponseTime_StdDev",
-                        "RejectedCount_Mean", "RejectedCount_StdDev", "TimeoutCount_Mean", "TimeoutCount_StdDev",
-                        "FailedCount_Mean", "FailedCount_StdDev", "Runs"
-                    )
-                ) + "\n"
-            )
-            for (stat in statistics) {
-                writer.write(
-                    outputContext.csvLine(
-                        listOf(
-                            stat.algorithmName,
-                            stat.makespan.mean, stat.makespan.stdDev,
-                            stat.loadBalance.mean, stat.loadBalance.stdDev,
-                            stat.cost.mean, stat.cost.stdDev,
-                            stat.totalTime.mean, stat.totalTime.stdDev,
-                            stat.fitness.mean, stat.fitness.stdDev,
-                            stat.averageWaitingTime.mean, stat.averageWaitingTime.stdDev,
-                            stat.averageResponseTime.mean, stat.averageResponseTime.stdDev,
-                            stat.rejectedCount.mean, stat.rejectedCount.stdDev,
-                            stat.timeoutCount.mean, stat.timeoutCount.stdDev,
-                            stat.failedCount.mean, stat.failedCount.stdDev,
-                            runs
-                        )
-                    ) + "\n"
-                )
-            }
-        }
-        Logger.info("结果已导出到: {}", csvFile.absolutePath)
-    }
-
-    private fun printRealtimeStatisticsResults(statistics: List<RealtimeAlgorithmStatistics>) {
-        Logger.result("\n${"=".repeat(120)}")
-        Logger.result("实时调度算法统计结果（{} 次运行）", runs)
-        Logger.result("${"=".repeat(120)}")
-        for (stat in statistics) {
-            Logger.result(
-                "{} -> makespan={}, fitness={}, wait={}, reject={}",
-                stat.algorithmName,
-                stat.makespan.toString(),
-                stat.fitness.toString(),
-                stat.averageWaitingTime.toString(),
-                stat.rejectedCount.toString()
-            )
-        }
-        Logger.result("${"=".repeat(120)}")
     }
 
     private fun printRealtimeComparisonResults(results: List<RealtimeAlgorithmResult>) {
@@ -514,7 +457,7 @@ class RealtimeComparisonRunner(
         Logger.result("${"=".repeat(100)}")
     }
 
-    private fun exportRealtimeToCSV(results: List<RealtimeAlgorithmResult>) {
+    private fun exportRealtimeToCSV(summaries: List<RealtimeRunSummary>) {
         if (!outputContext.csvEnabled) {
             Logger.info("CSV 输出已禁用，跳过实时结果导出")
             return
@@ -537,22 +480,41 @@ class RealtimeComparisonRunner(
             }
             writer.write(outputContext.csvLine(headers) + "\n")
 
-            for (result in results) {
+            for (summary in summaries) {
+                val result = summary.average
+                val stat = summary.statistics
                 val row = if (runs > 1) {
-                    listOf(
-                        result.algorithmName,
-                        result.makespan, 0.0,
-                        result.loadBalance, 0.0,
-                        result.cost, 0.0,
-                        result.totalTime, 0.0,
-                        result.fitness, 0.0,
-                        result.averageWaitingTime, 0.0,
-                        result.averageResponseTime, 0.0,
-                        result.rejectedCount, 0.0,
-                        result.timeoutCount, 0.0,
-                        result.failedCount, 0.0,
-                        runs
-                    )
+                    if (stat != null) {
+                        listOf(
+                            stat.algorithmName,
+                            stat.makespan.mean, stat.makespan.stdDev,
+                            stat.loadBalance.mean, stat.loadBalance.stdDev,
+                            stat.cost.mean, stat.cost.stdDev,
+                            stat.totalTime.mean, stat.totalTime.stdDev,
+                            stat.fitness.mean, stat.fitness.stdDev,
+                            stat.averageWaitingTime.mean, stat.averageWaitingTime.stdDev,
+                            stat.averageResponseTime.mean, stat.averageResponseTime.stdDev,
+                            stat.rejectedCount.mean, stat.rejectedCount.stdDev,
+                            stat.timeoutCount.mean, stat.timeoutCount.stdDev,
+                            stat.failedCount.mean, stat.failedCount.stdDev,
+                            summary.runResults.size
+                        )
+                    } else {
+                        listOf(
+                            result.algorithmName,
+                            result.makespan, Double.NaN,
+                            result.loadBalance, Double.NaN,
+                            result.cost, Double.NaN,
+                            result.totalTime, Double.NaN,
+                            result.fitness, Double.NaN,
+                            result.averageWaitingTime, Double.NaN,
+                            result.averageResponseTime, Double.NaN,
+                            result.rejectedCount, Double.NaN,
+                            result.timeoutCount, Double.NaN,
+                            result.failedCount, Double.NaN,
+                            0
+                        )
+                    }
                 } else {
                     listOf(
                         result.algorithmName,

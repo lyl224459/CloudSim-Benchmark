@@ -8,7 +8,6 @@ import util.Logger
 import util.StatisticalValue
 import java.text.DecimalFormat
 import scheduler.ResolvedAlgorithm
-import kotlinx.coroutines.runBlocking
 
 /**
  * 批量任务数实验运行器
@@ -95,10 +94,6 @@ class BatchCloudletCountRunner(
         Logger.info("\n${"=".repeat(80)}")
         Logger.info("批量任务数实验完成！")
         Logger.info("${"=".repeat(80)}")
-    }
-
-    fun runExperimentSync() = runBlocking {
-        runExperiment()
     }
 
     private suspend fun runCloudletCount(index: Int, cloudletCount: Int): Pair<Int, List<AlgorithmStatistics>> {

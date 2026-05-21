@@ -46,6 +46,11 @@ data class ExperimentOutputContext(
         }
     }
 
+    fun saveResolvedConfig(content: String) {
+        val dir = experimentDir ?: return
+        File(dir, "resolved_config.json").writeText(content)
+    }
+
     suspend fun saveAlgorithmTrialResult(
         algorithmName: String,
         trial: Int,
@@ -102,6 +107,8 @@ data class ExperimentOutputContext(
     }
 
     companion object {
+        private val experimentNameFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
+
         fun from(systemConfig: SystemConfig, experimentDir: File?): ExperimentOutputContext =
             ExperimentOutputContext(
                 experimentDir = experimentDir,
@@ -109,5 +116,38 @@ data class ExperimentOutputContext(
                 csvEnabled = systemConfig.output.csv.enabled,
                 csvDelimiter = systemConfig.output.csv.delimiter
             )
+
+        fun createExperiment(
+            systemConfig: SystemConfig,
+            mode: String,
+            experimentName: String? = null
+        ): ExperimentOutputContext {
+            val baseResultsDir = File(systemConfig.output.resultsDir)
+            val experimentDir = createExperimentDirectory(baseResultsDir, mode, experimentName)
+            return from(systemConfig, experimentDir)
+        }
+
+        fun createExperimentDirectory(
+            baseResultsDir: File,
+            mode: String,
+            experimentName: String? = null
+        ): File {
+            val modeDir = File(baseResultsDir, mode.lowercase()).also(File::mkdirs)
+            val resolvedName = experimentName
+                ?: "exp${findNextExperimentNumber(modeDir)}_${LocalDateTime.now().format(experimentNameFormatter)}"
+            return File(modeDir, resolvedName).also(File::mkdirs)
+        }
+
+        private fun findNextExperimentNumber(modeDir: File): Int {
+            val existingDirs = modeDir.listFiles { file ->
+                file.isDirectory && file.name.startsWith("exp")
+            } ?: emptyArray()
+
+            return existingDirs
+                .mapNotNull { it.name.substringAfter("exp").substringBefore("_").toIntOrNull() }
+                .maxOrNull()
+                ?.plus(1)
+                ?: 1
+        }
     }
 }

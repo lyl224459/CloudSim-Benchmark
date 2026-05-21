@@ -58,5 +58,5 @@ exit /b 0
 
 :build_project
 echo [Build] Running Gradle fatJar...
-call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon --no-configuration-cache
+call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon
 exit /b %errorlevel%

@@ -10,8 +10,6 @@ import org.slf4j.LoggerFactory
 import util.Logger
 import util.ExperimentConcurrency
 import util.ExperimentOutputContext
-import util.ResultsManager
-import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -48,7 +46,6 @@ object CommandExecutor {
         validateEnvironment()
         val resolved = RunResolver.resolve(command)
         configureLogging(resolved.systemConfig)
-        ResultsManager.configure(resolved.systemConfig)
 
         if (command.dryRun) {
             DryRunPrinter.printDryRun(resolved)
@@ -57,18 +54,21 @@ object CommandExecutor {
 
         val timestamp = LocalDateTime.now().format(timestampFormatter)
         val experimentName = RunResolver.renderExperimentName(resolved, timestamp)
-        val experimentDir = ResultsManager.createExperimentDirectory(resolved.mode, experimentName)
+        val outputContext = ExperimentOutputContext.createExperiment(resolved.systemConfig, resolved.mode, experimentName)
+        val experimentDir = outputContext.experimentDir
+            ?: throw IllegalStateException("无法创建实验输出目录")
 
         Logger.info("实验目录: {}", experimentDir.absolutePath)
-        ResultsManager.saveResolvedConfig(experimentDir, DryRunPrinter.resolvedJson(resolved, experimentDir, timestamp))
+        outputContext.saveResolvedConfig(DryRunPrinter.resolvedJson(resolved, experimentDir, timestamp))
 
-        runResolvedExperiment(resolved, experimentDir)
+        runResolvedExperiment(resolved, outputContext)
         Logger.info("CloudSim-Benchmark 执行完成")
     }
 
-    private suspend fun runResolvedExperiment(resolved: ResolvedExperimentConfig, experimentDir: File) {
+    private suspend fun runResolvedExperiment(resolved: ResolvedExperimentConfig, outputContext: ExperimentOutputContext) {
         val config = resolved.experimentConfig
-        val outputContext = ExperimentOutputContext.from(resolved.systemConfig, experimentDir)
+        val experimentDir = outputContext.experimentDir
+            ?: throw IllegalStateException("运行实验需要有效的输出目录")
         val concurrency = ExperimentConcurrency(
             resolved.execution.useCoroutines,
             resolved.execution.maxConcurrency

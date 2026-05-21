@@ -1,6 +1,5 @@
 package datacenter
 
-import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics
 import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.brokers.DatacenterBrokerSimple
 import scheduler.*
@@ -8,9 +7,9 @@ import util.ExperimentConcurrency
 import util.ExperimentOutputContext
 import util.Logger
 import util.StatisticalValue
+import util.mapCloudletsToVmIds
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
 import java.text.DecimalFormat
 import java.util.*
 import kotlin.system.measureTimeMillis
@@ -39,6 +38,11 @@ data class AlgorithmStatistics(
     val fitness: StatisticalValue
 )
 
+private data class AlgorithmRunSummary(
+    val average: AlgorithmResult,
+    val statistics: AlgorithmStatistics?,
+    val runResults: List<AlgorithmResult>
+)
 
 /**
  * 算法对比运行器
@@ -110,9 +114,7 @@ class ComparisonRunner(
         val (makespan, loadBalance, cost) = calculateMetrics(finishedCloudlets, vmList.size)
         
         // 计算总时间和适应度
-        val cloudletToVm = IntArray(cloudletList.size) { i ->
-            finishedCloudlets.find { it.id == cloudletList[i].id }?.vm?.id?.toInt() ?: 0
-        }
+        val cloudletToVm = mapCloudletsToVmIds(cloudletList, finishedCloudlets)
         val objFunc = SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
         val totalTime = objFunc.estimateTotalTime(cloudletToVm)
         val fitness = objFunc.calculate(cloudletToVm)
@@ -203,11 +205,12 @@ class ComparisonRunner(
 
         val results = mutableListOf<AlgorithmResult>()
         val executionTime = measureTimeMillis {
-            results.addAll(executeAlgorithms(algorithmsToRun).sortedBy { it.algorithmName })
+            val summaries = executeAlgorithmSummaries(algorithmsToRun).sortedBy { it.average.algorithmName }
+            results.addAll(summaries.map { it.average })
 
             Logger.info("所有算法执行完成")
             printComparisonResults(results)
-            exportToCSV(results)
+            exportToCSV(summaries)
 
             val summaryData = results.map { r ->
                 mapOf(
@@ -237,29 +240,46 @@ class ComparisonRunner(
         return resolvedAlgorithms
     }
 
-    private suspend fun executeAlgorithms(algorithmsToRun: List<ResolvedAlgorithm>): List<AlgorithmResult> {
-        return concurrency.map(algorithmsToRun) { executeAlgorithmSafely(it) }
+    private suspend fun executeAlgorithmSummaries(algorithmsToRun: List<ResolvedAlgorithm>): List<AlgorithmRunSummary> {
+        return concurrency.map(algorithmsToRun) { executeAlgorithmSummarySafely(it) }
     }
 
-    private suspend fun executeAlgorithmSafely(algorithm: ResolvedAlgorithm): AlgorithmResult {
+    private suspend fun executeAlgorithmSummarySafely(algorithm: ResolvedAlgorithm): AlgorithmRunSummary {
         return try {
             Logger.debug("开始执行算法: {}", algorithm.name)
-            val result = executeAlgorithmAsync(algorithm)
+            val result = buildAlgorithmSummary(executeAlgorithmRuns(algorithm))
             Logger.debug("算法 {} 执行完成", algorithm.name)
             result
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Logger.error("算法 {} 执行失败: {}", e, algorithm.name, e.message)
-            AlgorithmResult(
-                algorithmName = algorithm.name,
-                makespan = Double.NaN,
-                loadBalance = Double.NaN,
-                cost = Double.NaN,
-                totalTime = Double.NaN,
-                fitness = Double.NaN
-            )
+            failedAlgorithmSummary(algorithm.name)
         }
+    }
+
+    private fun failedAlgorithmSummary(algorithmName: String): AlgorithmRunSummary {
+        val failedResult = AlgorithmResult(
+            algorithmName = algorithmName,
+            makespan = Double.NaN,
+            loadBalance = Double.NaN,
+            cost = Double.NaN,
+            totalTime = Double.NaN,
+            fitness = Double.NaN
+        )
+        return AlgorithmRunSummary(
+            average = failedResult,
+            statistics = null,
+            runResults = emptyList()
+        )
+    }
+
+    private fun buildAlgorithmSummary(runResults: List<AlgorithmResult>): AlgorithmRunSummary {
+        return AlgorithmRunSummary(
+            average = averageResults(runResults),
+            statistics = calculateStatistics(runResults),
+            runResults = runResults
+        )
     }
 
     private fun executionModeDescription(): String {
@@ -283,11 +303,11 @@ class ComparisonRunner(
         val algorithmsToRun = algorithmsToRun()
         Logger.info("将运行 {} 个算法: {}", algorithmsToRun.size, algorithmsToRun.joinToString(", ") { it.name })
 
-        return concurrency.map(algorithmsToRun) { algorithm ->
-            calculateStatistics(executeAlgorithmRuns(algorithm))
-        }.sortedBy { it.algorithmName }
+        return executeAlgorithmSummaries(algorithmsToRun)
+            .sortedBy { it.average.algorithmName }
+            .mapNotNull { it.statistics }
     }
-    
+
     /**
      * 打印对比结果表格
      */
@@ -329,7 +349,7 @@ class ComparisonRunner(
     /**
      * 导出结果到 CSV 文件
      */
-    private fun exportToCSV(results: List<AlgorithmResult>) {
+    private fun exportToCSV(summaries: List<AlgorithmRunSummary>) {
         if (!outputContext.csvEnabled) {
             Logger.info("CSV 输出已禁用，跳过批处理结果导出")
             return
@@ -351,20 +371,33 @@ class ComparisonRunner(
             }
             
             // 写入数据
-            for (result in results) {
+            for (summary in summaries) {
+                val result = summary.average
+                val stat = summary.statistics
                 if (runs > 1) {
-                    // 多次运行：导出平均值和标准差（需要从统计结果中获取）
                     writer.write(
                         outputContext.csvLine(
-                            listOf(
-                                result.algorithmName,
-                                result.makespan, 0.0,
-                                result.loadBalance, 0.0,
-                                result.cost, 0.0,
-                                result.totalTime, 0.0,
-                                result.fitness, 0.0,
-                                runs
-                            )
+                            if (stat != null) {
+                                listOf(
+                                    stat.algorithmName,
+                                    stat.makespan.mean, stat.makespan.stdDev,
+                                    stat.loadBalance.mean, stat.loadBalance.stdDev,
+                                    stat.cost.mean, stat.cost.stdDev,
+                                    stat.totalTime.mean, stat.totalTime.stdDev,
+                                    stat.fitness.mean, stat.fitness.stdDev,
+                                    summary.runResults.size
+                                )
+                            } else {
+                                listOf(
+                                    result.algorithmName,
+                                    result.makespan, Double.NaN,
+                                    result.loadBalance, Double.NaN,
+                                    result.cost, Double.NaN,
+                                    result.totalTime, Double.NaN,
+                                    result.fitness, Double.NaN,
+                                    0
+                                )
+                            }
                         ) + "\n"
                     )
                 } else {
@@ -386,29 +419,8 @@ class ComparisonRunner(
         }
         Logger.info("结果已导出到: {}", csvFile.absolutePath)
         if (runs > 1) {
-            Logger.info("注: 导出值为 {} 次运行的平均值", runs)
+            Logger.info("注: 导出值为 {} 次运行的平均值与标准差", runs)
         }
-    }
-
-    /**
-     * 运行所有算法并对比（同步版本 - 兼容性方法）
-     * @deprecated 使用协程版本 runComparison() 获得更好的性能
-     */
-    fun runComparisonSync(): List<AlgorithmResult> {
-        return runBlocking {
-            runComparison()
-        }
-    }
-
-    fun runComparisonWithStatisticsSync(): List<AlgorithmStatistics> = runBlocking {
-        runComparisonWithStatistics()
-    }
-
-    /**
-     * 异步执行单个算法
-     */
-    private suspend fun executeAlgorithmAsync(algorithm: ResolvedAlgorithm): AlgorithmResult = coroutineScope {
-        averageResults(executeAlgorithmRuns(algorithm))
     }
 
     private suspend fun executeAlgorithmRuns(algorithm: ResolvedAlgorithm): List<AlgorithmResult> {
@@ -433,9 +445,7 @@ class ComparisonRunner(
 
     private fun calculateStatistics(runResults: List<AlgorithmResult>): AlgorithmStatistics {
         fun stats(values: List<Double>): StatisticalValue {
-            val ds = DescriptiveStatistics()
-            values.forEach(ds::addValue)
-            return StatisticalValue(ds.mean, ds.standardDeviation, ds.min, ds.max)
+            return StatisticalValue.fromArray(values.toDoubleArray())
         }
 
         return AlgorithmStatistics(

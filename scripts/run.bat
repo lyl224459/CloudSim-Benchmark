@@ -38,7 +38,7 @@ goto :end
 
 :run_gradle_build
 echo [Build] Running Gradle fatJar...
-call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon --no-configuration-cache
+call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon
 if errorlevel 1 exit /b 1
 echo [Build] Done.
 exit /b 0

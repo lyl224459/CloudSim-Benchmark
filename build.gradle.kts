@@ -29,6 +29,18 @@ java {
     targetCompatibility = JavaVersion.VERSION_23
 }
 
+val cloudSimJvmArgs = listOf(
+    "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+    "--add-opens", "java.base/java.util=ALL-UNNAMED",
+    "--add-opens", "java.base/java.nio=ALL-UNNAMED",
+    "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
+    "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
+    "--enable-native-access=ALL-UNNAMED",
+    "-Dfile.encoding=UTF-8",
+    "-Dconsole.encoding=UTF-8",
+    "-XX:+UseZGC"
+)
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_23)
@@ -84,27 +96,15 @@ dependencies {
 }
 
 tasks.test {
+    val runTestsRequested = providers.systemProperty("runTests").isPresent ||
+        providers.gradleProperty("runTests").isPresent
     useJUnitPlatform()
 
     // 测试优化：仅在需要时运行
-    // 注意：配置缓存不支持 project.hasProperty，使用系统属性代替
-    onlyIf {
-        System.getProperty("runTests") != null ||
-        project.hasProperty("runTests")
-    }
+    onlyIf { runTestsRequested }
 
     // 测试JVM参数优化
-    jvmArgs(
-        "-Xmx2g",
-        "-XX:+UseZGC",
-        "-XX:MaxGCPauseMillis=50",
-        "--enable-native-access=ALL-UNNAMED",
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED"
-    )
+    jvmArgs(listOf("-Xmx2g", "-XX:MaxGCPauseMillis=50") + cloudSimJvmArgs)
 
     // 测试报告配置
     reports {
@@ -145,26 +145,24 @@ tasks.processResources {
 tasks.named<JavaExec>("run") {
     classpath = sourceSets["main"].runtimeClasspath
     // 添加模块系统相关参数、编码设置和 ZGC 优化
-    jvmArgs = listOf(
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
-        "--enable-native-access=ALL-UNNAMED",
-        "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC"
-    )
+    jvmArgs = cloudSimJvmArgs
     // 设置标准输出编码
     systemProperty("file.encoding", "UTF-8")
 }
 
+val isCiBuildProvider = providers.environmentVariable("CI").map { it == "true" || it == "1" }.orElse(false)
+val forceJarCompressionProvider = providers.gradleProperty("compress").map { it == "true" }.orElse(false)
+val skipJarCompressionProvider = providers.gradleProperty("skipCompress").map { true }.orElse(false)
+val fastBuildProvider = providers.gradleProperty("fast").map { true }.orElse(false)
+
 // 创建 fat jar 任务
 tasks.register<Jar>("fatJar") {
+    val compressedEntries = (isCiBuildProvider.get() || forceJarCompressionProvider.get()) &&
+        !(skipJarCompressionProvider.get() || fastBuildProvider.get())
     archiveBaseName.set("cloudsim-benchmark")
     archiveClassifier.set("all")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    entryCompression = if (compressedEntries) ZipEntryCompression.DEFLATED else ZipEntryCompression.STORED
 
     // 优化：只包含必要的类文件
     from(sourceSets.main.get().output)
@@ -198,16 +196,9 @@ tasks.register<Jar>("fatJar") {
     
     // 确保在 CI/发布环境中使用压缩（继承自 tasks.withType<Zip> 的配置）
     doFirst {
-        val ciEnv = System.getenv("CI")
-        val isCI = ciEnv != null && (ciEnv == "true" || ciEnv == "1")
-        val forceCompress = project.hasProperty("compress") && project.property("compress") == "true"
-        val skipCompress = project.hasProperty("skipCompress") || project.hasProperty("fast")
-        
-        if ((isCI || forceCompress) && !skipCompress) {
-            entryCompression = ZipEntryCompression.DEFLATED
+        if (compressedEntries) {
             logger.lifecycle("📦 发布模式：fatJar 启用压缩（减小体积）")
         } else {
-            entryCompression = ZipEntryCompression.STORED
             logger.lifecycle("⚡ 开发模式：fatJar 禁用压缩（提升构建速度）")
         }
     }
@@ -215,23 +206,13 @@ tasks.register<Jar>("fatJar") {
 
 // 优化 Zip 任务性能 - 根据环境自动选择压缩策略
 tasks.withType<Zip> {
+    val compressedEntries = (isCiBuildProvider.get() || forceJarCompressionProvider.get()) &&
+        !(skipJarCompressionProvider.get() || fastBuildProvider.get())
     isZip64 = true
-    
-    // CI 环境（GitHub Actions/GitLab CI）使用压缩，本地开发不压缩以提升速度
-    val ciEnv = System.getenv("CI")
-    val isCI = ciEnv != null && (ciEnv == "true" || ciEnv == "1")
-    val forceCompress = project.hasProperty("compress") && project.property("compress") == "true"
-    val skipCompress = project.hasProperty("skipCompress") || project.hasProperty("fast")
-    
-    entryCompression = if ((isCI || forceCompress) && !skipCompress) {
-        logger.lifecycle("📦 发布模式：启用 JAR 压缩（减小体积）")
-        ZipEntryCompression.DEFLATED
-    } else {
-        logger.lifecycle("⚡ 开发模式：禁用 JAR 压缩（提升构建速度）")
-        ZipEntryCompression.STORED
-    }
-    
+
+    entryCompression = if (compressedEntries) ZipEntryCompression.DEFLATED else ZipEntryCompression.STORED
     isPreserveFileTimestamps = false // 移除时间戳以提升构建缓存命中率
+    isReproducibleFileOrder = true
 }
 
 // 优化复制任务
@@ -324,6 +305,46 @@ tasks.register<CreateStartScripts>("createRunScript") {
 
 // ========== Gradle 运行任务 ==========
 
+fun Provider<String>.orBlank(): String = orElse("").get()
+
+fun registerCloudSimRunTask(
+    taskName: String,
+    runMode: String,
+    taskDescription: String,
+    defaultTasks: String? = null
+) {
+    tasks.register<JavaExec>(taskName) {
+        group = "application"
+        description = taskDescription
+        mainClass.set("MainKt")
+        classpath = sourceSets["main"].runtimeClasspath
+        dependsOn("classes", "processResources")
+
+        val algorithms = providers.gradleProperty("algorithms").orBlank()
+        val seed = providers.gradleProperty("seed").orBlank()
+        val taskCounts = providers.gradleProperty("cloudletCounts").orElse(defaultTasks ?: "").get()
+        val dryRun = providers.gradleProperty("dryRun").map(String::toBoolean).orElse(false).get()
+
+        val argsList = mutableListOf("run", "--mode", runMode)
+        if (taskCounts.isNotBlank()) {
+            argsList.addAll(listOf("--tasks", taskCounts))
+        }
+        if (algorithms.isNotBlank()) {
+            argsList.addAll(listOf("--algorithms", algorithms))
+        }
+        if (seed.isNotBlank()) {
+            argsList.addAll(listOf("--seed", seed))
+        }
+        if (dryRun) {
+            argsList.add("--dry-run")
+        }
+
+        args = argsList
+        jvmArgs = cloudSimJvmArgs
+        systemProperty("file.encoding", "UTF-8")
+    }
+}
+
 /**
  * 批处理模式运行任务
  * 用法: 
@@ -331,41 +352,7 @@ tasks.register<CreateStartScripts>("createRunScript") {
  *   gradle runBatch -Palgorithms=PSO,WOA              # 覆盖算法列表
  *   gradle runBatch -Palgorithms=PSO,WOA -Pseed=42     # 指定算法和随机种子
  */
-tasks.register<JavaExec>("runBatch") {
-    group = "application"
-    description = "运行批处理调度模式实验"
-    mainClass.set("MainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    dependsOn("classes")
-    
-    // 获取参数（通过 -P 传递）
-    val algorithms = project.findProperty("algorithms") as String?
-    val seed = project.findProperty("seed") as String?
-    
-    // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>("run", "--mode", "batch")
-    if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.addAll(listOf("--algorithms", algorithms))
-    }
-    if (seed != null && seed.isNotEmpty()) {
-        argsList.addAll(listOf("--seed", seed))
-    }
-    
-    args = argsList
-    
-    jvmArgs = listOf(
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
-        "--enable-native-access=ALL-UNNAMED",
-        "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC"
-    )
-    systemProperty("file.encoding", "UTF-8")
-}
+registerCloudSimRunTask("runBatch", "batch", "运行批处理调度模式实验")
 
 /**
  * 实时调度模式运行任务
@@ -374,41 +361,7 @@ tasks.register<JavaExec>("runBatch") {
  *   gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME  # 覆盖算法列表
  *   gradle runRealtime -Palgorithms=PSO_REALTIME,WOA_REALTIME -Pseed=123  # 指定算法和随机种子
  */
-tasks.register<JavaExec>("runRealtime") {
-    group = "application"
-    description = "运行实时调度模式实验"
-    mainClass.set("MainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    dependsOn("classes", "processResources")
-    
-    // 获取参数（通过 -P 传递）
-    val algorithms = project.findProperty("algorithms") as String?
-    val seed = project.findProperty("seed") as String?
-    
-    // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>("run", "--mode", "realtime")
-    if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.addAll(listOf("--algorithms", algorithms))
-    }
-    if (seed != null && seed.isNotEmpty()) {
-        argsList.addAll(listOf("--seed", seed))
-    }
-    
-    args = argsList
-    
-    jvmArgs = listOf(
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
-        "--enable-native-access=ALL-UNNAMED",
-        "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC"
-    )
-    systemProperty("file.encoding", "UTF-8")
-}
+registerCloudSimRunTask("runRealtime", "realtime", "运行实时调度模式实验")
 
 /**
  * 批量任务数实验任务
@@ -418,83 +371,20 @@ tasks.register<JavaExec>("runRealtime") {
  *   gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA  # 指定任务数和算法
  *   gradle runBatchMulti -PcloudletCounts=50,100,200 -Palgorithms=PSO,WOA -Pseed=42  # 完整参数
  */
-tasks.register<JavaExec>("runBatchMulti") {
-    group = "application"
-    description = "运行批量任务数实验"
-    mainClass.set("MainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    dependsOn("classes", "processResources")
-    
-    // 获取参数（通过 -P 传递）
-    val cloudletCounts = project.findProperty("cloudletCounts") as String? ?: "50,100,200,500"
-    val algorithms = project.findProperty("algorithms") as String?
-    val seed = project.findProperty("seed") as String?
-    
-    // 构建参数列表（与命令行格式一致）
-    val argsList = mutableListOf<String>("run", "--mode", "batch-multi", "--tasks", cloudletCounts)
-    if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.addAll(listOf("--algorithms", algorithms))
-    }
-    if (seed != null && seed.isNotEmpty()) {
-        argsList.addAll(listOf("--seed", seed))
-    }
-    
-    args = argsList
-    
-    jvmArgs = listOf(
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
-        "--enable-native-access=ALL-UNNAMED",
-        "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC"
-    )
-    systemProperty("file.encoding", "UTF-8")
-}
+registerCloudSimRunTask(
+    "runBatchMulti",
+    "batch-multi",
+    "运行批量任务数实验",
+    defaultTasks = "50,100,200,500"
+)
 
 // 实时调度模式批量任务数实验任务
-tasks.register<JavaExec>("runRealtimeMulti") {
-    group = "application"
-    description = "运行实时调度模式批量任务数实验"
-    mainClass.set("MainKt")
-    classpath = sourceSets["main"].runtimeClasspath
-    dependsOn("classes", "processResources")
-
-    val cloudletCounts = project.findProperty("cloudletCounts") as String?
-    val algorithms = project.findProperty("algorithms") as String?
-    val seed = project.findProperty("seed") as String?
-
-    val argsList = mutableListOf<String>("run", "--mode", "realtime-multi")
-    if (cloudletCounts != null && cloudletCounts.isNotEmpty()) {
-        argsList.addAll(listOf("--tasks", cloudletCounts))
-    } else {
-        argsList.addAll(listOf("--tasks", "50,100,200,500"))
-    }
-    if (algorithms != null && algorithms.isNotEmpty()) {
-        argsList.addAll(listOf("--algorithms", algorithms))
-    }
-    if (seed != null && seed.isNotEmpty()) {
-        argsList.addAll(listOf("--seed", seed))
-    }
-
-    args = argsList
-
-    jvmArgs = listOf(
-        "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-        "--add-opens", "java.base/java.util=ALL-UNNAMED",
-        "--add-opens", "java.base/java.nio=ALL-UNNAMED",
-        "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED",
-        "--add-opens", "java.base/sun.nio.ch=ALL-UNNAMED",
-        "--enable-native-access=ALL-UNNAMED",
-        "-Dfile.encoding=UTF-8",
-        "-Dconsole.encoding=UTF-8",
-        "-XX:+UseZGC"
-    )
-    systemProperty("file.encoding", "UTF-8")
-}
+registerCloudSimRunTask(
+    "runRealtimeMulti",
+    "realtime-multi",
+    "运行实时调度模式批量任务数实验",
+    defaultTasks = "50,100,200,500"
+)
 
 // 内存监控任务
 tasks.register("memoryInfo") {

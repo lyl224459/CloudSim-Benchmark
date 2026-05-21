@@ -19,10 +19,34 @@ jobs:
       with:
         java-version: '23'
         distribution: 'temurin'
-        cache: 'gradle'
-          
+
+    - name: Restore Gradle cache
+      id: gradle-cache-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          .gradle/configuration-cache
+          .gradle/build-cache
+        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle.properties') }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: |
+          gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle.properties') }}-
+          gradle-${{ runner.os }}-
+
     - name: Build and Test
       run: .\gradlew.bat clean build --no-daemon --stacktrace
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
+
+    - name: Save Gradle cache
+      if: always()
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          .gradle/configuration-cache
+          .gradle/build-cache
+        key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle.properties') }}-${{ github.run_id }}-${{ github.run_attempt }}

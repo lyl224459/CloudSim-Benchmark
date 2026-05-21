@@ -187,8 +187,8 @@ Windows 脚本会自动读取系统代理（Internet Settings 中的 `ProxyEnabl
 
 项目现在支持系统配置和实验配置的分离：
 
-- **系统配置 ([SystemConfig](file:///src/main/kotlin/config/SystemConfig.kt#L77-L88))**: 管理基础设施配置，如输出目录、日志级别、JVM参数等
-- **实验配置 ([ExperimentConfig](file:///src/main/kotlin/config/ExperimentConfig.kt#L155-L167))**: 管理实验参数，如任务数、算法参数、目标函数权重等
+- **系统配置**: 见 `src/main/kotlin/config/SystemConfig.kt`，管理输出目录、日志级别、JVM 参数等
+- **实验配置**: 见 `src/main/kotlin/config/ExperimentConfig.kt`，管理 profile、任务数、算法参数、目标函数权重等
 
 ### 实验模式配置
 
@@ -214,36 +214,44 @@ maxIter = 50
 
 项目提供了四种模式的测试配置文件示例，位于 `configs/examples/` 目录下：
 
-1. **批处理模式测试配置** ([batch_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/batch_test.toml)):
+1. **批处理模式测试配置** (`configs/examples/batch_test.toml`):
 
 ```toml
-# 实验模式
+defaultProfile = "batch_test"
+
+[profiles.batch_test]
 mode = "batch"
-# 其他批处理相关配置...
+runs = 3
 ```
 
-2. **实时调度模式测试配置** ([realtime_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/realtime_test.toml)):
+2. **实时调度模式测试配置** (`configs/examples/realtime_test.toml`):
 
 ```toml
-# 实验模式
+defaultProfile = "realtime_test"
+
+[profiles.realtime_test]
 mode = "realtime"
-# 其他实时调度相关配置...
+runs = 3
 ```
 
-3. **批处理多任务数模式测试配置** ([batch_multi_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/batch_multi_test.toml)):
+3. **批处理多任务数模式测试配置** (`configs/examples/batch_multi_test.toml`):
 
 ```toml
-# 实验模式
-mode = "batch_multi"
-# 其他多任务数批处理相关配置...
+defaultProfile = "batch_multi_test"
+
+[profiles.batch_multi_test]
+mode = "batch-multi"
+tasks = [50, 100, 200]
 ```
 
-4. **实时多任务数模式测试配置** ([realtime_multi_test.toml](file:///D:/BaiduNetdiskDownload/code_obj/kotlin/cloudsim-b/configs/examples/realtime_multi_test.toml)):
+4. **实时多任务数模式测试配置** (`configs/examples/realtime_multi_test.toml`):
 
 ```toml
-# 实验模式
-mode = "realtime_multi"
-# 其他多任务数实时调度相关配置...
+defaultProfile = "realtime_multi_test"
+
+[profiles.realtime_multi_test]
+mode = "realtime-multi"
+tasks = [50, 100, 200]
 ```
 
 这些配置文件可以作为用户自定义实验配置的参考模板。
@@ -310,15 +318,14 @@ Containerfile 配置了完整的运行时环境，包括 JDK 23、ZGC 优化等�
 ```
 CloudSim-Benchmark/
 ├── src/main/kotlin/
-│   ├── [ComparisonRunner.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/ComparisonRunner.kt)         # 主比较执行器 (批处理)
-│   ├── [RealtimeComparisonRunner.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/RealtimeComparisonRunner.kt) # 主比较执行器 (实时)
-│   ├── [BatchCloudletCountRunner.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/BatchCloudletCountRunner.kt)  # 多任务数执行器 (批处理)
-│   ├── [RealtimeCloudletCountRunner.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/RealtimeCloudletCountRunner.kt) # 多任务数执行器 (实时)
-│   ├── [CoroutineDemo.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/CoroutineDemo.kt)           # 协程性能演示
+│   ├── ComparisonRunner.kt         # 主比较执行器 (批处理)
+│   ├── RealtimeComparisonRunner.kt # 主比较执行器 (实时)
+│   ├── BatchCloudletCountRunner.kt # 多任务数执行器 (批处理)
+│   ├── RealtimeCloudletCountRunner.kt # 多任务数执行器 (实时)
 │   ├── config/                    # 配置管理模块
-│   │   ├── [SystemConfig.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/config/SystemConfig.kt)        # 系统配置
-│   │   ├── [ExperimentConfig.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/config/ExperimentConfig.kt)    # 实验配置
-│   │   └── [ConfigurationManager.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/config/ConfigurationManager.kt) # 配置管理器
+│   │   ├── SystemConfig.kt        # 系统配置
+│   │   ├── ExperimentConfig.kt    # 实验配置
+│   │   └── ConfigurationManager.kt # 配置管理器
 │   ├── scheduler/                 # 调度算法模块
 │   │   ├── algorithms/            # 群体智能算法
 │   │   ├── realtime/              # 实时调度算法
@@ -326,6 +333,8 @@ CloudSim-Benchmark/
 │   ├── broker/                    # 云代理模块
 │   ├── datacenter/                # 数据中心模块
 │   └── util/                      # 工具类模块
+├── docs/examples/                 # 文档示例与演示代码
+│   └── CoroutineDemo.kt           # 协程性能演示
 ├── configs/                       # 配置文件目录
 ├── runs/                          # 实验结果目录
 ├── data/                          # 数据集目录
@@ -339,14 +348,14 @@ CloudSim-Benchmark/
 1. 在 `scheduler/algorithms` 或 `scheduler/realtime` 中创建新算法类
 2. 继承 `BaseScheduler` 或 `BaseRealtimeScheduler`
 3. 实现抽象方法（如 `optimize`）
-4. 在 [AlgorithmType.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/scheduler/AlgorithmType.kt) 中注册算法类型
+4. 在 `src/main/kotlin/scheduler/AlgorithmRegistry.kt` 中注册算法定义与别名
 5. 在 `configs/algorithms.toml` 中添加算法配置
 
 ### 扩展实验模式
 
-1. 在 [ExperimentMode.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/config/ExperimentConfig.kt#L35-L39) 中添加新模式
+1. 在 `src/main/kotlin/config/ExperimentConfig.kt` 中添加 `ExperimentMode`
 2. 实现对应的 Runner 类
-3. 在 [Main.kt](file:///e:/code_obj/kotlin/cloudsim-b/src/main/kotlin/Main.kt) 中注册命令行参数
+3. 在 `src/main/kotlin/cli/CliParser.kt` 与 `src/main/kotlin/cli/CommandExecutor.kt` 中注册命令行参数与执行逻辑
 4. 添加相应的配置验证逻辑
 
 ---

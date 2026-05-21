@@ -6,7 +6,6 @@ import util.ExperimentOutputContext
 import util.Logger
 import java.text.DecimalFormat
 import scheduler.ResolvedAlgorithm
-import kotlinx.coroutines.runBlocking
 
 /**
  * 实时调度批量任务数实验运行器
@@ -116,10 +115,6 @@ class RealtimeCloudletCountRunner(
         Logger.info("\n${"=".repeat(80)}")
         Logger.info("实时调度批量任务数实验完成！")
         Logger.info("${"=".repeat(80)}")
-    }
-
-    fun runBatchExperimentSync() = runBlocking {
-        runBatchExperiment()
     }
 
     private suspend fun runCloudletCount(index: Int, cloudletCount: Int): Pair<Int, List<RealtimeAlgorithmStatistics>> {
