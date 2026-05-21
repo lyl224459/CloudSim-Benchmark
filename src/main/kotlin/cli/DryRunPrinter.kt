@@ -73,7 +73,7 @@ object DryRunPrinter {
         }
         if (resolved.mode.startsWith("realtime")) {
             Logger.result(
-                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}, queuePolicy={}, priorityLevels={}, highPriorityRatio={}, deadlineFactor={}, vmQueueCapacity={}, overloadFailureMultiplier={}",
+                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}, queuePolicy={}, priorityLevels={}, highPriorityRatio={}, deadlineFactor={}, vmQueueCapacity={}, overloadFailureMultiplier={}, autoscalingEnabled={}, scaleOutQueueThreshold={}, maxDynamicVms={}, vmColdStartDelay={}, resourceModelEnabled={}, networkLatency={}, imagePullDelay={}, runtimeFailureRate={}, nodeFailureRate={}, timeoutAction={}",
                 resolved.realtime.arrival.distribution,
                 resolved.realtime.scheduling.strategy,
                 resolved.realtime.scheduling.maxQueueSize,
@@ -90,7 +90,17 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.highPriorityRatio,
                 resolved.realtime.scheduling.deadlineFactor,
                 resolved.realtime.scheduling.vmQueueCapacity,
-                resolved.realtime.scheduling.overloadFailureMultiplier
+                resolved.realtime.scheduling.overloadFailureMultiplier,
+                resolved.realtime.scheduling.autoscalingEnabled,
+                resolved.realtime.scheduling.scaleOutQueueThreshold,
+                resolved.realtime.scheduling.maxDynamicVms,
+                resolved.realtime.scheduling.vmColdStartDelay,
+                resolved.realtime.scheduling.resourceModelEnabled,
+                resolved.realtime.scheduling.networkLatency,
+                resolved.realtime.scheduling.imagePullDelay,
+                resolved.realtime.scheduling.runtimeFailureRate,
+                resolved.realtime.scheduling.nodeFailureRate,
+                resolved.realtime.scheduling.timeoutAction
             )
         }
         Logger.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
@@ -163,6 +173,24 @@ object DryRunPrinter {
                     put("deadlineFactor", config.realtime.scheduling.deadlineFactor)
                     put("vmQueueCapacity", config.realtime.scheduling.vmQueueCapacity)
                     put("overloadFailureMultiplier", config.realtime.scheduling.overloadFailureMultiplier)
+                    put("autoscalingEnabled", config.realtime.scheduling.autoscalingEnabled)
+                    put("scaleOutQueueThreshold", config.realtime.scheduling.scaleOutQueueThreshold)
+                    put("scaleInIdleTime", config.realtime.scheduling.scaleInIdleTime)
+                    put("maxDynamicVms", config.realtime.scheduling.maxDynamicVms)
+                    put("vmColdStartDelay", config.realtime.scheduling.vmColdStartDelay)
+                    put("scaleOutCost", config.realtime.scheduling.scaleOutCost)
+                    put("scaleInProtectionTime", config.realtime.scheduling.scaleInProtectionTime)
+                    put("resourceModelEnabled", config.realtime.scheduling.resourceModelEnabled)
+                    put("networkLatency", config.realtime.scheduling.networkLatency)
+                    put("imagePullDelay", config.realtime.scheduling.imagePullDelay)
+                    put("ioWeight", config.realtime.scheduling.ioWeight)
+                    put("ramWeight", config.realtime.scheduling.ramWeight)
+                    put("bwWeight", config.realtime.scheduling.bwWeight)
+                    put("runtimeFailureRate", config.realtime.scheduling.runtimeFailureRate)
+                    put("nodeFailureRate", config.realtime.scheduling.nodeFailureRate)
+                    put("checkpointInterval", config.realtime.scheduling.checkpointInterval)
+                    put("migrationDelay", config.realtime.scheduling.migrationDelay)
+                    put("timeoutAction", config.realtime.scheduling.timeoutAction)
                 }
             }
             putJsonObject("csv") {

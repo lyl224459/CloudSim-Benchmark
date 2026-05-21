@@ -89,7 +89,23 @@ class ConfigValidationTest {
                     highPriorityRatio = 1.1,
                     deadlineFactor = -0.1,
                     vmQueueCapacity = -1,
-                    overloadFailureMultiplier = -0.2
+                    overloadFailureMultiplier = -0.2,
+                    scaleOutQueueThreshold = -1,
+                    scaleInIdleTime = -1.0,
+                    maxDynamicVms = -1,
+                    vmColdStartDelay = -1.0,
+                    scaleOutCost = -1.0,
+                    scaleInProtectionTime = -1.0,
+                    networkLatency = -0.1,
+                    imagePullDelay = -0.1,
+                    ioWeight = -0.1,
+                    ramWeight = -0.1,
+                    bwWeight = -0.1,
+                    runtimeFailureRate = 1.5,
+                    nodeFailureRate = -0.1,
+                    checkpointInterval = -1.0,
+                    migrationDelay = -1.0,
+                    timeoutAction = "pause"
                 )
             )
         )
@@ -110,6 +126,22 @@ class ConfigValidationTest {
             assertThat(e.errors.any { it.field == "realtime.scheduling.deadlineFactor" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.vmQueueCapacity" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.overloadFailureMultiplier" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.scaleOutQueueThreshold" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.scaleInIdleTime" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.maxDynamicVms" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.vmColdStartDelay" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.scaleOutCost" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.scaleInProtectionTime" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.networkLatency" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.imagePullDelay" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.ioWeight" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.ramWeight" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.bwWeight" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.runtimeFailureRate" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.nodeFailureRate" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.checkpointInterval" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.migrationDelay" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.timeoutAction" }).isTrue()
         }
     }
 

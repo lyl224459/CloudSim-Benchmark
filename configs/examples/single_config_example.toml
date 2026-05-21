@@ -65,3 +65,99 @@ outputDir = "runs/realtime_smoke"
 cloudletCount = 200
 simulationDuration = 500.0
 arrivalRate = 5.0
+
+[profiles.realtime_sla]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_sla"
+
+[profiles.realtime_sla.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 4.0
+
+[profiles.realtime_sla.realtime.scheduling]
+deadlineFactor = 1.2
+taskTimeout = 20.0
+timeoutAction = "retry"
+retryLimit = 1
+retryDelay = 1.0
+checkpointInterval = 5.0
+
+[profiles.realtime_overload]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_overload"
+
+[profiles.realtime_overload.realtime]
+cloudletCount = 180
+simulationDuration = 180.0
+arrivalRate = 12.0
+
+[profiles.realtime_overload.realtime.scheduling]
+vmQueueCapacity = 2
+overloadFailureMultiplier = 0.6
+runtimeFailureRate = 0.05
+nodeFailureRate = 0.03
+retryLimit = 2
+retryDelay = 0.5
+
+[profiles.realtime_priority]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "RANDOM"]
+runs = 1
+outputDir = "runs/realtime_priority"
+
+[profiles.realtime_priority.realtime]
+cloudletCount = 120
+simulationDuration = 300.0
+arrivalRate = 5.0
+
+[profiles.realtime_priority.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 4
+highPriorityRatio = 0.25
+deadlineFactor = 1.5
+
+[profiles.realtime_capacity]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_capacity"
+
+[profiles.realtime_capacity.realtime]
+cloudletCount = 150
+simulationDuration = 250.0
+arrivalRate = 8.0
+
+[profiles.realtime_capacity.realtime.scheduling]
+resourceModelEnabled = true
+networkLatency = 0.05
+imagePullDelay = 0.5
+ioWeight = 1.0
+ramWeight = 0.5
+bwWeight = 0.5
+vmQueueCapacity = 3
+
+[profiles.realtime_autoscaling]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_autoscaling"
+
+[profiles.realtime_autoscaling.realtime]
+cloudletCount = 180
+simulationDuration = 300.0
+arrivalRate = 10.0
+
+[profiles.realtime_autoscaling.realtime.scheduling]
+autoscalingEnabled = true
+scaleOutQueueThreshold = 2
+scaleInIdleTime = 20.0
+maxDynamicVms = 2
+vmColdStartDelay = 5.0
+scaleOutCost = 0.25
+scaleInProtectionTime = 15.0
+vmQueueCapacity = 3

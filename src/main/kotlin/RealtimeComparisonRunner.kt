@@ -38,7 +38,20 @@ data class RealtimeAlgorithmResult(
     val capacityRejectedCount: Int,
     val averageQueueDepth: Double,
     val maxQueueDepth: Int,
-    val p95ResponseTime: Double
+    val p95ResponseTime: Double,
+    val p99ResponseTime: Double,
+    val scaleOutCount: Int,
+    val scaleInCount: Int,
+    val activeVmPeak: Int,
+    val autoscalingCost: Double,
+    val coldStartDelayTotal: Double,
+    val resourceRejectedCount: Int,
+    val runtimeFailureCount: Int,
+    val timeoutCancelledCount: Int,
+    val migrationCount: Int,
+    val checkpointRecoveryCount: Int,
+    val retrySuccessRate: Double,
+    val slaPenalty: Double
 )
 
 data class RealtimeAlgorithmStatistics(
@@ -63,7 +76,20 @@ data class RealtimeAlgorithmStatistics(
     val capacityRejectedCount: StatisticalValue,
     val averageQueueDepth: StatisticalValue,
     val maxQueueDepth: StatisticalValue,
-    val p95ResponseTime: StatisticalValue
+    val p95ResponseTime: StatisticalValue,
+    val p99ResponseTime: StatisticalValue,
+    val scaleOutCount: StatisticalValue,
+    val scaleInCount: StatisticalValue,
+    val activeVmPeak: StatisticalValue,
+    val autoscalingCost: StatisticalValue,
+    val coldStartDelayTotal: StatisticalValue,
+    val resourceRejectedCount: StatisticalValue,
+    val runtimeFailureCount: StatisticalValue,
+    val timeoutCancelledCount: StatisticalValue,
+    val migrationCount: StatisticalValue,
+    val checkpointRecoveryCount: StatisticalValue,
+    val retrySuccessRate: StatisticalValue,
+    val slaPenalty: StatisticalValue
 )
 
 private data class RealtimeRunSummary(
@@ -113,7 +139,20 @@ class RealtimeComparisonRunner(
         val capacityRejectedCount: Int,
         val averageQueueDepth: Double,
         val maxQueueDepth: Int,
-        val p95ResponseTime: Double
+        val p95ResponseTime: Double,
+        val p99ResponseTime: Double,
+        val scaleOutCount: Int,
+        val scaleInCount: Int,
+        val activeVmPeak: Int,
+        val autoscalingCost: Double,
+        val coldStartDelayTotal: Double,
+        val resourceRejectedCount: Int,
+        val runtimeFailureCount: Int,
+        val timeoutCancelledCount: Int,
+        val migrationCount: Int,
+        val checkpointRecoveryCount: Int,
+        val retrySuccessRate: Double,
+        val slaPenalty: Double
     )
 
     private fun executionModeDescription(): String {
@@ -149,7 +188,8 @@ class RealtimeComparisonRunner(
         simulation.start()
 
         val finishedCloudlets = broker.getCloudletFinishedList<org.cloudsimplus.cloudlets.Cloudlet>()
-        val metrics = calculateRealtimeMetrics(finishedCloudlets, vmList.size, broker)
+        val vmCountForMetrics = maxOf(vmList.size, broker.getActiveVmPeak())
+        val metrics = calculateRealtimeMetrics(finishedCloudlets, vmCountForMetrics, broker)
 
         val cloudletToVm = mapCloudletsToVmIds(cloudletList, finishedCloudlets)
         val objFunc = SchedulerObjectiveFunction(cloudletList, vmList, objectiveWeights)
@@ -204,7 +244,20 @@ class RealtimeComparisonRunner(
             capacityRejectedCount = metrics.capacityRejectedCount,
             averageQueueDepth = metrics.averageQueueDepth,
             maxQueueDepth = metrics.maxQueueDepth,
-            p95ResponseTime = metrics.p95ResponseTime
+            p95ResponseTime = metrics.p95ResponseTime,
+            p99ResponseTime = metrics.p99ResponseTime,
+            scaleOutCount = metrics.scaleOutCount,
+            scaleInCount = metrics.scaleInCount,
+            activeVmPeak = metrics.activeVmPeak,
+            autoscalingCost = metrics.autoscalingCost,
+            coldStartDelayTotal = metrics.coldStartDelayTotal,
+            resourceRejectedCount = metrics.resourceRejectedCount,
+            runtimeFailureCount = metrics.runtimeFailureCount,
+            timeoutCancelledCount = metrics.timeoutCancelledCount,
+            migrationCount = metrics.migrationCount,
+            checkpointRecoveryCount = metrics.checkpointRecoveryCount,
+            retrySuccessRate = metrics.retrySuccessRate,
+            slaPenalty = metrics.slaPenalty
         )
     }
 
@@ -221,6 +274,7 @@ class RealtimeComparisonRunner(
         val responseTimes = mutableListOf<Double>()
         var completedCount = 0
         var failedCount = 0
+        var slaPenalty = 0.0
 
         for (cloudlet in cloudletList) {
             when (cloudlet.status) {
@@ -230,7 +284,7 @@ class RealtimeComparisonRunner(
                         makespan = finishTime
                     }
 
-                    val vmId = cloudlet.vm.id.toInt()
+                    val vmId = cloudlet.vm.id.toInt().coerceIn(executeTimeOfVM.indices)
                     val actualCPUTime = cloudlet.getTotalExecutionTime()
                     executeTimeOfVM[vmId] += actualCPUTime
 
@@ -250,6 +304,11 @@ class RealtimeComparisonRunner(
                     totalWaitingTime += waitingTime
                     totalResponseTime += responseTime
                     responseTimes.add(responseTime)
+                    broker.getTaskMetadata(cloudlet)?.deadline?.let { deadline ->
+                        if (finishTime > deadline) {
+                            slaPenalty += finishTime - deadline
+                        }
+                    }
                     completedCount++
                 }
                 org.cloudsimplus.cloudlets.Cloudlet.Status.FAILED -> failedCount++
@@ -293,7 +352,20 @@ class RealtimeComparisonRunner(
             capacityRejectedCount = broker.getCapacityRejectedCount(),
             averageQueueDepth = broker.getAverageQueueDepth(),
             maxQueueDepth = broker.getMaxQueueDepth(),
-            p95ResponseTime = responseTimes.percentile95()
+            p95ResponseTime = responseTimes.percentile(0.95),
+            p99ResponseTime = responseTimes.percentile(0.99),
+            scaleOutCount = broker.getScaleOutCount(),
+            scaleInCount = broker.getScaleInCount(),
+            activeVmPeak = broker.getActiveVmPeak(),
+            autoscalingCost = broker.getAutoscalingCost(),
+            coldStartDelayTotal = broker.getColdStartDelayTotal(),
+            resourceRejectedCount = broker.getResourceRejectedCount(),
+            runtimeFailureCount = broker.getRuntimeFailureCount(),
+            timeoutCancelledCount = broker.getTimeoutCancelledCount(),
+            migrationCount = broker.getMigrationCount(),
+            checkpointRecoveryCount = broker.getCheckpointRecoveryCount(),
+            retrySuccessRate = broker.getRetrySuccessRate(),
+            slaPenalty = slaPenalty
         )
     }
 
@@ -332,6 +404,24 @@ class RealtimeComparisonRunner(
             "SLA deadline 系数" to scheduling.deadlineFactor,
             "单 VM 队列容量" to scheduling.vmQueueCapacity,
             "过载失败倍率" to scheduling.overloadFailureMultiplier,
+            "弹性伸缩" to scheduling.autoscalingEnabled,
+            "扩容队列阈值" to scheduling.scaleOutQueueThreshold,
+            "缩容空闲时间" to scheduling.scaleInIdleTime,
+            "最大动态 VM 数" to scheduling.maxDynamicVms,
+            "VM 冷启动延迟" to scheduling.vmColdStartDelay,
+            "扩容成本" to scheduling.scaleOutCost,
+            "缩容保护时间" to scheduling.scaleInProtectionTime,
+            "资源模型" to scheduling.resourceModelEnabled,
+            "网络延迟" to scheduling.networkLatency,
+            "镜像拉取延迟" to scheduling.imagePullDelay,
+            "I/O 权重" to scheduling.ioWeight,
+            "RAM 权重" to scheduling.ramWeight,
+            "带宽权重" to scheduling.bwWeight,
+            "运行中失败率" to scheduling.runtimeFailureRate,
+            "节点失败率" to scheduling.nodeFailureRate,
+            "checkpoint 间隔" to scheduling.checkpointInterval,
+            "迁移延迟" to scheduling.migrationDelay,
+            "超时动作" to scheduling.timeoutAction,
             "随机数种子" to randomSeed,
             "运行次数" to runs,
             "任务生成器" to generatorType.name
@@ -371,7 +461,20 @@ class RealtimeComparisonRunner(
                     "CapacityRejectedCount" to r.capacityRejectedCount,
                     "AvgQueueDepth" to r.averageQueueDepth,
                     "MaxQueueDepth" to r.maxQueueDepth,
-                    "P95ResponseTime" to r.p95ResponseTime
+                    "P95ResponseTime" to r.p95ResponseTime,
+                    "P99ResponseTime" to r.p99ResponseTime,
+                    "ScaleOutCount" to r.scaleOutCount,
+                    "ScaleInCount" to r.scaleInCount,
+                    "ActiveVmPeak" to r.activeVmPeak,
+                    "AutoscalingCost" to r.autoscalingCost,
+                    "ColdStartDelayTotal" to r.coldStartDelayTotal,
+                    "ResourceRejectedCount" to r.resourceRejectedCount,
+                    "RuntimeFailureCount" to r.runtimeFailureCount,
+                    "TimeoutCancelledCount" to r.timeoutCancelledCount,
+                    "MigrationCount" to r.migrationCount,
+                    "CheckpointRecoveryCount" to r.checkpointRecoveryCount,
+                    "RetrySuccessRate" to r.retrySuccessRate,
+                    "SlaPenalty" to r.slaPenalty
                 )
             }
             outputContext.saveSummaryResults(
@@ -381,7 +484,10 @@ class RealtimeComparisonRunner(
                     "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount",
                     "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount",
                     "SlaViolationCount", "SlaViolationRate", "CapacityRejectedCount", "AvgQueueDepth",
-                    "MaxQueueDepth", "P95ResponseTime"
+                    "MaxQueueDepth", "P95ResponseTime", "P99ResponseTime", "ScaleOutCount", "ScaleInCount",
+                    "ActiveVmPeak", "AutoscalingCost", "ColdStartDelayTotal", "ResourceRejectedCount",
+                    "RuntimeFailureCount", "TimeoutCancelledCount", "MigrationCount", "CheckpointRecoveryCount",
+                    "RetrySuccessRate", "SlaPenalty"
                 )
             )
         }
@@ -450,7 +556,20 @@ class RealtimeComparisonRunner(
             capacityRejectedCount = Int.MAX_VALUE,
             averageQueueDepth = Double.NaN,
             maxQueueDepth = Int.MAX_VALUE,
-            p95ResponseTime = Double.NaN
+            p95ResponseTime = Double.NaN,
+            p99ResponseTime = Double.NaN,
+            scaleOutCount = Int.MAX_VALUE,
+            scaleInCount = Int.MAX_VALUE,
+            activeVmPeak = Int.MAX_VALUE,
+            autoscalingCost = Double.NaN,
+            coldStartDelayTotal = Double.NaN,
+            resourceRejectedCount = Int.MAX_VALUE,
+            runtimeFailureCount = Int.MAX_VALUE,
+            timeoutCancelledCount = Int.MAX_VALUE,
+            migrationCount = Int.MAX_VALUE,
+            checkpointRecoveryCount = Int.MAX_VALUE,
+            retrySuccessRate = Double.NaN,
+            slaPenalty = Double.NaN
         )
         return RealtimeRunSummary(
             average = failedResult,
@@ -488,7 +607,20 @@ class RealtimeComparisonRunner(
             capacityRejectedCount = runResults.map { it.capacityRejectedCount }.average().roundToInt(),
             averageQueueDepth = runResults.map { it.averageQueueDepth }.average(),
             maxQueueDepth = runResults.map { it.maxQueueDepth }.average().roundToInt(),
-            p95ResponseTime = runResults.map { it.p95ResponseTime }.average()
+            p95ResponseTime = runResults.map { it.p95ResponseTime }.average(),
+            p99ResponseTime = runResults.map { it.p99ResponseTime }.average(),
+            scaleOutCount = runResults.map { it.scaleOutCount }.average().roundToInt(),
+            scaleInCount = runResults.map { it.scaleInCount }.average().roundToInt(),
+            activeVmPeak = runResults.map { it.activeVmPeak }.average().roundToInt(),
+            autoscalingCost = runResults.map { it.autoscalingCost }.average(),
+            coldStartDelayTotal = runResults.map { it.coldStartDelayTotal }.average(),
+            resourceRejectedCount = runResults.map { it.resourceRejectedCount }.average().roundToInt(),
+            runtimeFailureCount = runResults.map { it.runtimeFailureCount }.average().roundToInt(),
+            timeoutCancelledCount = runResults.map { it.timeoutCancelledCount }.average().roundToInt(),
+            migrationCount = runResults.map { it.migrationCount }.average().roundToInt(),
+            checkpointRecoveryCount = runResults.map { it.checkpointRecoveryCount }.average().roundToInt(),
+            retrySuccessRate = runResults.map { it.retrySuccessRate }.average(),
+            slaPenalty = runResults.map { it.slaPenalty }.average()
         )
     }
 
@@ -525,7 +657,20 @@ class RealtimeComparisonRunner(
                 "CapacityRejectedCount" to result.capacityRejectedCount.toDouble(),
                 "AvgQueueDepth" to result.averageQueueDepth,
                 "MaxQueueDepth" to result.maxQueueDepth.toDouble(),
-                "P95ResponseTime" to result.p95ResponseTime
+                "P95ResponseTime" to result.p95ResponseTime,
+                "P99ResponseTime" to result.p99ResponseTime,
+                "ScaleOutCount" to result.scaleOutCount.toDouble(),
+                "ScaleInCount" to result.scaleInCount.toDouble(),
+                "ActiveVmPeak" to result.activeVmPeak.toDouble(),
+                "AutoscalingCost" to result.autoscalingCost,
+                "ColdStartDelayTotal" to result.coldStartDelayTotal,
+                "ResourceRejectedCount" to result.resourceRejectedCount.toDouble(),
+                "RuntimeFailureCount" to result.runtimeFailureCount.toDouble(),
+                "TimeoutCancelledCount" to result.timeoutCancelledCount.toDouble(),
+                "MigrationCount" to result.migrationCount.toDouble(),
+                "CheckpointRecoveryCount" to result.checkpointRecoveryCount.toDouble(),
+                "RetrySuccessRate" to result.retrySuccessRate,
+                "SlaPenalty" to result.slaPenalty
             )
         )
         result
@@ -580,7 +725,20 @@ class RealtimeComparisonRunner(
             capacityRejectedCount = stats(results.map { it.capacityRejectedCount.toDouble() }),
             averageQueueDepth = stats(results.map { it.averageQueueDepth }),
             maxQueueDepth = stats(results.map { it.maxQueueDepth.toDouble() }),
-            p95ResponseTime = stats(results.map { it.p95ResponseTime })
+            p95ResponseTime = stats(results.map { it.p95ResponseTime }),
+            p99ResponseTime = stats(results.map { it.p99ResponseTime }),
+            scaleOutCount = stats(results.map { it.scaleOutCount.toDouble() }),
+            scaleInCount = stats(results.map { it.scaleInCount.toDouble() }),
+            activeVmPeak = stats(results.map { it.activeVmPeak.toDouble() }),
+            autoscalingCost = stats(results.map { it.autoscalingCost }),
+            coldStartDelayTotal = stats(results.map { it.coldStartDelayTotal }),
+            resourceRejectedCount = stats(results.map { it.resourceRejectedCount.toDouble() }),
+            runtimeFailureCount = stats(results.map { it.runtimeFailureCount.toDouble() }),
+            timeoutCancelledCount = stats(results.map { it.timeoutCancelledCount.toDouble() }),
+            migrationCount = stats(results.map { it.migrationCount.toDouble() }),
+            checkpointRecoveryCount = stats(results.map { it.checkpointRecoveryCount.toDouble() }),
+            retrySuccessRate = stats(results.map { it.retrySuccessRate }),
+            slaPenalty = stats(results.map { it.slaPenalty })
         )
     }
 
@@ -631,6 +789,19 @@ class RealtimeComparisonRunner(
                     "AvgQueueDepth_Mean", "AvgQueueDepth_StdDev",
                     "MaxQueueDepth_Mean", "MaxQueueDepth_StdDev",
                     "P95ResponseTime_Mean", "P95ResponseTime_StdDev",
+                    "P99ResponseTime_Mean", "P99ResponseTime_StdDev",
+                    "ScaleOutCount_Mean", "ScaleOutCount_StdDev",
+                    "ScaleInCount_Mean", "ScaleInCount_StdDev",
+                    "ActiveVmPeak_Mean", "ActiveVmPeak_StdDev",
+                    "AutoscalingCost_Mean", "AutoscalingCost_StdDev",
+                    "ColdStartDelayTotal_Mean", "ColdStartDelayTotal_StdDev",
+                    "ResourceRejectedCount_Mean", "ResourceRejectedCount_StdDev",
+                    "RuntimeFailureCount_Mean", "RuntimeFailureCount_StdDev",
+                    "TimeoutCancelledCount_Mean", "TimeoutCancelledCount_StdDev",
+                    "MigrationCount_Mean", "MigrationCount_StdDev",
+                    "CheckpointRecoveryCount_Mean", "CheckpointRecoveryCount_StdDev",
+                    "RetrySuccessRate_Mean", "RetrySuccessRate_StdDev",
+                    "SlaPenalty_Mean", "SlaPenalty_StdDev",
                     "Runs"
                 )
             } else {
@@ -639,7 +810,10 @@ class RealtimeComparisonRunner(
                     "AvgWaitingTime", "AvgResponseTime", "RejectedCount", "TimeoutCount", "FailedCount",
                     "RetryCount", "PermanentFailedCount", "AvgDecisionDelay", "CompletedCount", "SubmittedCount",
                     "SlaViolationCount", "SlaViolationRate", "CapacityRejectedCount", "AvgQueueDepth",
-                    "MaxQueueDepth", "P95ResponseTime"
+                    "MaxQueueDepth", "P95ResponseTime", "P99ResponseTime", "ScaleOutCount", "ScaleInCount",
+                    "ActiveVmPeak", "AutoscalingCost", "ColdStartDelayTotal", "ResourceRejectedCount",
+                    "RuntimeFailureCount", "TimeoutCancelledCount", "MigrationCount", "CheckpointRecoveryCount",
+                    "RetrySuccessRate", "SlaPenalty"
                 )
             }
             writer.write(outputContext.csvLine(headers) + "\n")
@@ -672,6 +846,19 @@ class RealtimeComparisonRunner(
                             stat.averageQueueDepth.mean, stat.averageQueueDepth.stdDev,
                             stat.maxQueueDepth.mean, stat.maxQueueDepth.stdDev,
                             stat.p95ResponseTime.mean, stat.p95ResponseTime.stdDev,
+                            stat.p99ResponseTime.mean, stat.p99ResponseTime.stdDev,
+                            stat.scaleOutCount.mean, stat.scaleOutCount.stdDev,
+                            stat.scaleInCount.mean, stat.scaleInCount.stdDev,
+                            stat.activeVmPeak.mean, stat.activeVmPeak.stdDev,
+                            stat.autoscalingCost.mean, stat.autoscalingCost.stdDev,
+                            stat.coldStartDelayTotal.mean, stat.coldStartDelayTotal.stdDev,
+                            stat.resourceRejectedCount.mean, stat.resourceRejectedCount.stdDev,
+                            stat.runtimeFailureCount.mean, stat.runtimeFailureCount.stdDev,
+                            stat.timeoutCancelledCount.mean, stat.timeoutCancelledCount.stdDev,
+                            stat.migrationCount.mean, stat.migrationCount.stdDev,
+                            stat.checkpointRecoveryCount.mean, stat.checkpointRecoveryCount.stdDev,
+                            stat.retrySuccessRate.mean, stat.retrySuccessRate.stdDev,
+                            stat.slaPenalty.mean, stat.slaPenalty.stdDev,
                             summary.runResults.size
                         )
                     } else {
@@ -698,6 +885,19 @@ class RealtimeComparisonRunner(
                             result.averageQueueDepth, Double.NaN,
                             result.maxQueueDepth, Double.NaN,
                             result.p95ResponseTime, Double.NaN,
+                            result.p99ResponseTime, Double.NaN,
+                            result.scaleOutCount, Double.NaN,
+                            result.scaleInCount, Double.NaN,
+                            result.activeVmPeak, Double.NaN,
+                            result.autoscalingCost, Double.NaN,
+                            result.coldStartDelayTotal, Double.NaN,
+                            result.resourceRejectedCount, Double.NaN,
+                            result.runtimeFailureCount, Double.NaN,
+                            result.timeoutCancelledCount, Double.NaN,
+                            result.migrationCount, Double.NaN,
+                            result.checkpointRecoveryCount, Double.NaN,
+                            result.retrySuccessRate, Double.NaN,
+                            result.slaPenalty, Double.NaN,
                             0
                         )
                     }
@@ -724,7 +924,20 @@ class RealtimeComparisonRunner(
                         result.capacityRejectedCount,
                         result.averageQueueDepth,
                         result.maxQueueDepth,
-                        result.p95ResponseTime
+                        result.p95ResponseTime,
+                        result.p99ResponseTime,
+                        result.scaleOutCount,
+                        result.scaleInCount,
+                        result.activeVmPeak,
+                        result.autoscalingCost,
+                        result.coldStartDelayTotal,
+                        result.resourceRejectedCount,
+                        result.runtimeFailureCount,
+                        result.timeoutCancelledCount,
+                        result.migrationCount,
+                        result.checkpointRecoveryCount,
+                        result.retrySuccessRate,
+                        result.slaPenalty
                     )
                 }
                 writer.write(outputContext.csvLine(row) + "\n")
@@ -733,10 +946,10 @@ class RealtimeComparisonRunner(
         Logger.info("实时调度结果已导出到: {}", csvFile.absolutePath)
     }
 
-    private fun List<Double>.percentile95(): Double {
+    private fun List<Double>.percentile(percentile: Double): Double {
         if (isEmpty()) return 0.0
         val sorted = sorted()
-        val index = ((sorted.size - 1) * 0.95).roundToInt().coerceIn(sorted.indices)
+        val index = ((sorted.size - 1) * percentile).roundToInt().coerceIn(sorted.indices)
         return sorted[index]
     }
 }

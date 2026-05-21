@@ -156,9 +156,29 @@ data class RealtimeSchedulingConfig(
     val highPriorityRatio: Double = 0.0,
     val deadlineFactor: Double = 0.0,
     val vmQueueCapacity: Int = 0,
-    val overloadFailureMultiplier: Double = 0.0
+    val overloadFailureMultiplier: Double = 0.0,
+    val autoscalingEnabled: Boolean = false,
+    val scaleOutQueueThreshold: Int = 0,
+    val scaleInIdleTime: Double = 0.0,
+    val maxDynamicVms: Int = 0,
+    val vmColdStartDelay: Double = 0.0,
+    val scaleOutCost: Double = 0.0,
+    val scaleInProtectionTime: Double = 0.0,
+    val resourceModelEnabled: Boolean = false,
+    val networkLatency: Double = 0.0,
+    val imagePullDelay: Double = 0.0,
+    val ioWeight: Double = 0.0,
+    val ramWeight: Double = 0.0,
+    val bwWeight: Double = 0.0,
+    val runtimeFailureRate: Double = 0.0,
+    val nodeFailureRate: Double = 0.0,
+    val checkpointInterval: Double = 0.0,
+    val migrationDelay: Double = 0.0,
+    val timeoutAction: String = "fail"
 ) {
     fun normalizedQueuePolicy(): RealtimeQueuePolicy = RealtimeQueuePolicy.parse(queuePolicy)
+
+    fun normalizedTimeoutAction(): RealtimeTimeoutAction = RealtimeTimeoutAction.parse(timeoutAction)
 }
 
 enum class RealtimeQueuePolicy(val configValue: String) {
@@ -170,6 +190,21 @@ enum class RealtimeQueuePolicy(val configValue: String) {
         fun parse(value: String): RealtimeQueuePolicy =
             entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
                 ?: throw IllegalArgumentException("未知实时队列策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
+enum class RealtimeTimeoutAction(val configValue: String) {
+    FAIL("fail"),
+    RETRY("retry"),
+    CANCEL("cancel"),
+    DEGRADE("degrade");
+
+    companion object {
+        fun parse(value: String): RealtimeTimeoutAction =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时超时动作: $value")
 
         fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
     }
@@ -509,7 +544,25 @@ data class ExperimentConfig(
                     "highPriorityRatio",
                     "deadlineFactor",
                     "vmQueueCapacity",
-                    "overloadFailureMultiplier"
+                    "overloadFailureMultiplier",
+                    "autoscalingEnabled",
+                    "scaleOutQueueThreshold",
+                    "scaleInIdleTime",
+                    "maxDynamicVms",
+                    "vmColdStartDelay",
+                    "scaleOutCost",
+                    "scaleInProtectionTime",
+                    "resourceModelEnabled",
+                    "networkLatency",
+                    "imagePullDelay",
+                    "ioWeight",
+                    "ramWeight",
+                    "bwWeight",
+                    "runtimeFailureRate",
+                    "nodeFailureRate",
+                    "checkpointInterval",
+                    "migrationDelay",
+                    "timeoutAction"
                 )
             )
             val current = base ?: TomlRealtimeConfig()
@@ -535,7 +588,37 @@ data class ExperimentConfig(
                 vmQueueCapacity = properties["vmQueueCapacity"]?.let { parseRequiredInt("realtime.scheduling.vmQueueCapacity", it) } ?: current.scheduling.vmQueueCapacity,
                 overloadFailureMultiplier = properties["overloadFailureMultiplier"]?.let {
                     parseRequiredDouble("realtime.scheduling.overloadFailureMultiplier", it)
-                } ?: current.scheduling.overloadFailureMultiplier
+                } ?: current.scheduling.overloadFailureMultiplier,
+                autoscalingEnabled = properties["autoscalingEnabled"]?.let { parseRequiredBoolean("realtime.scheduling.autoscalingEnabled", it) } ?: current.scheduling.autoscalingEnabled,
+                scaleOutQueueThreshold = properties["scaleOutQueueThreshold"]?.let {
+                    parseRequiredInt("realtime.scheduling.scaleOutQueueThreshold", it)
+                } ?: current.scheduling.scaleOutQueueThreshold,
+                scaleInIdleTime = properties["scaleInIdleTime"]?.let { parseRequiredDouble("realtime.scheduling.scaleInIdleTime", it) } ?: current.scheduling.scaleInIdleTime,
+                maxDynamicVms = properties["maxDynamicVms"]?.let { parseRequiredInt("realtime.scheduling.maxDynamicVms", it) } ?: current.scheduling.maxDynamicVms,
+                vmColdStartDelay = properties["vmColdStartDelay"]?.let {
+                    parseRequiredDouble("realtime.scheduling.vmColdStartDelay", it)
+                } ?: current.scheduling.vmColdStartDelay,
+                scaleOutCost = properties["scaleOutCost"]?.let { parseRequiredDouble("realtime.scheduling.scaleOutCost", it) } ?: current.scheduling.scaleOutCost,
+                scaleInProtectionTime = properties["scaleInProtectionTime"]?.let {
+                    parseRequiredDouble("realtime.scheduling.scaleInProtectionTime", it)
+                } ?: current.scheduling.scaleInProtectionTime,
+                resourceModelEnabled = properties["resourceModelEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.resourceModelEnabled", it)
+                } ?: current.scheduling.resourceModelEnabled,
+                networkLatency = properties["networkLatency"]?.let { parseRequiredDouble("realtime.scheduling.networkLatency", it) } ?: current.scheduling.networkLatency,
+                imagePullDelay = properties["imagePullDelay"]?.let { parseRequiredDouble("realtime.scheduling.imagePullDelay", it) } ?: current.scheduling.imagePullDelay,
+                ioWeight = properties["ioWeight"]?.let { parseRequiredDouble("realtime.scheduling.ioWeight", it) } ?: current.scheduling.ioWeight,
+                ramWeight = properties["ramWeight"]?.let { parseRequiredDouble("realtime.scheduling.ramWeight", it) } ?: current.scheduling.ramWeight,
+                bwWeight = properties["bwWeight"]?.let { parseRequiredDouble("realtime.scheduling.bwWeight", it) } ?: current.scheduling.bwWeight,
+                runtimeFailureRate = properties["runtimeFailureRate"]?.let {
+                    parseRequiredDouble("realtime.scheduling.runtimeFailureRate", it)
+                } ?: current.scheduling.runtimeFailureRate,
+                nodeFailureRate = properties["nodeFailureRate"]?.let { parseRequiredDouble("realtime.scheduling.nodeFailureRate", it) } ?: current.scheduling.nodeFailureRate,
+                checkpointInterval = properties["checkpointInterval"]?.let {
+                    parseRequiredDouble("realtime.scheduling.checkpointInterval", it)
+                } ?: current.scheduling.checkpointInterval,
+                migrationDelay = properties["migrationDelay"]?.let { parseRequiredDouble("realtime.scheduling.migrationDelay", it) } ?: current.scheduling.migrationDelay,
+                timeoutAction = properties["timeoutAction"]?.let { TomlSectionParser.unquote(it) } ?: current.scheduling.timeoutAction
             )
             return current.copy(scheduling = scheduling)
         }
@@ -645,6 +728,10 @@ data class ExperimentConfig(
         private fun parseRequiredDouble(field: String, raw: String): Double =
             TomlSectionParser.unquote(raw).toDoubleOrNull()
                 ?: throw IllegalArgumentException("$field 必须是数字: $raw")
+
+        private fun parseRequiredBoolean(field: String, raw: String): Boolean =
+            TomlSectionParser.unquote(raw).toBooleanStrictOrNull()
+                ?: throw IllegalArgumentException("$field 必须是布尔值: $raw")
 
         private fun validateKeys(context: String, values: Map<String, String>, allowed: Set<String>) {
             val unknown = values.keys.filter { it !in allowed }
@@ -875,6 +962,71 @@ data class ExperimentConfig(
             if (realtime.scheduling.overloadFailureMultiplier < 0.0) {
                 errors.add(ValidationError("realtime.scheduling.overloadFailureMultiplier", realtime.scheduling.overloadFailureMultiplier.toString(),
                     "过载失败倍率不能为负数"))
+            }
+            if (realtime.scheduling.scaleOutQueueThreshold < 0) {
+                errors.add(ValidationError("realtime.scheduling.scaleOutQueueThreshold", realtime.scheduling.scaleOutQueueThreshold.toString(),
+                    "扩容队列阈值不能为负数"))
+            }
+            if (realtime.scheduling.scaleInIdleTime < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.scaleInIdleTime", realtime.scheduling.scaleInIdleTime.toString(),
+                    "缩容空闲时间不能为负数"))
+            }
+            if (realtime.scheduling.maxDynamicVms < 0) {
+                errors.add(ValidationError("realtime.scheduling.maxDynamicVms", realtime.scheduling.maxDynamicVms.toString(),
+                    "最大动态 VM 数不能为负数"))
+            }
+            if (realtime.scheduling.vmColdStartDelay < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.vmColdStartDelay", realtime.scheduling.vmColdStartDelay.toString(),
+                    "VM 冷启动延迟不能为负数"))
+            }
+            if (realtime.scheduling.scaleOutCost < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.scaleOutCost", realtime.scheduling.scaleOutCost.toString(),
+                    "扩容成本不能为负数"))
+            }
+            if (realtime.scheduling.scaleInProtectionTime < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.scaleInProtectionTime", realtime.scheduling.scaleInProtectionTime.toString(),
+                    "缩容保护时间不能为负数"))
+            }
+            if (realtime.scheduling.networkLatency < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.networkLatency", realtime.scheduling.networkLatency.toString(),
+                    "网络延迟不能为负数"))
+            }
+            if (realtime.scheduling.imagePullDelay < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.imagePullDelay", realtime.scheduling.imagePullDelay.toString(),
+                    "镜像拉取延迟不能为负数"))
+            }
+            if (realtime.scheduling.ioWeight < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.ioWeight", realtime.scheduling.ioWeight.toString(),
+                    "I/O 权重不能为负数"))
+            }
+            if (realtime.scheduling.ramWeight < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.ramWeight", realtime.scheduling.ramWeight.toString(),
+                    "RAM 权重不能为负数"))
+            }
+            if (realtime.scheduling.bwWeight < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.bwWeight", realtime.scheduling.bwWeight.toString(),
+                    "带宽权重不能为负数"))
+            }
+            if (realtime.scheduling.runtimeFailureRate < 0.0 || realtime.scheduling.runtimeFailureRate > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.runtimeFailureRate", realtime.scheduling.runtimeFailureRate.toString(),
+                    "运行中失败率必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.nodeFailureRate < 0.0 || realtime.scheduling.nodeFailureRate > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.nodeFailureRate", realtime.scheduling.nodeFailureRate.toString(),
+                    "节点失败率必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.checkpointInterval < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.checkpointInterval", realtime.scheduling.checkpointInterval.toString(),
+                    "checkpoint 间隔不能为负数"))
+            }
+            if (realtime.scheduling.migrationDelay < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.migrationDelay", realtime.scheduling.migrationDelay.toString(),
+                    "迁移延迟不能为负数"))
+            }
+            val timeoutActions = RealtimeTimeoutAction.valuesForConfig()
+            if (realtime.scheduling.timeoutAction.lowercase() !in timeoutActions) {
+                errors.add(ValidationError("realtime.scheduling.timeoutAction", realtime.scheduling.timeoutAction,
+                    "超时动作必须是以下值之一: ${timeoutActions.joinToString(", ")}"))
             }
             val reservations = setOf("none", "partial", "full")
             if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {

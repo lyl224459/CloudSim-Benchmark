@@ -107,6 +107,16 @@ class RealtimeCloudletCountRunner(
             "SLA deadline 系数" to scheduling.deadlineFactor,
             "单 VM 队列容量" to scheduling.vmQueueCapacity,
             "过载失败倍率" to scheduling.overloadFailureMultiplier,
+            "弹性伸缩" to scheduling.autoscalingEnabled,
+            "扩容队列阈值" to scheduling.scaleOutQueueThreshold,
+            "最大动态 VM 数" to scheduling.maxDynamicVms,
+            "VM 冷启动延迟" to scheduling.vmColdStartDelay,
+            "资源模型" to scheduling.resourceModelEnabled,
+            "网络延迟" to scheduling.networkLatency,
+            "镜像拉取延迟" to scheduling.imagePullDelay,
+            "运行中失败率" to scheduling.runtimeFailureRate,
+            "节点失败率" to scheduling.nodeFailureRate,
+            "超时动作" to scheduling.timeoutAction,
             "随机数种子" to randomSeed,
             "任务生成器" to generatorType.name
         ))
@@ -204,6 +214,19 @@ class RealtimeCloudletCountRunner(
                         "AvgQueueDepth_Mean", "AvgQueueDepth_StdDev",
                         "MaxQueueDepth_Mean", "MaxQueueDepth_StdDev",
                         "P95ResponseTime_Mean", "P95ResponseTime_StdDev",
+                        "P99ResponseTime_Mean", "P99ResponseTime_StdDev",
+                        "ScaleOutCount_Mean", "ScaleOutCount_StdDev",
+                        "ScaleInCount_Mean", "ScaleInCount_StdDev",
+                        "ActiveVmPeak_Mean", "ActiveVmPeak_StdDev",
+                        "AutoscalingCost_Mean", "AutoscalingCost_StdDev",
+                        "ColdStartDelayTotal_Mean", "ColdStartDelayTotal_StdDev",
+                        "ResourceRejectedCount_Mean", "ResourceRejectedCount_StdDev",
+                        "RuntimeFailureCount_Mean", "RuntimeFailureCount_StdDev",
+                        "TimeoutCancelledCount_Mean", "TimeoutCancelledCount_StdDev",
+                        "MigrationCount_Mean", "MigrationCount_StdDev",
+                        "CheckpointRecoveryCount_Mean", "CheckpointRecoveryCount_StdDev",
+                        "RetrySuccessRate_Mean", "RetrySuccessRate_StdDev",
+                        "SlaPenalty_Mean", "SlaPenalty_StdDev",
                         "Runs"
                     )
                 ) + "\n"
@@ -240,6 +263,19 @@ class RealtimeCloudletCountRunner(
                                 stat.averageQueueDepth.mean, stat.averageQueueDepth.stdDev,
                                 stat.maxQueueDepth.mean, stat.maxQueueDepth.stdDev,
                                 stat.p95ResponseTime.mean, stat.p95ResponseTime.stdDev,
+                                stat.p99ResponseTime.mean, stat.p99ResponseTime.stdDev,
+                                stat.scaleOutCount.mean, stat.scaleOutCount.stdDev,
+                                stat.scaleInCount.mean, stat.scaleInCount.stdDev,
+                                stat.activeVmPeak.mean, stat.activeVmPeak.stdDev,
+                                stat.autoscalingCost.mean, stat.autoscalingCost.stdDev,
+                                stat.coldStartDelayTotal.mean, stat.coldStartDelayTotal.stdDev,
+                                stat.resourceRejectedCount.mean, stat.resourceRejectedCount.stdDev,
+                                stat.runtimeFailureCount.mean, stat.runtimeFailureCount.stdDev,
+                                stat.timeoutCancelledCount.mean, stat.timeoutCancelledCount.stdDev,
+                                stat.migrationCount.mean, stat.migrationCount.stdDev,
+                                stat.checkpointRecoveryCount.mean, stat.checkpointRecoveryCount.stdDev,
+                                stat.retrySuccessRate.mean, stat.retrySuccessRate.stdDev,
+                                stat.slaPenalty.mean, stat.slaPenalty.stdDev,
                                 runs
                             )
                         ) + "\n"
@@ -270,7 +306,20 @@ class RealtimeCloudletCountRunner(
             "CapacityRejectedCount",
             "AvgQueueDepth",
             "MaxQueueDepth",
-            "P95ResponseTime"
+            "P95ResponseTime",
+            "P99ResponseTime",
+            "ScaleOutCount",
+            "ScaleInCount",
+            "ActiveVmPeak",
+            "AutoscalingCost",
+            "ColdStartDelayTotal",
+            "ResourceRejectedCount",
+            "RuntimeFailureCount",
+            "TimeoutCancelledCount",
+            "MigrationCount",
+            "CheckpointRecoveryCount",
+            "RetrySuccessRate",
+            "SlaPenalty"
         )
         val summaryData = results.flatMap { (count, stats) ->
             stats.map { stat ->
@@ -294,7 +343,20 @@ class RealtimeCloudletCountRunner(
                     "CapacityRejectedCount" to stat.capacityRejectedCount.mean,
                     "AvgQueueDepth" to stat.averageQueueDepth.mean,
                     "MaxQueueDepth" to stat.maxQueueDepth.mean,
-                    "P95ResponseTime" to stat.p95ResponseTime.mean
+                    "P95ResponseTime" to stat.p95ResponseTime.mean,
+                    "P99ResponseTime" to stat.p99ResponseTime.mean,
+                    "ScaleOutCount" to stat.scaleOutCount.mean,
+                    "ScaleInCount" to stat.scaleInCount.mean,
+                    "ActiveVmPeak" to stat.activeVmPeak.mean,
+                    "AutoscalingCost" to stat.autoscalingCost.mean,
+                    "ColdStartDelayTotal" to stat.coldStartDelayTotal.mean,
+                    "ResourceRejectedCount" to stat.resourceRejectedCount.mean,
+                    "RuntimeFailureCount" to stat.runtimeFailureCount.mean,
+                    "TimeoutCancelledCount" to stat.timeoutCancelledCount.mean,
+                    "MigrationCount" to stat.migrationCount.mean,
+                    "CheckpointRecoveryCount" to stat.checkpointRecoveryCount.mean,
+                    "RetrySuccessRate" to stat.retrySuccessRate.mean,
+                    "SlaPenalty" to stat.slaPenalty.mean
                 )
             }
         }

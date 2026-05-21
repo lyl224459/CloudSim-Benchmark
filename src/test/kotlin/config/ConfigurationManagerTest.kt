@@ -102,6 +102,24 @@ class ConfigurationManagerTest {
             deadlineFactor = 1.5
             vmQueueCapacity = 3
             overloadFailureMultiplier = 0.2
+            autoscalingEnabled = true
+            scaleOutQueueThreshold = 2
+            scaleInIdleTime = 10.0
+            maxDynamicVms = 3
+            vmColdStartDelay = 4.0
+            scaleOutCost = 0.25
+            scaleInProtectionTime = 8.0
+            resourceModelEnabled = true
+            networkLatency = 0.05
+            imagePullDelay = 0.5
+            ioWeight = 1.0
+            ramWeight = 0.5
+            bwWeight = 0.25
+            runtimeFailureRate = 0.03
+            nodeFailureRate = 0.02
+            checkpointInterval = 5.0
+            migrationDelay = 1.5
+            timeoutAction = "retry"
         """.trimIndent())
 
         try {
@@ -132,6 +150,24 @@ class ConfigurationManagerTest {
             assertEquals(1.5, realtime?.scheduling?.deadlineFactor)
             assertEquals(3, realtime?.scheduling?.vmQueueCapacity)
             assertEquals(0.2, realtime?.scheduling?.overloadFailureMultiplier)
+            assertEquals(true, realtime?.scheduling?.autoscalingEnabled)
+            assertEquals(2, realtime?.scheduling?.scaleOutQueueThreshold)
+            assertEquals(10.0, realtime?.scheduling?.scaleInIdleTime)
+            assertEquals(3, realtime?.scheduling?.maxDynamicVms)
+            assertEquals(4.0, realtime?.scheduling?.vmColdStartDelay)
+            assertEquals(0.25, realtime?.scheduling?.scaleOutCost)
+            assertEquals(8.0, realtime?.scheduling?.scaleInProtectionTime)
+            assertEquals(true, realtime?.scheduling?.resourceModelEnabled)
+            assertEquals(0.05, realtime?.scheduling?.networkLatency)
+            assertEquals(0.5, realtime?.scheduling?.imagePullDelay)
+            assertEquals(1.0, realtime?.scheduling?.ioWeight)
+            assertEquals(0.5, realtime?.scheduling?.ramWeight)
+            assertEquals(0.25, realtime?.scheduling?.bwWeight)
+            assertEquals(0.03, realtime?.scheduling?.runtimeFailureRate)
+            assertEquals(0.02, realtime?.scheduling?.nodeFailureRate)
+            assertEquals(5.0, realtime?.scheduling?.checkpointInterval)
+            assertEquals(1.5, realtime?.scheduling?.migrationDelay)
+            assertEquals("retry", realtime?.scheduling?.timeoutAction)
         } finally {
             configFile.delete()
         }

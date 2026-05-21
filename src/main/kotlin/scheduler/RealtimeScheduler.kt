@@ -91,7 +91,7 @@ abstract class RealtimeSchedulerBase(
             RealtimeQueuePolicy.PRIORITY -> compareByDescending<RealtimeNodeState> { it.availableSlots }
                 .thenBy { it.availableTime }
                 .thenBy { it.estimatedLoad }
-            RealtimeQueuePolicy.DEADLINE -> compareBy<RealtimeNodeState> { projectedFinishTime(context.newCloudlet, it) }
+            RealtimeQueuePolicy.DEADLINE -> compareBy<RealtimeNodeState> { projectedFinishTime(context, it) }
                 .thenBy { it.availableTime }
                 .thenBy { it.queueDepth }
             RealtimeQueuePolicy.FIFO -> compareBy<RealtimeNodeState> { it.availableTime }
@@ -101,9 +101,9 @@ abstract class RealtimeSchedulerBase(
         return base.sortedWith(policyComparator.thenBy { it.vmIndex })
     }
 
-    private fun projectedFinishTime(cloudlet: Cloudlet, state: RealtimeNodeState): Double {
-        val vm = vmList[state.vmIndex]
-        return state.availableTime + cloudlet.length.toDouble() / vm.mips
+    private fun projectedFinishTime(context: RealtimeSchedulingContext, state: RealtimeNodeState): Double {
+        val vm = context.vmList[state.vmIndex]
+        return state.availableTime + context.newCloudlet.length.toDouble() / vm.mips
     }
 }
 
@@ -147,7 +147,7 @@ class RealtimePSOScheduler(
         if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
             val allCloudlets = context.activeCloudlets + context.newCloudlet
             val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, context.vmList, objectiveWeights)
-            val pso = PSO(objFunc, population, 0.0, (vmNum - 1).toDouble(), 
+            val pso = PSO(objFunc, population, 0.0, (context.vmList.size - 1).toDouble(),
                 allCloudlets.size, maxIter, random)
             val allocation = pso.execute()
             return allocation[allCloudlets.size - 1]  // 返回新任务的分配
@@ -172,7 +172,7 @@ class RealtimeWOAScheduler(
         if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
             val allCloudlets = context.activeCloudlets + context.newCloudlet
             val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, context.vmList, objectiveWeights)
-            val woa = WOA(objFunc, population, 0.0, (vmNum - 1).toDouble(), 
+            val woa = WOA(objFunc, population, 0.0, (context.vmList.size - 1).toDouble(),
                 allCloudlets.size, maxIter, random)
             val allocation = woa.execute()
             return allocation[allCloudlets.size - 1]

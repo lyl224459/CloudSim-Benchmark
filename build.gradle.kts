@@ -1,6 +1,6 @@
 plugins {
-    kotlin("jvm") version "2.1.21"
-    kotlin("plugin.serialization") version "2.1.21"
+    kotlin("jvm") version "2.3.20"
+    kotlin("plugin.serialization") version "2.3.20"
     application
 }
 
@@ -51,8 +51,6 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
         // 添加编译参数优化
         freeCompilerArgs.addAll(listOf(
-            "-Xinline-classes",
-            "-Xbackend-threads=$cpuCores",
             "-Xlambdas=indy"
         ))
     }
@@ -70,12 +68,12 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.4.14")
 
     // TOML配置文件解析库
-    implementation("com.akuleshov7:ktoml-core:0.5.0")
-    implementation("com.akuleshov7:ktoml-file:0.5.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+    implementation("com.akuleshov7:ktoml-core:0.7.1")
+    implementation("com.akuleshov7:ktoml-file:0.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
     // Kotlin协程
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // 高性能计算库
     implementation("it.unimi.dsi:fastutil:8.5.12")            // Fastutil - 高性能集合
