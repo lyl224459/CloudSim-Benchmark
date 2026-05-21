@@ -252,3 +252,56 @@ tenantCount = 3
 tenantQuota = [2, 1, 1]
 tenantWeights = [1.0, 2.0, 1.0]
 tenantFairnessPolicy = "weighted_fair"
+
+[profiles.realtime_region_latency]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_region_latency"
+
+[profiles.realtime_region_latency.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 6.0
+
+[profiles.realtime_region_latency.realtime.scheduling]
+topologyEnabled = true
+topologyPolicy = "latency_aware"
+regionCount = 3
+racksPerRegion = 2
+hostsPerRack = 2
+localRegion = 0
+crossRackLatency = 0.15
+crossRegionLatency = 1.25
+crossRegionCost = 0.4
+vmQueueCapacity = 3
+
+[profiles.realtime_fault_domain_spread]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_fault_domain_spread"
+
+[profiles.realtime_fault_domain_spread.realtime]
+cloudletCount = 150
+simulationDuration = 260.0
+arrivalRate = 8.0
+
+[profiles.realtime_fault_domain_spread.realtime.scheduling]
+topologyEnabled = true
+topologyPolicy = "spread_fault_domains"
+regionCount = 3
+racksPerRegion = 2
+hostsPerRack = 2
+localRegion = 0
+crossRackLatency = 0.1
+crossRegionLatency = 1.0
+crossRegionCost = 0.2
+hostFailureRate = 0.01
+rackFailureRate = 0.02
+regionFailureRate = 0.03
+vmQueueCapacity = 2
+autoscalingEnabled = true
+scaleOutQueueThreshold = 2
+maxDynamicVms = 2
+vmColdStartDelay = 1.0

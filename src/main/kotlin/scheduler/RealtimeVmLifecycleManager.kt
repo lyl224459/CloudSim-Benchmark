@@ -27,7 +27,8 @@ data class RealtimeVmLifecycleSnapshot(
 
 class RealtimeVmLifecycleManager(
     initialVms: List<Vm>,
-    private val scheduling: RealtimeSchedulingConfig
+    private val scheduling: RealtimeSchedulingConfig,
+    private val topologyModel: RealtimeTopologyModel = RealtimeTopologyModel.Disabled
 ) {
     private val mutableVms = initialVms.toMutableList()
     private val lifecycleByIndex = linkedMapOf<Int, RealtimeVmLifecycleSnapshot>()
@@ -67,7 +68,7 @@ class RealtimeVmLifecycleManager(
     fun hasLiveDynamicVms(): Boolean =
         lifecycleByIndex.values.any { it.dynamic && it.lifecycle != RealtimeVmLifecycle.TERMINATED }
 
-    fun maybeScaleOut(queueDepth: Int, currentTime: Double): List<Vm> {
+    fun maybeScaleOut(queueDepth: Int, currentTime: Double, activeVmIndexes: Set<Int> = emptySet()): List<Vm> {
         if (!scheduling.autoscalingEnabled) return emptyList()
         if (scheduling.maxDynamicVms <= dynamicVmCount()) return emptyList()
         if (queueDepth < scheduling.scaleOutQueueThreshold.coerceAtLeast(1)) return emptyList()
@@ -76,6 +77,7 @@ class RealtimeVmLifecycleManager(
         val vm = createDynamicVm()
         val index = mutableVms.size
         mutableVms.add(vm)
+        topologyModel.registerDynamicVm(index, activeVmIndexes)
         val lifecycle = if (scheduling.vmColdStartDelay > 0.0) {
             RealtimeVmLifecycle.WARMING
         } else {

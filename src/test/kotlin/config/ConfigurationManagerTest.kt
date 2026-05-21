@@ -131,6 +131,18 @@ class ConfigurationManagerTest {
             tenantQuota = [2, 1, 1]
             tenantWeights = [1.0, 2.0, 1.0]
             tenantFairnessPolicy = "weighted_fair"
+            topologyEnabled = true
+            topologyPolicy = "spread_fault_domains"
+            regionCount = 4
+            racksPerRegion = 3
+            hostsPerRack = 2
+            localRegion = 1
+            crossRackLatency = 0.15
+            crossRegionLatency = 2.5
+            crossRegionCost = 0.8
+            hostFailureRate = 0.01
+            rackFailureRate = 0.02
+            regionFailureRate = 0.03
         """.trimIndent())
 
         try {
@@ -190,6 +202,18 @@ class ConfigurationManagerTest {
             assertEquals(listOf(2, 1, 1), realtime?.scheduling?.tenantQuota)
             assertEquals(listOf(1.0, 2.0, 1.0), realtime?.scheduling?.tenantWeights)
             assertEquals("weighted_fair", realtime?.scheduling?.tenantFairnessPolicy)
+            assertEquals(true, realtime?.scheduling?.topologyEnabled)
+            assertEquals("spread_fault_domains", realtime?.scheduling?.topologyPolicy)
+            assertEquals(4, realtime?.scheduling?.regionCount)
+            assertEquals(3, realtime?.scheduling?.racksPerRegion)
+            assertEquals(2, realtime?.scheduling?.hostsPerRack)
+            assertEquals(1, realtime?.scheduling?.localRegion)
+            assertEquals(0.15, realtime?.scheduling?.crossRackLatency)
+            assertEquals(2.5, realtime?.scheduling?.crossRegionLatency)
+            assertEquals(0.8, realtime?.scheduling?.crossRegionCost)
+            assertEquals(0.01, realtime?.scheduling?.hostFailureRate)
+            assertEquals(0.02, realtime?.scheduling?.rackFailureRate)
+            assertEquals(0.03, realtime?.scheduling?.regionFailureRate)
         } finally {
             configFile.delete()
         }

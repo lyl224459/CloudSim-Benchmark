@@ -1,6 +1,7 @@
 package scheduler
 
 import config.RealtimeQueuePolicy
+import config.RealtimeTopologyPolicy
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import java.util.*
@@ -88,7 +89,7 @@ abstract class RealtimeSchedulerBase(
     protected fun orderedCandidateStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> {
         val base = context.candidateNodeStates.ifEmpty { context.nodeStates }
         val preemptableVmIndexes = context.preemptionCandidates.map { it.victimVmIndex.value }.toSet()
-        val policyComparator = when (context.queuePolicy) {
+        val queueComparator = when (context.queuePolicy) {
             RealtimeQueuePolicy.PRIORITY -> compareByDescending<RealtimeNodeState> { it.availableSlots }
                 .thenBy { it.availableTime }
                 .thenBy { it.estimatedLoad }
@@ -99,9 +100,19 @@ abstract class RealtimeSchedulerBase(
                 .thenBy { it.estimatedLoad }
                 .thenBy { it.queueDepth }
         }
+        val topologyComparator = when (context.topologyPolicy) {
+            RealtimeTopologyPolicy.SPREAD_FAULT_DOMAINS -> compareBy<RealtimeNodeState> { it.failureDomainLoad }
+                .thenBy { it.topologyLatency }
+                .thenBy { it.topologyCost }
+            RealtimeTopologyPolicy.LATENCY_AWARE -> compareBy<RealtimeNodeState> { it.availableTime }
+                .thenBy { it.topologyLatency }
+                .thenBy { it.topologyCost }
+                .thenBy { it.failureDomainLoad }
+        }
         return base.sortedWith(
             compareByDescending<RealtimeNodeState> { it.vmIndex in preemptableVmIndexes }
-                .then(policyComparator)
+                .then(topologyComparator)
+                .then(queueComparator)
                 .thenBy { it.vmIndex }
         )
     }

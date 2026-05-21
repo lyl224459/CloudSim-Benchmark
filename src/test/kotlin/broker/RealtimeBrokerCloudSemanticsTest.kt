@@ -500,6 +500,33 @@ class RealtimeBrokerCloudSemanticsTest {
         assertThat(broker.getPreemptedCount()).isEqualTo(1)
     }
 
+    @Test
+    fun `topology host failure pressure triggers runtime failure accounting`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                topologyEnabled = true,
+                regionCount = 1,
+                racksPerRegion = 1,
+                hostsPerRack = 1,
+                hostFailureRate = 1.0,
+                retryLimit = 0
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000)))
+
+        simulation.start()
+
+        assertThat(broker.getHostFailureCount()).isEqualTo(1)
+        assertThat(broker.getRuntimeFailureCount()).isGreaterThanOrEqualTo(1)
+    }
+
     private fun createVm(): Vm =
         VmSimple(1000.0, 1)
             .setRam(1024)

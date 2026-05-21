@@ -114,7 +114,18 @@ class ConfigValidationTest {
                     tenantCount = 0,
                     tenantQuota = listOf(1, -1),
                     tenantWeights = listOf(1.0, 0.0),
-                    tenantFairnessPolicy = "lottery"
+                    tenantFairnessPolicy = "lottery",
+                    topologyPolicy = "random",
+                    regionCount = 0,
+                    racksPerRegion = 0,
+                    hostsPerRack = 0,
+                    localRegion = 2,
+                    crossRackLatency = -0.1,
+                    crossRegionLatency = -0.1,
+                    crossRegionCost = -0.1,
+                    hostFailureRate = 1.1,
+                    rackFailureRate = -0.1,
+                    regionFailureRate = 1.2
                 )
             )
         )
@@ -162,6 +173,17 @@ class ConfigValidationTest {
             assertThat(e.errors.any { it.field == "realtime.scheduling.tenantWeights" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.tenantWeights[1]" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.tenantFairnessPolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.topologyPolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.regionCount" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.racksPerRegion" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostsPerRack" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.localRegion" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.crossRackLatency" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.crossRegionLatency" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.crossRegionCost" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostFailureRate" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.rackFailureRate" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.regionFailureRate" }).isTrue()
         }
     }
 

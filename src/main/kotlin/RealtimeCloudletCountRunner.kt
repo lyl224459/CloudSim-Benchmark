@@ -128,6 +128,18 @@ class RealtimeCloudletCountRunner(
             "租户配额" to scheduling.tenantQuota.joinToString(", "),
             "租户权重" to scheduling.tenantWeights.joinToString(", "),
             "租户公平策略" to scheduling.tenantFairnessPolicy,
+            "拓扑模型" to scheduling.topologyEnabled,
+            "拓扑策略" to scheduling.topologyPolicy,
+            "Region 数量" to scheduling.regionCount,
+            "每 Region Rack 数" to scheduling.racksPerRegion,
+            "每 Rack Host 数" to scheduling.hostsPerRack,
+            "本地 Region" to scheduling.localRegion,
+            "跨 Rack 延迟" to scheduling.crossRackLatency,
+            "跨 Region 延迟" to scheduling.crossRegionLatency,
+            "跨 Region 成本" to scheduling.crossRegionCost,
+            "Host 失败率" to scheduling.hostFailureRate,
+            "Rack 失败率" to scheduling.rackFailureRate,
+            "Region 失败率" to scheduling.regionFailureRate,
             "随机数种子" to randomSeed,
             "任务生成器" to generatorType.name
         ))
@@ -246,6 +258,14 @@ class RealtimeCloudletCountRunner(
                         "CheckpointLossTotal_Mean", "CheckpointLossTotal_StdDev",
                         "TenantQuotaRejectedCount_Mean", "TenantQuotaRejectedCount_StdDev",
                         "TenantFairnessIndex_Mean", "TenantFairnessIndex_StdDev",
+                        "CrossRackAssignmentCount_Mean", "CrossRackAssignmentCount_StdDev",
+                        "CrossRegionAssignmentCount_Mean", "CrossRegionAssignmentCount_StdDev",
+                        "AverageTopologyLatency_Mean", "AverageTopologyLatency_StdDev",
+                        "TopologyCost_Mean", "TopologyCost_StdDev",
+                        "HostFailureCount_Mean", "HostFailureCount_StdDev",
+                        "RackFailureCount_Mean", "RackFailureCount_StdDev",
+                        "RegionFailureCount_Mean", "RegionFailureCount_StdDev",
+                        "FailureDomainSpreadScore_Mean", "FailureDomainSpreadScore_StdDev",
                         "Runs"
                     )
                 ) + "\n"
@@ -303,6 +323,14 @@ class RealtimeCloudletCountRunner(
                                 stat.checkpointLossTotal.mean, stat.checkpointLossTotal.stdDev,
                                 stat.tenantQuotaRejectedCount.mean, stat.tenantQuotaRejectedCount.stdDev,
                                 stat.tenantFairnessIndex.mean, stat.tenantFairnessIndex.stdDev,
+                                stat.crossRackAssignmentCount.mean, stat.crossRackAssignmentCount.stdDev,
+                                stat.crossRegionAssignmentCount.mean, stat.crossRegionAssignmentCount.stdDev,
+                                stat.averageTopologyLatency.mean, stat.averageTopologyLatency.stdDev,
+                                stat.topologyCost.mean, stat.topologyCost.stdDev,
+                                stat.hostFailureCount.mean, stat.hostFailureCount.stdDev,
+                                stat.rackFailureCount.mean, stat.rackFailureCount.stdDev,
+                                stat.regionFailureCount.mean, stat.regionFailureCount.stdDev,
+                                stat.failureDomainSpreadScore.mean, stat.failureDomainSpreadScore.stdDev,
                                 runs
                             )
                         ) + "\n"
@@ -354,7 +382,15 @@ class RealtimeCloudletCountRunner(
             "PreemptionPenalty",
             "CheckpointLossTotal",
             "TenantQuotaRejectedCount",
-            "TenantFairnessIndex"
+            "TenantFairnessIndex",
+            "CrossRackAssignmentCount",
+            "CrossRegionAssignmentCount",
+            "AverageTopologyLatency",
+            "TopologyCost",
+            "HostFailureCount",
+            "RackFailureCount",
+            "RegionFailureCount",
+            "FailureDomainSpreadScore"
         )
         val summaryData = results.flatMap { (count, stats) ->
             stats.map { stat ->
@@ -399,7 +435,15 @@ class RealtimeCloudletCountRunner(
                     "PreemptionPenalty" to stat.preemptionPenalty.mean,
                     "CheckpointLossTotal" to stat.checkpointLossTotal.mean,
                     "TenantQuotaRejectedCount" to stat.tenantQuotaRejectedCount.mean,
-                    "TenantFairnessIndex" to stat.tenantFairnessIndex.mean
+                    "TenantFairnessIndex" to stat.tenantFairnessIndex.mean,
+                    "CrossRackAssignmentCount" to stat.crossRackAssignmentCount.mean,
+                    "CrossRegionAssignmentCount" to stat.crossRegionAssignmentCount.mean,
+                    "AverageTopologyLatency" to stat.averageTopologyLatency.mean,
+                    "TopologyCost" to stat.topologyCost.mean,
+                    "HostFailureCount" to stat.hostFailureCount.mean,
+                    "RackFailureCount" to stat.rackFailureCount.mean,
+                    "RegionFailureCount" to stat.regionFailureCount.mean,
+                    "FailureDomainSpreadScore" to stat.failureDomainSpreadScore.mean
                 )
             }
         }

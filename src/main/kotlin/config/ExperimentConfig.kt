@@ -185,7 +185,19 @@ data class RealtimeSchedulingConfig(
     val tenantCount: Int = 1,
     val tenantQuota: List<Int> = emptyList(),
     val tenantWeights: List<Double> = emptyList(),
-    val tenantFairnessPolicy: String = "quota_first"
+    val tenantFairnessPolicy: String = "quota_first",
+    val topologyEnabled: Boolean = false,
+    val topologyPolicy: String = "latency_aware",
+    val regionCount: Int = 3,
+    val racksPerRegion: Int = 2,
+    val hostsPerRack: Int = 2,
+    val localRegion: Int = 0,
+    val crossRackLatency: Double = 0.1,
+    val crossRegionLatency: Double = 1.0,
+    val crossRegionCost: Double = 0.0,
+    val hostFailureRate: Double = 0.0,
+    val rackFailureRate: Double = 0.0,
+    val regionFailureRate: Double = 0.0
 ) {
     fun normalizedQueuePolicy(): RealtimeQueuePolicy = RealtimeQueuePolicy.parse(queuePolicy)
 
@@ -195,6 +207,8 @@ data class RealtimeSchedulingConfig(
 
     fun normalizedTenantFairnessPolicy(): RealtimeTenantFairnessPolicy =
         RealtimeTenantFairnessPolicy.parse(tenantFairnessPolicy)
+
+    fun normalizedTopologyPolicy(): RealtimeTopologyPolicy = RealtimeTopologyPolicy.parse(topologyPolicy)
 }
 
 enum class RealtimeQueuePolicy(val configValue: String) {
@@ -247,6 +261,19 @@ enum class RealtimeTenantFairnessPolicy(val configValue: String) {
         fun parse(value: String): RealtimeTenantFairnessPolicy =
             entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
                 ?: throw IllegalArgumentException("未知实时租户公平策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
+enum class RealtimeTopologyPolicy(val configValue: String) {
+    LATENCY_AWARE("latency_aware"),
+    SPREAD_FAULT_DOMAINS("spread_fault_domains");
+
+    companion object {
+        fun parse(value: String): RealtimeTopologyPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时拓扑策略: $value")
 
         fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
     }
@@ -615,7 +642,19 @@ data class ExperimentConfig(
                     "tenantCount",
                     "tenantQuota",
                     "tenantWeights",
-                    "tenantFairnessPolicy"
+                    "tenantFairnessPolicy",
+                    "topologyEnabled",
+                    "topologyPolicy",
+                    "regionCount",
+                    "racksPerRegion",
+                    "hostsPerRack",
+                    "localRegion",
+                    "crossRackLatency",
+                    "crossRegionLatency",
+                    "crossRegionCost",
+                    "hostFailureRate",
+                    "rackFailureRate",
+                    "regionFailureRate"
                 )
             )
             val current = base ?: TomlRealtimeConfig()
@@ -702,7 +741,43 @@ data class ExperimentConfig(
                 } ?: current.scheduling.tenantWeights,
                 tenantFairnessPolicy = properties["tenantFairnessPolicy"]?.let {
                     TomlSectionParser.unquote(it)
-                } ?: current.scheduling.tenantFairnessPolicy
+                } ?: current.scheduling.tenantFairnessPolicy,
+                topologyEnabled = properties["topologyEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.topologyEnabled", it)
+                } ?: current.scheduling.topologyEnabled,
+                topologyPolicy = properties["topologyPolicy"]?.let {
+                    TomlSectionParser.unquote(it)
+                } ?: current.scheduling.topologyPolicy,
+                regionCount = properties["regionCount"]?.let {
+                    parseRequiredInt("realtime.scheduling.regionCount", it)
+                } ?: current.scheduling.regionCount,
+                racksPerRegion = properties["racksPerRegion"]?.let {
+                    parseRequiredInt("realtime.scheduling.racksPerRegion", it)
+                } ?: current.scheduling.racksPerRegion,
+                hostsPerRack = properties["hostsPerRack"]?.let {
+                    parseRequiredInt("realtime.scheduling.hostsPerRack", it)
+                } ?: current.scheduling.hostsPerRack,
+                localRegion = properties["localRegion"]?.let {
+                    parseRequiredInt("realtime.scheduling.localRegion", it)
+                } ?: current.scheduling.localRegion,
+                crossRackLatency = properties["crossRackLatency"]?.let {
+                    parseRequiredDouble("realtime.scheduling.crossRackLatency", it)
+                } ?: current.scheduling.crossRackLatency,
+                crossRegionLatency = properties["crossRegionLatency"]?.let {
+                    parseRequiredDouble("realtime.scheduling.crossRegionLatency", it)
+                } ?: current.scheduling.crossRegionLatency,
+                crossRegionCost = properties["crossRegionCost"]?.let {
+                    parseRequiredDouble("realtime.scheduling.crossRegionCost", it)
+                } ?: current.scheduling.crossRegionCost,
+                hostFailureRate = properties["hostFailureRate"]?.let {
+                    parseRequiredDouble("realtime.scheduling.hostFailureRate", it)
+                } ?: current.scheduling.hostFailureRate,
+                rackFailureRate = properties["rackFailureRate"]?.let {
+                    parseRequiredDouble("realtime.scheduling.rackFailureRate", it)
+                } ?: current.scheduling.rackFailureRate,
+                regionFailureRate = properties["regionFailureRate"]?.let {
+                    parseRequiredDouble("realtime.scheduling.regionFailureRate", it)
+                } ?: current.scheduling.regionFailureRate
             )
             return current.copy(scheduling = scheduling)
         }
@@ -1168,6 +1243,51 @@ data class ExperimentConfig(
             if (realtime.scheduling.tenantFairnessPolicy.lowercase() !in tenantFairnessPolicies) {
                 errors.add(ValidationError("realtime.scheduling.tenantFairnessPolicy", realtime.scheduling.tenantFairnessPolicy,
                     "租户公平策略必须是以下值之一: ${tenantFairnessPolicies.joinToString(", ")}"))
+            }
+            val topologyPolicies = RealtimeTopologyPolicy.valuesForConfig()
+            if (realtime.scheduling.topologyPolicy.lowercase() !in topologyPolicies) {
+                errors.add(ValidationError("realtime.scheduling.topologyPolicy", realtime.scheduling.topologyPolicy,
+                    "拓扑策略必须是以下值之一: ${topologyPolicies.joinToString(", ")}"))
+            }
+            if (realtime.scheduling.regionCount < 1) {
+                errors.add(ValidationError("realtime.scheduling.regionCount", realtime.scheduling.regionCount.toString(),
+                    "Region 数量必须大于等于 1"))
+            }
+            if (realtime.scheduling.racksPerRegion < 1) {
+                errors.add(ValidationError("realtime.scheduling.racksPerRegion", realtime.scheduling.racksPerRegion.toString(),
+                    "每个 Region 的 Rack 数量必须大于等于 1"))
+            }
+            if (realtime.scheduling.hostsPerRack < 1) {
+                errors.add(ValidationError("realtime.scheduling.hostsPerRack", realtime.scheduling.hostsPerRack.toString(),
+                    "每个 Rack 的 Host 数量必须大于等于 1"))
+            }
+            if (realtime.scheduling.localRegion !in 0 until realtime.scheduling.regionCount.coerceAtLeast(1)) {
+                errors.add(ValidationError("realtime.scheduling.localRegion", realtime.scheduling.localRegion.toString(),
+                    "本地 Region 必须在 [0, regionCount) 范围内"))
+            }
+            if (realtime.scheduling.crossRackLatency < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.crossRackLatency", realtime.scheduling.crossRackLatency.toString(),
+                    "跨 Rack 延迟不能为负数"))
+            }
+            if (realtime.scheduling.crossRegionLatency < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.crossRegionLatency", realtime.scheduling.crossRegionLatency.toString(),
+                    "跨 Region 延迟不能为负数"))
+            }
+            if (realtime.scheduling.crossRegionCost < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.crossRegionCost", realtime.scheduling.crossRegionCost.toString(),
+                    "跨 Region 成本不能为负数"))
+            }
+            if (realtime.scheduling.hostFailureRate < 0.0 || realtime.scheduling.hostFailureRate > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.hostFailureRate", realtime.scheduling.hostFailureRate.toString(),
+                    "Host 失败率必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.rackFailureRate < 0.0 || realtime.scheduling.rackFailureRate > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.rackFailureRate", realtime.scheduling.rackFailureRate.toString(),
+                    "Rack 失败率必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.regionFailureRate < 0.0 || realtime.scheduling.regionFailureRate > 1.0) {
+                errors.add(ValidationError("realtime.scheduling.regionFailureRate", realtime.scheduling.regionFailureRate.toString(),
+                    "Region 失败率必须在 [0,1] 范围内"))
             }
             val reservations = setOf("none", "partial", "full")
             if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {

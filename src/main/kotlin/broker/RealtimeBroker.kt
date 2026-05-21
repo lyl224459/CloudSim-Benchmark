@@ -14,6 +14,8 @@ import scheduler.RealtimeSchedulingContext
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskMetadata
 import scheduler.RealtimeTaskRecord
+import scheduler.RealtimeTopologyMetrics
+import scheduler.RealtimeTopologyModel
 import scheduler.RealtimeVmLifecycleManager
 import java.util.Random
 import kotlin.math.ceil
@@ -46,7 +48,8 @@ class RealtimeBroker(
     private val attempts = mutableMapOf<Long, Int>()
     private val lifecycleStore = RealtimeTaskLifecycleStore()
     private val vmReservations = mutableMapOf<Long, Int>()
-    private val vmLifecycleManager = RealtimeVmLifecycleManager(initialVmList, schedulingConfig)
+    private val topologyModel = RealtimeTopologyModel.fromConfig(schedulingConfig, initialVmList.size)
+    private val vmLifecycleManager = RealtimeVmLifecycleManager(initialVmList, schedulingConfig, topologyModel)
     private val vmList: List<Vm> get() = vmLifecycleManager.vmList
     private val nodeStateTracker = RealtimeNodeStateTracker(
         vmLifecycleManager.vmList,
@@ -58,7 +61,8 @@ class RealtimeBroker(
             ioWeight = schedulingConfig.ioWeight,
             ramWeight = schedulingConfig.ramWeight,
             bwWeight = schedulingConfig.bwWeight
-        )
+        ),
+        topologyModel
     )
     private val failureRandom = Random(0L)
     private val admissionController = RealtimeAdmissionController(schedulingConfig)
@@ -84,6 +88,9 @@ class RealtimeBroker(
     private var preemptionDelayTotal = 0.0
     private var preemptionPenaltyTotal = 0.0
     private var checkpointLossTotal = 0L
+    private var hostFailureCount = 0
+    private var rackFailureCount = 0
+    private var regionFailureCount = 0
     private var decisionDelayTotal = 0.0
     private var decisionCount = 0
     private var queueDepthSampleTotal = 0
@@ -204,6 +211,19 @@ class RealtimeBroker(
 
     fun getTenantFairnessIndex(cloudlets: List<Cloudlet>): Double =
         tenantController.fairnessIndex(cloudlets, lifecycleStore.snapshot())
+
+    fun getTopologyMetrics(cloudlets: List<Cloudlet>): RealtimeTopologyMetrics =
+        topologyModel.metricsFor(
+            cloudlets.mapNotNull { cloudlet ->
+                lifecycleStore.get(cloudlet.id)?.assignedVmIndex ?: vmReservations[cloudlet.id] ?: cloudlet.vm?.id?.toInt()
+            }
+        )
+
+    fun getHostFailureCount(): Int = hostFailureCount
+
+    fun getRackFailureCount(): Int = rackFailureCount
+
+    fun getRegionFailureCount(): Int = regionFailureCount
 
     fun getArrivalTime(cloudlet: Cloudlet): Double = arrivalTimes[cloudlet.id] ?: cloudlet.submissionDelay
 
@@ -471,6 +491,7 @@ class RealtimeBroker(
             ),
             taskMetadata = lifecycleStore.get(cloudlet.id) ?: createMetadata(cloudlet),
             queuePolicy = schedulingConfig.normalizedQueuePolicy(),
+            topologyPolicy = schedulingConfig.normalizedTopologyPolicy(),
             preemptionCandidates = preemptionController.candidates(
                 incoming = lifecycleStore.get(cloudlet.id) ?: createMetadata(cloudlet),
                 activeCloudlets = activeCloudlets,
@@ -498,6 +519,7 @@ class RealtimeBroker(
 
         val runtimeFailureRate = effectiveRuntimeFailureRate(cloudlet)
         if (runtimeFailureRate > 0.0 && deterministicUnit(cloudlet.id, attempt, salt = 61) < runtimeFailureRate) {
+            recordTopologyFailure(cloudlet, attempt)
             val runtime = estimatedRuntime(cloudlet)
             val delay = (runtime * (0.25 + deterministicUnit(cloudlet.id, attempt, salt = 67) * 0.5)).coerceAtLeast(0.001)
             schedule(delay, RUNTIME_FAILURE_EVENT_TAG, CloudletEventPayload(cloudlet, attempt))
@@ -510,7 +532,27 @@ class RealtimeBroker(
         val pressure = states.getOrNull(assignedVmIndex)?.failurePressure ?: 0.0
         return (schedulingConfig.runtimeFailureRate +
             schedulingConfig.nodeFailureRate +
-            pressure * schedulingConfig.overloadFailureMultiplier).coerceIn(0.0, 1.0)
+            pressure * schedulingConfig.overloadFailureMultiplier +
+            topologyModel.failurePressure(topologyModel.locationOf(assignedVmIndex))).coerceIn(0.0, 1.0)
+    }
+
+    private fun recordTopologyFailure(cloudlet: Cloudlet, attempt: Int) {
+        if (!schedulingConfig.topologyEnabled) return
+        val assignedVmIndex = lifecycleStore.get(cloudlet.id)?.assignedVmIndex ?: return
+        val location = topologyModel.locationOf(assignedVmIndex)
+        val unit = deterministicUnit(cloudlet.id, attempt, salt = 71)
+        val hostCutoff = schedulingConfig.hostFailureRate
+        val rackCutoff = hostCutoff + schedulingConfig.rackFailureRate
+        val regionCutoff = rackCutoff + if (location.regionId.value != schedulingConfig.localRegion) {
+            schedulingConfig.regionFailureRate
+        } else {
+            0.0
+        }
+        when {
+            unit < hostCutoff -> hostFailureCount++
+            unit < rackCutoff -> rackFailureCount++
+            unit < regionCutoff -> regionFailureCount++
+        }
     }
 
     private fun onCloudletTimeout(cloudlet: Cloudlet, attempt: Int) {
@@ -747,7 +789,8 @@ class RealtimeBroker(
         }
 
     private fun submitNewDynamicVmsIfNeeded(queueDepth: Int, currentTime: Double) {
-        val newVms = vmLifecycleManager.maybeScaleOut(queueDepth, currentTime)
+        val activeIndexes = getActiveCloudlets().mapNotNull { vmReservations[it.id] ?: it.vm?.id?.toInt() }.toSet()
+        val newVms = vmLifecycleManager.maybeScaleOut(queueDepth, currentTime, activeIndexes)
         if (newVms.isNotEmpty()) {
             submitVmList(newVms, schedulingConfig.vmColdStartDelay)
             if (schedulingConfig.scaleInIdleTime > 0.0) {

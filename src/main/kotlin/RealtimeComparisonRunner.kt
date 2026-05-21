@@ -59,7 +59,15 @@ data class RealtimeAlgorithmResult(
     val preemptionPenalty: Double,
     val checkpointLossTotal: Long,
     val tenantQuotaRejectedCount: Int,
-    val tenantFairnessIndex: Double
+    val tenantFairnessIndex: Double,
+    val crossRackAssignmentCount: Int,
+    val crossRegionAssignmentCount: Int,
+    val averageTopologyLatency: Double,
+    val topologyCost: Double,
+    val hostFailureCount: Int,
+    val rackFailureCount: Int,
+    val regionFailureCount: Int,
+    val failureDomainSpreadScore: Double
 )
 
 data class RealtimeAlgorithmStatistics(
@@ -105,7 +113,15 @@ data class RealtimeAlgorithmStatistics(
     val preemptionPenalty: StatisticalValue,
     val checkpointLossTotal: StatisticalValue,
     val tenantQuotaRejectedCount: StatisticalValue,
-    val tenantFairnessIndex: StatisticalValue
+    val tenantFairnessIndex: StatisticalValue,
+    val crossRackAssignmentCount: StatisticalValue,
+    val crossRegionAssignmentCount: StatisticalValue,
+    val averageTopologyLatency: StatisticalValue,
+    val topologyCost: StatisticalValue,
+    val hostFailureCount: StatisticalValue,
+    val rackFailureCount: StatisticalValue,
+    val regionFailureCount: StatisticalValue,
+    val failureDomainSpreadScore: StatisticalValue
 )
 
 private data class RealtimeRunSummary(
@@ -176,7 +192,15 @@ class RealtimeComparisonRunner(
         val preemptionPenalty: Double,
         val checkpointLossTotal: Long,
         val tenantQuotaRejectedCount: Int,
-        val tenantFairnessIndex: Double
+        val tenantFairnessIndex: Double,
+        val crossRackAssignmentCount: Int,
+        val crossRegionAssignmentCount: Int,
+        val averageTopologyLatency: Double,
+        val topologyCost: Double,
+        val hostFailureCount: Int,
+        val rackFailureCount: Int,
+        val regionFailureCount: Int,
+        val failureDomainSpreadScore: Double
     )
 
     private fun executionModeDescription(): String {
@@ -289,7 +313,15 @@ class RealtimeComparisonRunner(
             preemptionPenalty = metrics.preemptionPenalty,
             checkpointLossTotal = metrics.checkpointLossTotal,
             tenantQuotaRejectedCount = metrics.tenantQuotaRejectedCount,
-            tenantFairnessIndex = metrics.tenantFairnessIndex
+            tenantFairnessIndex = metrics.tenantFairnessIndex,
+            crossRackAssignmentCount = metrics.crossRackAssignmentCount,
+            crossRegionAssignmentCount = metrics.crossRegionAssignmentCount,
+            averageTopologyLatency = metrics.averageTopologyLatency,
+            topologyCost = metrics.topologyCost,
+            hostFailureCount = metrics.hostFailureCount,
+            rackFailureCount = metrics.rackFailureCount,
+            regionFailureCount = metrics.regionFailureCount,
+            failureDomainSpreadScore = metrics.failureDomainSpreadScore
         )
     }
 
@@ -364,6 +396,7 @@ class RealtimeComparisonRunner(
         } else {
             0.0
         }
+        val topologyMetrics = broker.getTopologyMetrics(cloudletList)
 
         return RealtimeMetrics(
             makespan = makespan,
@@ -405,7 +438,15 @@ class RealtimeComparisonRunner(
             preemptionPenalty = broker.getPreemptionPenalty(),
             checkpointLossTotal = broker.getCheckpointLossTotal(),
             tenantQuotaRejectedCount = broker.getTenantQuotaRejectedCount(),
-            tenantFairnessIndex = broker.getTenantFairnessIndex(cloudletList)
+            tenantFairnessIndex = broker.getTenantFairnessIndex(cloudletList),
+            crossRackAssignmentCount = topologyMetrics.crossRackAssignmentCount,
+            crossRegionAssignmentCount = topologyMetrics.crossRegionAssignmentCount,
+            averageTopologyLatency = topologyMetrics.averageTopologyLatency,
+            topologyCost = topologyMetrics.topologyCost,
+            hostFailureCount = broker.getHostFailureCount(),
+            rackFailureCount = broker.getRackFailureCount(),
+            regionFailureCount = broker.getRegionFailureCount(),
+            failureDomainSpreadScore = topologyMetrics.failureDomainSpreadScore
         )
     }
 
@@ -473,6 +514,18 @@ class RealtimeComparisonRunner(
             "租户配额" to scheduling.tenantQuota.joinToString(", "),
             "租户权重" to scheduling.tenantWeights.joinToString(", "),
             "租户公平策略" to scheduling.tenantFairnessPolicy,
+            "拓扑模型" to scheduling.topologyEnabled,
+            "拓扑策略" to scheduling.topologyPolicy,
+            "Region 数量" to scheduling.regionCount,
+            "每 Region Rack 数" to scheduling.racksPerRegion,
+            "每 Rack Host 数" to scheduling.hostsPerRack,
+            "本地 Region" to scheduling.localRegion,
+            "跨 Rack 延迟" to scheduling.crossRackLatency,
+            "跨 Region 延迟" to scheduling.crossRegionLatency,
+            "跨 Region 成本" to scheduling.crossRegionCost,
+            "Host 失败率" to scheduling.hostFailureRate,
+            "Rack 失败率" to scheduling.rackFailureRate,
+            "Region 失败率" to scheduling.regionFailureRate,
             "随机数种子" to randomSeed,
             "运行次数" to runs,
             "任务生成器" to generatorType.name
@@ -533,7 +586,15 @@ class RealtimeComparisonRunner(
                     "PreemptionPenalty" to r.preemptionPenalty,
                     "CheckpointLossTotal" to r.checkpointLossTotal,
                     "TenantQuotaRejectedCount" to r.tenantQuotaRejectedCount,
-                    "TenantFairnessIndex" to r.tenantFairnessIndex
+                    "TenantFairnessIndex" to r.tenantFairnessIndex,
+                    "CrossRackAssignmentCount" to r.crossRackAssignmentCount,
+                    "CrossRegionAssignmentCount" to r.crossRegionAssignmentCount,
+                    "AverageTopologyLatency" to r.averageTopologyLatency,
+                    "TopologyCost" to r.topologyCost,
+                    "HostFailureCount" to r.hostFailureCount,
+                    "RackFailureCount" to r.rackFailureCount,
+                    "RegionFailureCount" to r.regionFailureCount,
+                    "FailureDomainSpreadScore" to r.failureDomainSpreadScore
                 )
             }
             outputContext.saveSummaryResults(
@@ -548,7 +609,9 @@ class RealtimeComparisonRunner(
                     "RuntimeFailureCount", "TimeoutCancelledCount", "MigrationCount", "CheckpointRecoveryCount",
                     "RetrySuccessRate", "SlaPenalty", "PreemptedCount", "PreemptionSuccessCount",
                     "PreemptionFailedCount", "AvgPreemptionDelay", "PreemptionPenalty", "CheckpointLossTotal",
-                    "TenantQuotaRejectedCount", "TenantFairnessIndex"
+                    "TenantQuotaRejectedCount", "TenantFairnessIndex", "CrossRackAssignmentCount",
+                    "CrossRegionAssignmentCount", "AverageTopologyLatency", "TopologyCost",
+                    "HostFailureCount", "RackFailureCount", "RegionFailureCount", "FailureDomainSpreadScore"
                 )
             )
         }
@@ -638,7 +701,15 @@ class RealtimeComparisonRunner(
             preemptionPenalty = Double.NaN,
             checkpointLossTotal = Long.MAX_VALUE,
             tenantQuotaRejectedCount = Int.MAX_VALUE,
-            tenantFairnessIndex = Double.NaN
+            tenantFairnessIndex = Double.NaN,
+            crossRackAssignmentCount = Int.MAX_VALUE,
+            crossRegionAssignmentCount = Int.MAX_VALUE,
+            averageTopologyLatency = Double.NaN,
+            topologyCost = Double.NaN,
+            hostFailureCount = Int.MAX_VALUE,
+            rackFailureCount = Int.MAX_VALUE,
+            regionFailureCount = Int.MAX_VALUE,
+            failureDomainSpreadScore = Double.NaN
         )
         return RealtimeRunSummary(
             average = failedResult,
@@ -697,7 +768,15 @@ class RealtimeComparisonRunner(
             preemptionPenalty = runResults.map { it.preemptionPenalty }.average(),
             checkpointLossTotal = runResults.map { it.checkpointLossTotal }.average().roundToInt().toLong(),
             tenantQuotaRejectedCount = runResults.map { it.tenantQuotaRejectedCount }.average().roundToInt(),
-            tenantFairnessIndex = runResults.map { it.tenantFairnessIndex }.average()
+            tenantFairnessIndex = runResults.map { it.tenantFairnessIndex }.average(),
+            crossRackAssignmentCount = runResults.map { it.crossRackAssignmentCount }.average().roundToInt(),
+            crossRegionAssignmentCount = runResults.map { it.crossRegionAssignmentCount }.average().roundToInt(),
+            averageTopologyLatency = runResults.map { it.averageTopologyLatency }.average(),
+            topologyCost = runResults.map { it.topologyCost }.average(),
+            hostFailureCount = runResults.map { it.hostFailureCount }.average().roundToInt(),
+            rackFailureCount = runResults.map { it.rackFailureCount }.average().roundToInt(),
+            regionFailureCount = runResults.map { it.regionFailureCount }.average().roundToInt(),
+            failureDomainSpreadScore = runResults.map { it.failureDomainSpreadScore }.average()
         )
     }
 
@@ -755,7 +834,15 @@ class RealtimeComparisonRunner(
                 "PreemptionPenalty" to result.preemptionPenalty,
                 "CheckpointLossTotal" to result.checkpointLossTotal.toDouble(),
                 "TenantQuotaRejectedCount" to result.tenantQuotaRejectedCount.toDouble(),
-                "TenantFairnessIndex" to result.tenantFairnessIndex
+                "TenantFairnessIndex" to result.tenantFairnessIndex,
+                "CrossRackAssignmentCount" to result.crossRackAssignmentCount.toDouble(),
+                "CrossRegionAssignmentCount" to result.crossRegionAssignmentCount.toDouble(),
+                "AverageTopologyLatency" to result.averageTopologyLatency,
+                "TopologyCost" to result.topologyCost,
+                "HostFailureCount" to result.hostFailureCount.toDouble(),
+                "RackFailureCount" to result.rackFailureCount.toDouble(),
+                "RegionFailureCount" to result.regionFailureCount.toDouble(),
+                "FailureDomainSpreadScore" to result.failureDomainSpreadScore
             )
         )
         result
@@ -831,7 +918,15 @@ class RealtimeComparisonRunner(
             preemptionPenalty = stats(results.map { it.preemptionPenalty }),
             checkpointLossTotal = stats(results.map { it.checkpointLossTotal.toDouble() }),
             tenantQuotaRejectedCount = stats(results.map { it.tenantQuotaRejectedCount.toDouble() }),
-            tenantFairnessIndex = stats(results.map { it.tenantFairnessIndex })
+            tenantFairnessIndex = stats(results.map { it.tenantFairnessIndex }),
+            crossRackAssignmentCount = stats(results.map { it.crossRackAssignmentCount.toDouble() }),
+            crossRegionAssignmentCount = stats(results.map { it.crossRegionAssignmentCount.toDouble() }),
+            averageTopologyLatency = stats(results.map { it.averageTopologyLatency }),
+            topologyCost = stats(results.map { it.topologyCost }),
+            hostFailureCount = stats(results.map { it.hostFailureCount.toDouble() }),
+            rackFailureCount = stats(results.map { it.rackFailureCount.toDouble() }),
+            regionFailureCount = stats(results.map { it.regionFailureCount.toDouble() }),
+            failureDomainSpreadScore = stats(results.map { it.failureDomainSpreadScore })
         )
     }
 
@@ -903,6 +998,14 @@ class RealtimeComparisonRunner(
                     "CheckpointLossTotal_Mean", "CheckpointLossTotal_StdDev",
                     "TenantQuotaRejectedCount_Mean", "TenantQuotaRejectedCount_StdDev",
                     "TenantFairnessIndex_Mean", "TenantFairnessIndex_StdDev",
+                    "CrossRackAssignmentCount_Mean", "CrossRackAssignmentCount_StdDev",
+                    "CrossRegionAssignmentCount_Mean", "CrossRegionAssignmentCount_StdDev",
+                    "AverageTopologyLatency_Mean", "AverageTopologyLatency_StdDev",
+                    "TopologyCost_Mean", "TopologyCost_StdDev",
+                    "HostFailureCount_Mean", "HostFailureCount_StdDev",
+                    "RackFailureCount_Mean", "RackFailureCount_StdDev",
+                    "RegionFailureCount_Mean", "RegionFailureCount_StdDev",
+                    "FailureDomainSpreadScore_Mean", "FailureDomainSpreadScore_StdDev",
                     "Runs"
                 )
             } else {
@@ -916,7 +1019,9 @@ class RealtimeComparisonRunner(
                     "RuntimeFailureCount", "TimeoutCancelledCount", "MigrationCount", "CheckpointRecoveryCount",
                     "RetrySuccessRate", "SlaPenalty", "PreemptedCount", "PreemptionSuccessCount",
                     "PreemptionFailedCount", "AvgPreemptionDelay", "PreemptionPenalty", "CheckpointLossTotal",
-                    "TenantQuotaRejectedCount", "TenantFairnessIndex"
+                    "TenantQuotaRejectedCount", "TenantFairnessIndex", "CrossRackAssignmentCount",
+                    "CrossRegionAssignmentCount", "AverageTopologyLatency", "TopologyCost",
+                    "HostFailureCount", "RackFailureCount", "RegionFailureCount", "FailureDomainSpreadScore"
                 )
             }
             writer.write(outputContext.csvLine(headers) + "\n")
@@ -970,6 +1075,14 @@ class RealtimeComparisonRunner(
                             stat.checkpointLossTotal.mean, stat.checkpointLossTotal.stdDev,
                             stat.tenantQuotaRejectedCount.mean, stat.tenantQuotaRejectedCount.stdDev,
                             stat.tenantFairnessIndex.mean, stat.tenantFairnessIndex.stdDev,
+                            stat.crossRackAssignmentCount.mean, stat.crossRackAssignmentCount.stdDev,
+                            stat.crossRegionAssignmentCount.mean, stat.crossRegionAssignmentCount.stdDev,
+                            stat.averageTopologyLatency.mean, stat.averageTopologyLatency.stdDev,
+                            stat.topologyCost.mean, stat.topologyCost.stdDev,
+                            stat.hostFailureCount.mean, stat.hostFailureCount.stdDev,
+                            stat.rackFailureCount.mean, stat.rackFailureCount.stdDev,
+                            stat.regionFailureCount.mean, stat.regionFailureCount.stdDev,
+                            stat.failureDomainSpreadScore.mean, stat.failureDomainSpreadScore.stdDev,
                             summary.runResults.size
                         )
                     } else {
@@ -1017,6 +1130,14 @@ class RealtimeComparisonRunner(
                             result.checkpointLossTotal, Double.NaN,
                             result.tenantQuotaRejectedCount, Double.NaN,
                             result.tenantFairnessIndex, Double.NaN,
+                            result.crossRackAssignmentCount, Double.NaN,
+                            result.crossRegionAssignmentCount, Double.NaN,
+                            result.averageTopologyLatency, Double.NaN,
+                            result.topologyCost, Double.NaN,
+                            result.hostFailureCount, Double.NaN,
+                            result.rackFailureCount, Double.NaN,
+                            result.regionFailureCount, Double.NaN,
+                            result.failureDomainSpreadScore, Double.NaN,
                             0
                         )
                     }
@@ -1064,7 +1185,15 @@ class RealtimeComparisonRunner(
                         result.preemptionPenalty,
                         result.checkpointLossTotal,
                         result.tenantQuotaRejectedCount,
-                        result.tenantFairnessIndex
+                        result.tenantFairnessIndex,
+                        result.crossRackAssignmentCount,
+                        result.crossRegionAssignmentCount,
+                        result.averageTopologyLatency,
+                        result.topologyCost,
+                        result.hostFailureCount,
+                        result.rackFailureCount,
+                        result.regionFailureCount,
+                        result.failureDomainSpreadScore
                     )
                 }
                 writer.write(outputContext.csvLine(row) + "\n")
