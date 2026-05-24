@@ -115,6 +115,10 @@ class ConfigValidationTest {
                     tenantQuota = listOf(1, -1),
                     tenantWeights = listOf(1.0, 0.0),
                     tenantFairnessPolicy = "lottery",
+                    tenantSchedulingPolicy = "lottery",
+                    tenantBurstAllowance = -1,
+                    tenantSlaPenaltyWeight = -0.1,
+                    tenantCostBudget = listOf(10.0, -1.0),
                     topologyPolicy = "random",
                     regionCount = 0,
                     racksPerRegion = 0,
@@ -125,7 +129,16 @@ class ConfigValidationTest {
                     crossRegionCost = -0.1,
                     hostFailureRate = 1.1,
                     rackFailureRate = -0.1,
-                    regionFailureRate = 1.2
+                    regionFailureRate = 1.2,
+                    hostCountPerRack = 0,
+                    hostCpuCapacity = -1.0,
+                    hostRamCapacity = -1.0,
+                    hostBwCapacity = -1.0,
+                    hostIoCapacity = -1.0,
+                    crossRackBandwidth = -1.0,
+                    crossRegionBandwidth = -1.0,
+                    dataLocalityPolicy = "nearest",
+                    imageCacheCapacity = -1
                 )
             )
         )
@@ -173,6 +186,11 @@ class ConfigValidationTest {
             assertThat(e.errors.any { it.field == "realtime.scheduling.tenantWeights" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.tenantWeights[1]" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.tenantFairnessPolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantSchedulingPolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantBurstAllowance" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantSlaPenaltyWeight" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantCostBudget" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.tenantCostBudget[1]" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.topologyPolicy" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.regionCount" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.racksPerRegion" }).isTrue()
@@ -184,6 +202,15 @@ class ConfigValidationTest {
             assertThat(e.errors.any { it.field == "realtime.scheduling.hostFailureRate" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.rackFailureRate" }).isTrue()
             assertThat(e.errors.any { it.field == "realtime.scheduling.regionFailureRate" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostCountPerRack" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostCpuCapacity" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostRamCapacity" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostBwCapacity" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.hostIoCapacity" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.crossRackBandwidth" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.crossRegionBandwidth" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.dataLocalityPolicy" }).isTrue()
+            assertThat(e.errors.any { it.field == "realtime.scheduling.imageCacheCapacity" }).isTrue()
         }
     }
 

@@ -73,6 +73,47 @@ class RealtimeTopologyModelTest {
     }
 
     @Test
+    fun `physical candidates enforce capacity and reuse image cache`() {
+        val model = RealtimeTopologyModel.fromConfig(
+            RealtimeSchedulingConfig(
+                physicalTopologyEnabled = true,
+                imageCacheEnabled = true,
+                regionCount = 1,
+                racksPerRegion = 1,
+                hostCountPerRack = 1,
+                hostCpuCapacity = 1.0,
+                imageCacheCapacity = 1
+            ),
+            initialVmCount = 1
+        )
+        val workload = RealtimeWorkloadDescriptor(
+            cloudletId = CloudletId(1),
+            tenantId = TenantId(0),
+            priority = 0,
+            deadline = null,
+            requestedCpu = 2.0,
+            requestedRam = 0.0,
+            requestedBw = 0.0,
+            requestedIo = 0.0,
+            dataRegion = RegionId(0),
+            inputDataSizeGb = 0.0,
+            imageId = "base-image",
+            imageSizeGb = 10.0
+        )
+
+        val rejected = model.candidatesFor(listOf(nodeState(0)), createVms(1), workload, emptyList()).single()
+        assertThat(rejected.placement).isInstanceOf(RealtimePlacementDecision.Rejected::class.java)
+
+        val acceptedWorkload = workload.copy(requestedCpu = 0.5)
+        val first = model.candidatesFor(listOf(nodeState(0)), createVms(1), acceptedWorkload, emptyList()).single()
+        assertThat(first.acceptedPlacement?.imageCacheHit).isFalse()
+
+        model.recordSubmission(0, acceptedWorkload)
+        val second = model.candidatesFor(listOf(nodeState(0)), createVms(1), acceptedWorkload, emptyList()).single()
+        assertThat(second.acceptedPlacement?.imageCacheHit).isTrue()
+    }
+
+    @Test
     fun `latency aware scheduler prefers earliest topology adjusted available time`() {
         val scheduler = RealtimeMinLoadScheduler(createVms(3))
         val selected = scheduler.scheduleOnArrival(

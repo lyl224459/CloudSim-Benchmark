@@ -73,7 +73,7 @@ object DryRunPrinter {
         }
         if (resolved.mode.startsWith("realtime")) {
             Logger.result(
-                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}, queuePolicy={}, priorityLevels={}, highPriorityRatio={}, deadlineFactor={}, vmQueueCapacity={}, overloadFailureMultiplier={}, autoscalingEnabled={}, scaleOutQueueThreshold={}, maxDynamicVms={}, vmColdStartDelay={}, resourceModelEnabled={}, networkLatency={}, imagePullDelay={}, runtimeFailureRate={}, nodeFailureRate={}, timeoutAction={}, preemptionEnabled={}, preemptionPolicy={}, preemptionMinPriorityGap={}, preemptionMaxPerTask={}, preemptionDelay={}, preemptionPenalty={}, multiTenantEnabled={}, tenantCount={}, tenantQuota=[{}], tenantWeights=[{}], tenantFairnessPolicy={}, topologyEnabled={}, topologyPolicy={}, regionCount={}, racksPerRegion={}, hostsPerRack={}, localRegion={}, crossRackLatency={}, crossRegionLatency={}, crossRegionCost={}, hostFailureRate={}, rackFailureRate={}, regionFailureRate={}",
+                "实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}, queuePolicy={}, priorityLevels={}, highPriorityRatio={}, deadlineFactor={}, vmQueueCapacity={}, overloadFailureMultiplier={}, autoscalingEnabled={}, scaleOutQueueThreshold={}, maxDynamicVms={}, vmColdStartDelay={}, resourceModelEnabled={}, networkLatency={}, imagePullDelay={}, runtimeFailureRate={}, nodeFailureRate={}, timeoutAction={}, preemptionEnabled={}, preemptionPolicy={}, preemptionMinPriorityGap={}, preemptionMaxPerTask={}, preemptionDelay={}, preemptionPenalty={}, multiTenantEnabled={}, tenantCount={}, tenantQuota=[{}], tenantWeights=[{}], tenantFairnessPolicy={}, tenantSchedulingPolicy={}, tenantBurstAllowance={}, tenantSlaPenaltyWeight={}, tenantCostBudget=[{}], topologyEnabled={}, topologyPolicy={}, regionCount={}, racksPerRegion={}, hostsPerRack={}, localRegion={}, crossRackLatency={}, crossRegionLatency={}, crossRegionCost={}, hostFailureRate={}, rackFailureRate={}, regionFailureRate={}",
                 resolved.realtime.arrival.distribution,
                 resolved.realtime.scheduling.strategy,
                 resolved.realtime.scheduling.maxQueueSize,
@@ -112,6 +112,10 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.tenantQuota.joinToString(","),
                 resolved.realtime.scheduling.tenantWeights.joinToString(","),
                 resolved.realtime.scheduling.tenantFairnessPolicy,
+                resolved.realtime.scheduling.tenantSchedulingPolicy,
+                resolved.realtime.scheduling.tenantBurstAllowance,
+                resolved.realtime.scheduling.tenantSlaPenaltyWeight,
+                resolved.realtime.scheduling.tenantCostBudget.joinToString(","),
                 resolved.realtime.scheduling.topologyEnabled,
                 resolved.realtime.scheduling.topologyPolicy,
                 resolved.realtime.scheduling.regionCount,
@@ -124,6 +128,21 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.hostFailureRate,
                 resolved.realtime.scheduling.rackFailureRate,
                 resolved.realtime.scheduling.regionFailureRate
+            )
+            Logger.result(
+                "物理拓扑/数据本地性: physicalTopologyEnabled={}, dataLocalityEnabled={}, imageCacheEnabled={}, hostCountPerRack={}, hostCpuCapacity={}, hostRamCapacity={}, hostBwCapacity={}, hostIoCapacity={}, crossRackBandwidth={}, crossRegionBandwidth={}, dataLocalityPolicy={}, imageCacheCapacity={}",
+                resolved.realtime.scheduling.physicalTopologyEnabled,
+                resolved.realtime.scheduling.dataLocalityEnabled,
+                resolved.realtime.scheduling.imageCacheEnabled,
+                resolved.realtime.scheduling.hostCountPerRack,
+                resolved.realtime.scheduling.hostCpuCapacity,
+                resolved.realtime.scheduling.hostRamCapacity,
+                resolved.realtime.scheduling.hostBwCapacity,
+                resolved.realtime.scheduling.hostIoCapacity,
+                resolved.realtime.scheduling.crossRackBandwidth,
+                resolved.realtime.scheduling.crossRegionBandwidth,
+                resolved.realtime.scheduling.dataLocalityPolicy,
+                resolved.realtime.scheduling.imageCacheCapacity
             )
         }
         Logger.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
@@ -229,6 +248,12 @@ object DryRunPrinter {
                         config.realtime.scheduling.tenantWeights.forEach { add(JsonPrimitive(it)) }
                     }
                     put("tenantFairnessPolicy", config.realtime.scheduling.tenantFairnessPolicy)
+                    put("tenantSchedulingPolicy", config.realtime.scheduling.tenantSchedulingPolicy)
+                    put("tenantBurstAllowance", config.realtime.scheduling.tenantBurstAllowance)
+                    put("tenantSlaPenaltyWeight", config.realtime.scheduling.tenantSlaPenaltyWeight)
+                    putJsonArray("tenantCostBudget") {
+                        config.realtime.scheduling.tenantCostBudget.forEach { add(JsonPrimitive(it)) }
+                    }
                     put("topologyEnabled", config.realtime.scheduling.topologyEnabled)
                     put("topologyPolicy", config.realtime.scheduling.topologyPolicy)
                     put("regionCount", config.realtime.scheduling.regionCount)
@@ -241,6 +266,18 @@ object DryRunPrinter {
                     put("hostFailureRate", config.realtime.scheduling.hostFailureRate)
                     put("rackFailureRate", config.realtime.scheduling.rackFailureRate)
                     put("regionFailureRate", config.realtime.scheduling.regionFailureRate)
+                    put("physicalTopologyEnabled", config.realtime.scheduling.physicalTopologyEnabled)
+                    put("dataLocalityEnabled", config.realtime.scheduling.dataLocalityEnabled)
+                    put("imageCacheEnabled", config.realtime.scheduling.imageCacheEnabled)
+                    put("hostCountPerRack", config.realtime.scheduling.hostCountPerRack)
+                    put("hostCpuCapacity", config.realtime.scheduling.hostCpuCapacity)
+                    put("hostRamCapacity", config.realtime.scheduling.hostRamCapacity)
+                    put("hostBwCapacity", config.realtime.scheduling.hostBwCapacity)
+                    put("hostIoCapacity", config.realtime.scheduling.hostIoCapacity)
+                    put("crossRackBandwidth", config.realtime.scheduling.crossRackBandwidth)
+                    put("crossRegionBandwidth", config.realtime.scheduling.crossRegionBandwidth)
+                    put("dataLocalityPolicy", config.realtime.scheduling.dataLocalityPolicy)
+                    put("imageCacheCapacity", config.realtime.scheduling.imageCacheCapacity)
                 }
             }
             putJsonObject("csv") {

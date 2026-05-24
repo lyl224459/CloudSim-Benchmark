@@ -1,6 +1,8 @@
 package datacenter.generator
 
 import config.GoogleTraceConfig
+import datacenter.RealtimeTraceMetadata
+import datacenter.RealtimeTraceMetadataRegistry
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.cloudlets.CloudletSimple
 import org.cloudsimplus.utilizationmodels.UtilizationModelDynamic
@@ -247,6 +249,31 @@ class GoogleTraceCloudletGenerator(
             .setUtilizationModel(utilizationModel)
             .setPriority(record.priority)
 
+        RealtimeTraceMetadataRegistry.put(
+            cloudlet,
+            RealtimeTraceMetadata(
+                tenantKey = record.userName,
+                tenantId = record.userName?.let { stableTenantId(it) },
+                priority = record.priority,
+                requestedCpu = record.cpuRequest,
+                requestedRam = record.memoryRequest,
+                requestedBw = record.cpuRequest?.times(1000.0),
+                requestedIo = record.diskSpaceRequest,
+                dataRegion = record.userName?.let { Math.floorMod(stableTenantId(it), 3) },
+                inputDataSize = record.diskSpaceRequest?.coerceAtLeast(0.0)
+                    ?: record.memoryRequest?.coerceAtLeast(0.0)
+                    ?: 1.0,
+                imageId = "trace-image-${Math.floorMod(record.jobId.toInt(), 16)}",
+                imageSize = record.memoryRequest?.times(1024.0)?.coerceAtLeast(0.0) ?: 1.0,
+                retryHint = when (record.eventType) {
+                    1, 2, 4, 5 -> 1
+                    else -> 0
+                }
+            )
+        )
         return cloudlet
     }
+
+    private fun stableTenantId(userName: String): Int =
+        userName.fold(0) { acc, char -> acc * 31 + char.code }.let { Math.floorMod(it, 1024) }
 }

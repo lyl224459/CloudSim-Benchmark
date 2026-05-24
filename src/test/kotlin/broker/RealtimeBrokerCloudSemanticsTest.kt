@@ -1,6 +1,8 @@
 package broker
 
 import config.RealtimeSchedulingConfig
+import datacenter.RealtimeTraceMetadata
+import datacenter.RealtimeTraceMetadataRegistry
 import datacenter.DatacenterCreator
 import datacenter.DatacenterType
 import org.assertj.core.api.Assertions.assertThat
@@ -326,6 +328,120 @@ class RealtimeBrokerCloudSemanticsTest {
         simulation.start()
 
         assertThat(broker.getTenantFairnessIndex(cloudlets)).isBetween(0.0, 1.0)
+    }
+
+    @Test
+    fun `trace metadata overrides tenant priority deadline and resource request`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val cloudlet = createCloudlet(42, length = 1_000, submissionDelay = 0.1)
+        RealtimeTraceMetadataRegistry.put(
+            cloudlet,
+            RealtimeTraceMetadata(
+                tenantKey = "trace-user",
+                tenantId = 5,
+                priority = 0,
+                deadline = 3.5,
+                requestedCpu = 0.5,
+                requestedRam = 128.0,
+                requestedBw = 64.0,
+                requestedIo = 32.0,
+                dataRegion = 1,
+                inputDataSize = 2.5,
+                imageId = "trace-image-a",
+                imageSize = 3.0,
+                retryHint = 1
+            )
+        )
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 3,
+                priorityLevels = 3,
+                deadlineFactor = 10.0,
+                resourceModelEnabled = true
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(listOf(cloudlet))
+
+        simulation.start()
+
+        val metadata = broker.getTaskMetadata(cloudlet)
+        assertThat(metadata?.tenantId?.value).isEqualTo(2)
+        assertThat(metadata?.tenantKey).isEqualTo("trace-user")
+        assertThat(metadata?.priority).isEqualTo(0)
+        assertThat(metadata?.deadline).isEqualTo(3.5)
+        assertThat(metadata?.requestedRam).isEqualTo(128.0)
+        assertThat(metadata?.dataRegion?.value).isEqualTo(1)
+        assertThat(metadata?.inputDataSizeGb).isEqualTo(2.5)
+        assertThat(metadata?.imageId).isEqualTo("trace-image-a")
+        assertThat(metadata?.imageSizeGb).isEqualTo(3.0)
+        assertThat(metadata?.traceRetryHint).isEqualTo(1)
+        RealtimeTraceMetadataRegistry.clear()
+    }
+
+    @Test
+    fun `physical host capacity rejection is surfaced as resource rejection`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val cloudlet = createCloudlet(7, length = 1_000, submissionDelay = 0.1)
+        RealtimeTraceMetadataRegistry.put(cloudlet, RealtimeTraceMetadata(requestedCpu = 2.0))
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                physicalTopologyEnabled = true,
+                regionCount = 1,
+                racksPerRegion = 1,
+                hostCountPerRack = 1,
+                hostCpuCapacity = 1.0
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(listOf(cloudlet))
+
+        simulation.start()
+
+        assertThat(broker.getResourceRejectedCount()).isEqualTo(1)
+        assertThat(broker.getCapacityRejectedCount()).isEqualTo(0)
+        RealtimeTraceMetadataRegistry.clear()
+    }
+
+    @Test
+    fun `tenant budget rejection is reported separately from quota`() {
+        val simulation = CloudSimPlus()
+        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+        val vm = createVm()
+        val first = createCloudlet(0, length = 20_000, submissionDelay = 0.1)
+        val second = createCloudlet(1, length = 20_000, submissionDelay = 0.2)
+        RealtimeTraceMetadataRegistry.put(first, RealtimeTraceMetadata(tenantId = 0, requestedCpu = 1.0))
+        RealtimeTraceMetadataRegistry.put(second, RealtimeTraceMetadata(tenantId = 0, requestedCpu = 1.0))
+        val broker = RealtimeBroker(
+            simulation,
+            RealtimeMinLoadScheduler(listOf(vm)),
+            listOf(vm),
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 1,
+                tenantCostBudget = listOf(1.5),
+                decisionDelay = 10.0
+            )
+        )
+        broker.submitVmList(listOf(vm))
+        broker.submitCloudletListRealtime(listOf(first, second))
+
+        simulation.start()
+
+        assertThat(broker.getTenantBudgetRejectedCount()).isEqualTo(1)
+        assertThat(broker.getTenantQuotaRejectedCount()).isEqualTo(0)
+        RealtimeTraceMetadataRegistry.clear()
     }
 
     @Test

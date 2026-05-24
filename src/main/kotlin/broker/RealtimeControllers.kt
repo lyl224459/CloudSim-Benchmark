@@ -3,21 +3,25 @@ package broker
 import config.RealtimePreemptionPolicy
 import config.RealtimeSchedulingConfig
 import config.RealtimeTenantFairnessPolicy
+import config.TenantSchedulingPolicy
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.CloudletId
 import scheduler.RealtimeNodeState
 import scheduler.RealtimePreemptionCandidate
+import scheduler.RealtimeTenantFairnessSnapshot
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskRecord
 import scheduler.TenantId
 import scheduler.VmIndex
+import kotlin.math.abs
 import kotlin.math.pow
 
 enum class RealtimeRejectReason {
     QUEUE,
     CAPACITY,
     RESOURCE,
-    TENANT_QUOTA
+    TENANT_QUOTA,
+    TENANT_BUDGET
 }
 
 sealed interface AdmissionDecision {
@@ -44,18 +48,9 @@ class RealtimeAdmissionController(
     }
 }
 
-data class TenantSnapshot(
-    val tenantId: TenantId,
-    val activeCount: Int,
-    val completedCount: Int,
-    val quota: Int?,
-    val weight: Double,
-    val fairnessScore: Double
-)
-
 sealed interface TenantAdmissionDecision {
     data object Accepted : TenantAdmissionDecision
-    data class Rejected(val tenantId: TenantId, val quota: Int) : TenantAdmissionDecision
+    data class Rejected(val tenantId: TenantId, val reason: RealtimeRejectReason, val limit: Double) : TenantAdmissionDecision
 }
 
 class RealtimeTenantController(
@@ -69,6 +64,8 @@ class RealtimeTenantController(
         else -> scheduling.tenantWeights
     }
     private val policy: RealtimeTenantFairnessPolicy = scheduling.normalizedTenantFairnessPolicy()
+    private val schedulingPolicy: TenantSchedulingPolicy = scheduling.normalizedTenantSchedulingPolicy()
+    private val costBudgets: List<Double>? = scheduling.tenantCostBudget.takeIf { it.isNotEmpty() }
 
     fun tenantFor(cloudletId: CloudletId, sampler: (CloudletId, Int, Int) -> Double): TenantId {
         if (!enabled) return TenantId(0)
@@ -78,23 +75,42 @@ class RealtimeTenantController(
 
     fun decide(incoming: RealtimeTaskRecord, activeRecords: List<RealtimeTaskRecord>): TenantAdmissionDecision {
         if (!enabled) return TenantAdmissionDecision.Accepted
-        val quota = quotas?.getOrNull(incoming.tenantId.value) ?: return TenantAdmissionDecision.Accepted
         val activeCount = activeRecords.count {
             it.cloudletId != incoming.cloudletId &&
                 it.tenantId == incoming.tenantId &&
                 it.lifecycle.isActiveForTenantQuota()
         }
-        return if (activeCount >= quota) {
-            TenantAdmissionDecision.Rejected(incoming.tenantId, quota)
-        } else {
-            TenantAdmissionDecision.Accepted
+        val quota = quotas?.getOrNull(incoming.tenantId.value)
+        val allowedQuota = quota?.plus(scheduling.tenantBurstAllowance)
+        if (allowedQuota != null && activeCount >= allowedQuota) {
+            return TenantAdmissionDecision.Rejected(
+                tenantId = incoming.tenantId,
+                reason = RealtimeRejectReason.TENANT_QUOTA,
+                limit = allowedQuota.toDouble()
+            )
         }
+
+        val budget = costBudgets?.getOrNull(incoming.tenantId.value)
+        if (budget != null) {
+            val activeCost = activeRecords
+                .filter { it.cloudletId != incoming.cloudletId && it.tenantId == incoming.tenantId }
+                .sumOf(::estimatedTaskCost)
+            if (activeCost + estimatedTaskCost(incoming) > budget) {
+                return TenantAdmissionDecision.Rejected(
+                    tenantId = incoming.tenantId,
+                    reason = RealtimeRejectReason.TENANT_BUDGET,
+                    limit = budget
+                )
+            }
+        }
+
+        return TenantAdmissionDecision.Accepted
     }
 
     fun snapshots(
         records: List<RealtimeTaskRecord>,
         completedCloudlets: List<Cloudlet> = emptyList()
-    ): List<TenantSnapshot> {
+    ): List<RealtimeTenantFairnessSnapshot> {
         val completedByTenant = completedCloudlets
             .mapNotNull { cloudlet -> records.firstOrNull { it.cloudletId == cloudlet.id } }
             .groupingBy { it.tenantId.value }
@@ -103,17 +119,55 @@ class RealtimeTenantController(
             .filter { it.lifecycle.isActiveForTenantQuota() }
             .groupingBy { it.tenantId.value }
             .eachCount()
+        val resourceByTenant = records
+            .filter { it.lifecycle.isActiveForTenantQuota() }
+            .groupBy { it.tenantId.value }
+            .mapValues { (_, tenantRecords) -> dominantResourceShare(tenantRecords) }
+        val budgetByTenant = records
+            .groupBy { it.tenantId.value }
+            .mapValues { (_, tenantRecords) -> tenantRecords.sumOf(::estimatedTaskCost) }
+        val slaPenaltyByTenant = completedCloudlets
+            .mapNotNull { cloudlet ->
+                records.firstOrNull { it.cloudletId == cloudlet.id }?.let { record ->
+                    val deadline = record.deadline ?: return@let null
+                    if (cloudlet.status == Cloudlet.Status.SUCCESS && cloudlet.finishTime > deadline) {
+                        record.tenantId.value to (cloudlet.finishTime - deadline) * scheduling.tenantSlaPenaltyWeight
+                    } else {
+                        null
+                    }
+                }
+            }
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, penalties) -> penalties.sum() }
         return (0 until tenantCount).map { index ->
             val activeCount = activeByTenant[index] ?: 0
             val completedCount = completedByTenant[index] ?: 0
             val weight = weights.getOrNull(index) ?: 1.0
-            TenantSnapshot(
+            val fairnessScore = fairnessScore(activeCount, completedCount, weight)
+            val dominantShare = resourceByTenant[index] ?: 0.0
+            val budgetUsed = budgetByTenant[index] ?: 0.0
+            val budgetLimit = costBudgets?.getOrNull(index)
+            val slaPenalty = slaPenaltyByTenant[index] ?: 0.0
+            RealtimeTenantFairnessSnapshot(
                 tenantId = TenantId(index),
                 activeCount = activeCount,
                 completedCount = completedCount,
                 quota = quotas?.getOrNull(index),
                 weight = weight,
-                fairnessScore = fairnessScore(activeCount, completedCount, weight)
+                fairnessScore = fairnessScore,
+                dominantResourceShare = dominantShare,
+                budgetUsed = budgetUsed,
+                budgetLimit = budgetLimit,
+                slaPenalty = slaPenalty,
+                fairnessPressure = fairnessPressure(
+                    activeCount = activeCount,
+                    completedCount = completedCount,
+                    weight = weight,
+                    dominantResourceShare = dominantShare,
+                    budgetUsed = budgetUsed,
+                    budgetLimit = budgetLimit,
+                    slaPenalty = slaPenalty
+                )
             )
         }
     }
@@ -134,12 +188,99 @@ class RealtimeTenantController(
         return (sum * sum) / (tenantCount.toDouble() * squareSum)
     }
 
+    fun dominantResourceFairnessIndex(records: List<RealtimeTaskRecord>): Double {
+        if (!enabled) return 1.0
+        val shares = (0 until tenantCount).map { tenant ->
+            dominantResourceShare(records.filter { it.tenantId.value == tenant })
+        }
+        return jainsIndex(shares)
+    }
+
+    fun fairnessViolationCount(records: List<RealtimeTaskRecord>): Int {
+        if (!enabled) return 0
+        val snapshot = snapshots(records)
+        val maxPressure = snapshot.maxOfOrNull { it.fairnessPressure } ?: return 0
+        if (maxPressure <= 0.0) return 0
+        return snapshot.count { maxPressure - it.fairnessPressure > 1.0 }
+    }
+
+    fun tenantSlaPenalty(cloudlets: List<Cloudlet>, records: List<RealtimeTaskRecord>): Double =
+        snapshots(records, cloudlets).sumOf { it.slaPenalty }
+
+    fun costSlaTradeoffScore(cost: Double, tenantSlaPenalty: Double): Double =
+        cost + tenantSlaPenalty
+
+    fun retrySuccessByTenant(cloudlets: List<Cloudlet>, records: List<RealtimeTaskRecord>): Double {
+        if (!enabled) return 1.0
+        val successById = cloudlets
+            .filter { it.status == Cloudlet.Status.SUCCESS }
+            .map { it.id }
+            .toSet()
+        val retryRecords = records.filter { it.attempt > 0 }
+        if (retryRecords.isEmpty()) return 1.0
+        val rates = retryRecords.groupBy { it.tenantId.value }.values.map { tenantRecords ->
+            tenantRecords.count { it.cloudletId in successById }.toDouble() / tenantRecords.size.toDouble()
+        }
+        return if (rates.isEmpty()) 1.0 else rates.average()
+    }
+
     private fun fairnessScore(activeCount: Int, completedCount: Int, weight: Double): Double {
         val base = when (policy) {
             RealtimeTenantFairnessPolicy.QUOTA_FIRST -> activeCount.toDouble()
             RealtimeTenantFairnessPolicy.WEIGHTED_FAIR -> (activeCount + completedCount).toDouble() / weight
         }
         return base
+    }
+
+    private fun fairnessPressure(
+        activeCount: Int,
+        completedCount: Int,
+        weight: Double,
+        dominantResourceShare: Double,
+        budgetUsed: Double,
+        budgetLimit: Double?,
+        slaPenalty: Double
+    ): Double =
+        when (schedulingPolicy) {
+            TenantSchedulingPolicy.QUOTA_FIRST -> activeCount.toDouble()
+            TenantSchedulingPolicy.WEIGHTED_FAIR -> (activeCount + completedCount).toDouble() / weight
+            TenantSchedulingPolicy.DOMINANT_RESOURCE_FAIRNESS -> {
+                dominantResourceShare +
+                    budgetPressure(budgetUsed, budgetLimit) +
+                    slaPenalty * scheduling.tenantSlaPenaltyWeight
+            }
+        }
+
+    private fun budgetPressure(used: Double, limit: Double?): Double {
+        if (limit == null || limit <= 0.0) return 0.0
+        return used / limit
+    }
+
+    private fun dominantResourceShare(records: List<RealtimeTaskRecord>): Double {
+        if (records.isEmpty()) return 0.0
+        val cpu = records.sumOf { it.requestedCpu ?: 0.0 }
+        val ram = records.sumOf { it.requestedRam ?: 0.0 }
+        val bw = records.sumOf { it.requestedBw ?: 0.0 }
+        val io = records.sumOf { it.requestedIo ?: 0.0 }
+        val total = cpu + ram + bw + io
+        if (total <= 0.0) return records.size.toDouble()
+        return maxOf(cpu, ram, bw, io) / total
+    }
+
+    private fun estimatedTaskCost(record: RealtimeTaskRecord): Double =
+        listOfNotNull(record.requestedCpu, record.requestedRam, record.requestedBw, record.requestedIo)
+            .sum()
+            .takeIf { it > 0.0 }
+            ?: 1.0
+
+    private fun jainsIndex(values: List<Double>): Double {
+        if (values.isEmpty()) return 1.0
+        val normalized = values.map { if (abs(it) < 1e-12) 0.0 else it }
+        val sum = normalized.sum()
+        if (sum <= 0.0) return 1.0
+        val squareSum = normalized.sumOf { it * it }
+        if (squareSum <= 0.0) return 1.0
+        return (sum * sum) / (normalized.size.toDouble() * squareSum)
     }
 
     private fun RealtimeTaskLifecycle.isActiveForTenantQuota(): Boolean =

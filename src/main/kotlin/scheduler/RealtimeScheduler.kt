@@ -76,7 +76,7 @@ abstract class RealtimeSchedulerBase(
     }
 
     protected fun findLeastLoadedVm(context: RealtimeSchedulingContext): Int {
-        val base = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        val base = selectableNodeStates(context)
         return base.minWithOrNull(
             compareBy<RealtimeNodeState> { !it.acceptingWork }
                 .thenBy { it.availableTime }
@@ -87,7 +87,7 @@ abstract class RealtimeSchedulerBase(
     }
 
     protected fun orderedCandidateStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> {
-        val base = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        val base = selectableNodeStates(context)
         val preemptableVmIndexes = context.preemptionCandidates.map { it.victimVmIndex.value }.toSet()
         val queueComparator = when (context.queuePolicy) {
             RealtimeQueuePolicy.PRIORITY -> compareByDescending<RealtimeNodeState> { it.availableSlots }
@@ -111,10 +111,28 @@ abstract class RealtimeSchedulerBase(
         }
         return base.sortedWith(
             compareByDescending<RealtimeNodeState> { it.vmIndex in preemptableVmIndexes }
+                .thenBy { tenantAdjustedCost(context, it) }
                 .then(topologyComparator)
                 .then(queueComparator)
                 .thenBy { it.vmIndex }
         )
+    }
+
+    protected fun selectableNodeStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> =
+        if (context.nodeCandidates.isNotEmpty()) {
+            context.candidateNodeStates
+        } else {
+            context.candidateNodeStates.ifEmpty { context.nodeStates }
+        }
+
+    private fun tenantAdjustedCost(context: RealtimeSchedulingContext, state: RealtimeNodeState): Double {
+        val pressure = context.tenantFairnessPressure
+        return when (context.tenantSchedulingPolicy) {
+            config.TenantSchedulingPolicy.QUOTA_FIRST -> 0.0
+            config.TenantSchedulingPolicy.WEIGHTED_FAIR -> state.queueDepth * pressure
+            config.TenantSchedulingPolicy.DOMINANT_RESOURCE_FAIRNESS ->
+                state.resourcePressure + state.topologyCost * (1.0 + pressure)
+        }
     }
 
     private fun projectedFinishTime(context: RealtimeSchedulingContext, state: RealtimeNodeState): Double {
@@ -132,7 +150,8 @@ class RealtimeRandomScheduler(
 ) : RealtimeSchedulerBase(vmList) {
     
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-        val candidates = context.candidateNodeStates.ifEmpty { context.nodeStates }
+        val candidates = selectableNodeStates(context)
+        if (candidates.isEmpty()) return 0
         return candidates[random.nextInt(candidates.size)].vmIndex
     }
 }

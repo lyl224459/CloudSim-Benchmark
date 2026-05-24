@@ -44,6 +44,41 @@ class RealtimeTenantControllerTest {
     }
 
     @Test
+    fun `tenant burst allowance permits quota overflow`() {
+        val controller = RealtimeTenantController(
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 1,
+                tenantQuota = listOf(1),
+                tenantBurstAllowance = 1
+            )
+        )
+
+        val decision = controller.decide(record(2), listOf(record(1, lifecycle = RealtimeTaskLifecycle.RUNNING)))
+
+        assertThat(decision).isEqualTo(TenantAdmissionDecision.Accepted)
+    }
+
+    @Test
+    fun `tenant budget rejects excess estimated resource cost`() {
+        val controller = RealtimeTenantController(
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 1,
+                tenantCostBudget = listOf(1.5)
+            )
+        )
+        val incoming = record(2, requestedCpu = 1.0)
+        val active = listOf(record(1, lifecycle = RealtimeTaskLifecycle.RUNNING, requestedCpu = 1.0))
+
+        val decision = controller.decide(incoming, active)
+
+        assertThat(decision).isEqualTo(
+            TenantAdmissionDecision.Rejected(TenantId(0), RealtimeRejectReason.TENANT_BUDGET, 1.5)
+        )
+    }
+
+    @Test
     fun `fairness index returns one for balanced tenants`() {
         val controller = RealtimeTenantController(
             RealtimeSchedulingConfig(
@@ -76,15 +111,39 @@ class RealtimeTenantControllerTest {
         assertThat(controller.tenantFor(CloudletId(7), sampler)).isEqualTo(controller.tenantFor(CloudletId(7), sampler))
     }
 
+    @Test
+    fun `dominant resource fairness index stays bounded`() {
+        val controller = RealtimeTenantController(
+            RealtimeSchedulingConfig(
+                multiTenantEnabled = true,
+                tenantCount = 2,
+                tenantSchedulingPolicy = "dominant_resource_fairness"
+            )
+        )
+
+        val fairness = controller.dominantResourceFairnessIndex(
+            listOf(
+                record(1, tenantId = TenantId(0), requestedCpu = 2.0, requestedRam = 1.0),
+                record(2, tenantId = TenantId(1), requestedCpu = 1.0, requestedRam = 2.0)
+            )
+        )
+
+        assertThat(fairness).isBetween(0.0, 1.0)
+    }
+
     private fun record(
         cloudletId: Long,
         tenantId: TenantId = TenantId(0),
-        lifecycle: RealtimeTaskLifecycle = RealtimeTaskLifecycle.ARRIVED
+        lifecycle: RealtimeTaskLifecycle = RealtimeTaskLifecycle.ARRIVED,
+        requestedCpu: Double? = null,
+        requestedRam: Double? = null
     ): RealtimeTaskRecord =
         RealtimeTaskRecord(
             cloudletId = cloudletId,
             originalArrivalTime = 0.0,
             tenantId = tenantId,
-            lifecycle = lifecycle
+            lifecycle = lifecycle,
+            requestedCpu = requestedCpu,
+            requestedRam = requestedRam
         )
 }

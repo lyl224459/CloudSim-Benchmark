@@ -186,6 +186,10 @@ data class RealtimeSchedulingConfig(
     val tenantQuota: List<Int> = emptyList(),
     val tenantWeights: List<Double> = emptyList(),
     val tenantFairnessPolicy: String = "quota_first",
+    val tenantSchedulingPolicy: String = "quota_first",
+    val tenantBurstAllowance: Int = 0,
+    val tenantSlaPenaltyWeight: Double = 1.0,
+    val tenantCostBudget: List<Double> = emptyList(),
     val topologyEnabled: Boolean = false,
     val topologyPolicy: String = "latency_aware",
     val regionCount: Int = 3,
@@ -197,7 +201,19 @@ data class RealtimeSchedulingConfig(
     val crossRegionCost: Double = 0.0,
     val hostFailureRate: Double = 0.0,
     val rackFailureRate: Double = 0.0,
-    val regionFailureRate: Double = 0.0
+    val regionFailureRate: Double = 0.0,
+    val physicalTopologyEnabled: Boolean = false,
+    val dataLocalityEnabled: Boolean = false,
+    val imageCacheEnabled: Boolean = false,
+    val hostCountPerRack: Int = 2,
+    val hostCpuCapacity: Double = 0.0,
+    val hostRamCapacity: Double = 0.0,
+    val hostBwCapacity: Double = 0.0,
+    val hostIoCapacity: Double = 0.0,
+    val crossRackBandwidth: Double = 0.0,
+    val crossRegionBandwidth: Double = 0.0,
+    val dataLocalityPolicy: String = "prefer_local",
+    val imageCacheCapacity: Int = 0
 ) {
     fun normalizedQueuePolicy(): RealtimeQueuePolicy = RealtimeQueuePolicy.parse(queuePolicy)
 
@@ -208,7 +224,12 @@ data class RealtimeSchedulingConfig(
     fun normalizedTenantFairnessPolicy(): RealtimeTenantFairnessPolicy =
         RealtimeTenantFairnessPolicy.parse(tenantFairnessPolicy)
 
+    fun normalizedTenantSchedulingPolicy(): TenantSchedulingPolicy =
+        TenantSchedulingPolicy.parse(tenantSchedulingPolicy)
+
     fun normalizedTopologyPolicy(): RealtimeTopologyPolicy = RealtimeTopologyPolicy.parse(topologyPolicy)
+
+    fun normalizedDataLocalityPolicy(): DataLocalityPolicy = DataLocalityPolicy.parse(dataLocalityPolicy)
 }
 
 enum class RealtimeQueuePolicy(val configValue: String) {
@@ -266,6 +287,20 @@ enum class RealtimeTenantFairnessPolicy(val configValue: String) {
     }
 }
 
+enum class TenantSchedulingPolicy(val configValue: String) {
+    QUOTA_FIRST("quota_first"),
+    WEIGHTED_FAIR("weighted_fair"),
+    DOMINANT_RESOURCE_FAIRNESS("dominant_resource_fairness");
+
+    companion object {
+        fun parse(value: String): TenantSchedulingPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时租户调度策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
 enum class RealtimeTopologyPolicy(val configValue: String) {
     LATENCY_AWARE("latency_aware"),
     SPREAD_FAULT_DOMAINS("spread_fault_domains");
@@ -274,6 +309,20 @@ enum class RealtimeTopologyPolicy(val configValue: String) {
         fun parse(value: String): RealtimeTopologyPolicy =
             entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
                 ?: throw IllegalArgumentException("未知实时拓扑策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
+enum class DataLocalityPolicy(val configValue: String) {
+    PREFER_LOCAL("prefer_local"),
+    BALANCED("balanced"),
+    IGNORE("ignore");
+
+    companion object {
+        fun parse(value: String): DataLocalityPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知数据本地性策略: $value")
 
         fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
     }
@@ -643,6 +692,10 @@ data class ExperimentConfig(
                     "tenantQuota",
                     "tenantWeights",
                     "tenantFairnessPolicy",
+                    "tenantSchedulingPolicy",
+                    "tenantBurstAllowance",
+                    "tenantSlaPenaltyWeight",
+                    "tenantCostBudget",
                     "topologyEnabled",
                     "topologyPolicy",
                     "regionCount",
@@ -654,7 +707,19 @@ data class ExperimentConfig(
                     "crossRegionCost",
                     "hostFailureRate",
                     "rackFailureRate",
-                    "regionFailureRate"
+                    "regionFailureRate",
+                    "physicalTopologyEnabled",
+                    "dataLocalityEnabled",
+                    "imageCacheEnabled",
+                    "hostCountPerRack",
+                    "hostCpuCapacity",
+                    "hostRamCapacity",
+                    "hostBwCapacity",
+                    "hostIoCapacity",
+                    "crossRackBandwidth",
+                    "crossRegionBandwidth",
+                    "dataLocalityPolicy",
+                    "imageCacheCapacity"
                 )
             )
             val current = base ?: TomlRealtimeConfig()
@@ -742,6 +807,18 @@ data class ExperimentConfig(
                 tenantFairnessPolicy = properties["tenantFairnessPolicy"]?.let {
                     TomlSectionParser.unquote(it)
                 } ?: current.scheduling.tenantFairnessPolicy,
+                tenantSchedulingPolicy = properties["tenantSchedulingPolicy"]?.let {
+                    TomlSectionParser.unquote(it)
+                } ?: current.scheduling.tenantSchedulingPolicy,
+                tenantBurstAllowance = properties["tenantBurstAllowance"]?.let {
+                    parseRequiredInt("realtime.scheduling.tenantBurstAllowance", it)
+                } ?: current.scheduling.tenantBurstAllowance,
+                tenantSlaPenaltyWeight = properties["tenantSlaPenaltyWeight"]?.let {
+                    parseRequiredDouble("realtime.scheduling.tenantSlaPenaltyWeight", it)
+                } ?: current.scheduling.tenantSlaPenaltyWeight,
+                tenantCostBudget = properties["tenantCostBudget"]?.let {
+                    parseDoubleArrayValue(it)
+                } ?: current.scheduling.tenantCostBudget,
                 topologyEnabled = properties["topologyEnabled"]?.let {
                     parseRequiredBoolean("realtime.scheduling.topologyEnabled", it)
                 } ?: current.scheduling.topologyEnabled,
@@ -777,7 +854,43 @@ data class ExperimentConfig(
                 } ?: current.scheduling.rackFailureRate,
                 regionFailureRate = properties["regionFailureRate"]?.let {
                     parseRequiredDouble("realtime.scheduling.regionFailureRate", it)
-                } ?: current.scheduling.regionFailureRate
+                } ?: current.scheduling.regionFailureRate,
+                physicalTopologyEnabled = properties["physicalTopologyEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.physicalTopologyEnabled", it)
+                } ?: current.scheduling.physicalTopologyEnabled,
+                dataLocalityEnabled = properties["dataLocalityEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.dataLocalityEnabled", it)
+                } ?: current.scheduling.dataLocalityEnabled,
+                imageCacheEnabled = properties["imageCacheEnabled"]?.let {
+                    parseRequiredBoolean("realtime.scheduling.imageCacheEnabled", it)
+                } ?: current.scheduling.imageCacheEnabled,
+                hostCountPerRack = properties["hostCountPerRack"]?.let {
+                    parseRequiredInt("realtime.scheduling.hostCountPerRack", it)
+                } ?: current.scheduling.hostCountPerRack,
+                hostCpuCapacity = properties["hostCpuCapacity"]?.let {
+                    parseRequiredDouble("realtime.scheduling.hostCpuCapacity", it)
+                } ?: current.scheduling.hostCpuCapacity,
+                hostRamCapacity = properties["hostRamCapacity"]?.let {
+                    parseRequiredDouble("realtime.scheduling.hostRamCapacity", it)
+                } ?: current.scheduling.hostRamCapacity,
+                hostBwCapacity = properties["hostBwCapacity"]?.let {
+                    parseRequiredDouble("realtime.scheduling.hostBwCapacity", it)
+                } ?: current.scheduling.hostBwCapacity,
+                hostIoCapacity = properties["hostIoCapacity"]?.let {
+                    parseRequiredDouble("realtime.scheduling.hostIoCapacity", it)
+                } ?: current.scheduling.hostIoCapacity,
+                crossRackBandwidth = properties["crossRackBandwidth"]?.let {
+                    parseRequiredDouble("realtime.scheduling.crossRackBandwidth", it)
+                } ?: current.scheduling.crossRackBandwidth,
+                crossRegionBandwidth = properties["crossRegionBandwidth"]?.let {
+                    parseRequiredDouble("realtime.scheduling.crossRegionBandwidth", it)
+                } ?: current.scheduling.crossRegionBandwidth,
+                dataLocalityPolicy = properties["dataLocalityPolicy"]?.let {
+                    TomlSectionParser.unquote(it)
+                } ?: current.scheduling.dataLocalityPolicy,
+                imageCacheCapacity = properties["imageCacheCapacity"]?.let {
+                    parseRequiredInt("realtime.scheduling.imageCacheCapacity", it)
+                } ?: current.scheduling.imageCacheCapacity
             )
             return current.copy(scheduling = scheduling)
         }
@@ -1244,6 +1357,31 @@ data class ExperimentConfig(
                 errors.add(ValidationError("realtime.scheduling.tenantFairnessPolicy", realtime.scheduling.tenantFairnessPolicy,
                     "租户公平策略必须是以下值之一: ${tenantFairnessPolicies.joinToString(", ")}"))
             }
+            val tenantSchedulingPolicies = TenantSchedulingPolicy.valuesForConfig()
+            if (realtime.scheduling.tenantSchedulingPolicy.lowercase() !in tenantSchedulingPolicies) {
+                errors.add(ValidationError("realtime.scheduling.tenantSchedulingPolicy", realtime.scheduling.tenantSchedulingPolicy,
+                    "租户调度策略必须是以下值之一: ${tenantSchedulingPolicies.joinToString(", ")}"))
+            }
+            if (realtime.scheduling.tenantBurstAllowance < 0) {
+                errors.add(ValidationError("realtime.scheduling.tenantBurstAllowance", realtime.scheduling.tenantBurstAllowance.toString(),
+                    "租户突发额度不能为负数"))
+            }
+            if (realtime.scheduling.tenantSlaPenaltyWeight < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.tenantSlaPenaltyWeight", realtime.scheduling.tenantSlaPenaltyWeight.toString(),
+                    "租户 SLA 惩罚权重不能为负数"))
+            }
+            if (realtime.scheduling.tenantCostBudget.isNotEmpty() &&
+                realtime.scheduling.tenantCostBudget.size != realtime.scheduling.tenantCount
+            ) {
+                errors.add(ValidationError("realtime.scheduling.tenantCostBudget", realtime.scheduling.tenantCostBudget.joinToString(","),
+                    "租户成本预算数量必须等于 tenantCount"))
+            }
+            realtime.scheduling.tenantCostBudget.forEachIndexed { index, budget ->
+                if (budget < 0.0) {
+                    errors.add(ValidationError("realtime.scheduling.tenantCostBudget[$index]", budget.toString(),
+                        "租户成本预算不能为负数"))
+                }
+            }
             val topologyPolicies = RealtimeTopologyPolicy.valuesForConfig()
             if (realtime.scheduling.topologyPolicy.lowercase() !in topologyPolicies) {
                 errors.add(ValidationError("realtime.scheduling.topologyPolicy", realtime.scheduling.topologyPolicy,
@@ -1288,6 +1426,43 @@ data class ExperimentConfig(
             if (realtime.scheduling.regionFailureRate < 0.0 || realtime.scheduling.regionFailureRate > 1.0) {
                 errors.add(ValidationError("realtime.scheduling.regionFailureRate", realtime.scheduling.regionFailureRate.toString(),
                     "Region 失败率必须在 [0,1] 范围内"))
+            }
+            if (realtime.scheduling.hostCountPerRack < 1) {
+                errors.add(ValidationError("realtime.scheduling.hostCountPerRack", realtime.scheduling.hostCountPerRack.toString(),
+                    "物理拓扑中每个 Rack 的 Host 数量必须大于等于 1"))
+            }
+            if (realtime.scheduling.hostCpuCapacity < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.hostCpuCapacity", realtime.scheduling.hostCpuCapacity.toString(),
+                    "Host CPU 容量不能为负数"))
+            }
+            if (realtime.scheduling.hostRamCapacity < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.hostRamCapacity", realtime.scheduling.hostRamCapacity.toString(),
+                    "Host RAM 容量不能为负数"))
+            }
+            if (realtime.scheduling.hostBwCapacity < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.hostBwCapacity", realtime.scheduling.hostBwCapacity.toString(),
+                    "Host 带宽容量不能为负数"))
+            }
+            if (realtime.scheduling.hostIoCapacity < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.hostIoCapacity", realtime.scheduling.hostIoCapacity.toString(),
+                    "Host I/O 容量不能为负数"))
+            }
+            if (realtime.scheduling.crossRackBandwidth < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.crossRackBandwidth", realtime.scheduling.crossRackBandwidth.toString(),
+                    "跨 Rack 带宽不能为负数"))
+            }
+            if (realtime.scheduling.crossRegionBandwidth < 0.0) {
+                errors.add(ValidationError("realtime.scheduling.crossRegionBandwidth", realtime.scheduling.crossRegionBandwidth.toString(),
+                    "跨 Region 带宽不能为负数"))
+            }
+            val dataLocalityPolicies = DataLocalityPolicy.valuesForConfig()
+            if (realtime.scheduling.dataLocalityPolicy.lowercase() !in dataLocalityPolicies) {
+                errors.add(ValidationError("realtime.scheduling.dataLocalityPolicy", realtime.scheduling.dataLocalityPolicy,
+                    "数据本地性策略必须是以下值之一: ${dataLocalityPolicies.joinToString(", ")}"))
+            }
+            if (realtime.scheduling.imageCacheCapacity < 0) {
+                errors.add(ValidationError("realtime.scheduling.imageCacheCapacity", realtime.scheduling.imageCacheCapacity.toString(),
+                    "镜像缓存容量不能为负数"))
             }
             val reservations = setOf("none", "partial", "full")
             if (realtime.scheduling.resourceReservation.lowercase() !in reservations) {

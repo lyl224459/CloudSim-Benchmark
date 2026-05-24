@@ -131,6 +131,10 @@ class ConfigurationManagerTest {
             tenantQuota = [2, 1, 1]
             tenantWeights = [1.0, 2.0, 1.0]
             tenantFairnessPolicy = "weighted_fair"
+            tenantSchedulingPolicy = "dominant_resource_fairness"
+            tenantBurstAllowance = 2
+            tenantSlaPenaltyWeight = 1.5
+            tenantCostBudget = [10.0, 20.0, 15.0]
             topologyEnabled = true
             topologyPolicy = "spread_fault_domains"
             regionCount = 4
@@ -143,6 +147,18 @@ class ConfigurationManagerTest {
             hostFailureRate = 0.01
             rackFailureRate = 0.02
             regionFailureRate = 0.03
+            physicalTopologyEnabled = true
+            dataLocalityEnabled = true
+            imageCacheEnabled = true
+            hostCountPerRack = 4
+            hostCpuCapacity = 8.0
+            hostRamCapacity = 32768.0
+            hostBwCapacity = 10000.0
+            hostIoCapacity = 5000.0
+            crossRackBandwidth = 20.0
+            crossRegionBandwidth = 5.0
+            dataLocalityPolicy = "balanced"
+            imageCacheCapacity = 3
         """.trimIndent())
 
         try {
@@ -202,6 +218,10 @@ class ConfigurationManagerTest {
             assertEquals(listOf(2, 1, 1), realtime?.scheduling?.tenantQuota)
             assertEquals(listOf(1.0, 2.0, 1.0), realtime?.scheduling?.tenantWeights)
             assertEquals("weighted_fair", realtime?.scheduling?.tenantFairnessPolicy)
+            assertEquals("dominant_resource_fairness", realtime?.scheduling?.tenantSchedulingPolicy)
+            assertEquals(2, realtime?.scheduling?.tenantBurstAllowance)
+            assertEquals(1.5, realtime?.scheduling?.tenantSlaPenaltyWeight)
+            assertEquals(listOf(10.0, 20.0, 15.0), realtime?.scheduling?.tenantCostBudget)
             assertEquals(true, realtime?.scheduling?.topologyEnabled)
             assertEquals("spread_fault_domains", realtime?.scheduling?.topologyPolicy)
             assertEquals(4, realtime?.scheduling?.regionCount)
@@ -214,6 +234,18 @@ class ConfigurationManagerTest {
             assertEquals(0.01, realtime?.scheduling?.hostFailureRate)
             assertEquals(0.02, realtime?.scheduling?.rackFailureRate)
             assertEquals(0.03, realtime?.scheduling?.regionFailureRate)
+            assertEquals(true, realtime?.scheduling?.physicalTopologyEnabled)
+            assertEquals(true, realtime?.scheduling?.dataLocalityEnabled)
+            assertEquals(true, realtime?.scheduling?.imageCacheEnabled)
+            assertEquals(4, realtime?.scheduling?.hostCountPerRack)
+            assertEquals(8.0, realtime?.scheduling?.hostCpuCapacity)
+            assertEquals(32768.0, realtime?.scheduling?.hostRamCapacity)
+            assertEquals(10000.0, realtime?.scheduling?.hostBwCapacity)
+            assertEquals(5000.0, realtime?.scheduling?.hostIoCapacity)
+            assertEquals(20.0, realtime?.scheduling?.crossRackBandwidth)
+            assertEquals(5.0, realtime?.scheduling?.crossRegionBandwidth)
+            assertEquals("balanced", realtime?.scheduling?.dataLocalityPolicy)
+            assertEquals(3, realtime?.scheduling?.imageCacheCapacity)
         } finally {
             configFile.delete()
         }
