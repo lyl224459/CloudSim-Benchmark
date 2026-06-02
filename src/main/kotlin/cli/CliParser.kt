@@ -1,21 +1,23 @@
 package cli
 
 private val supportedModes = setOf("batch", "realtime", "batch-multi", "realtime-multi")
-private val legacyModes = mapOf(
-    "batch" to "run --mode batch",
-    "b" to "run --mode batch",
-    "realtime" to "run --mode realtime",
-    "r" to "run --mode realtime",
-    "batch-multi" to "run --mode batch-multi",
-    "bm" to "run --mode batch-multi",
-    "batch_multi" to "run --mode batch-multi",
-    "realtime-multi" to "run --mode realtime-multi",
-    "rm" to "run --mode realtime-multi",
-    "realtime_multi" to "run --mode realtime-multi"
-)
+private val legacyModes =
+    mapOf(
+        "batch" to "run --mode batch",
+        "b" to "run --mode batch",
+        "realtime" to "run --mode realtime",
+        "r" to "run --mode realtime",
+        "batch-multi" to "run --mode batch-multi",
+        "bm" to "run --mode batch-multi",
+        "batch_multi" to "run --mode batch-multi",
+        "realtime-multi" to "run --mode realtime-multi",
+        "rm" to "run --mode realtime-multi",
+        "realtime_multi" to "run --mode realtime-multi",
+    )
 
-class CliParser(private val args: Array<String>) {
-
+class CliParser(
+    private val args: Array<String>,
+) {
     sealed interface Command
 
     data class RunCommand(
@@ -31,14 +33,69 @@ class CliParser(private val args: Array<String>) {
         val outputDir: String? = null,
         val useCoroutines: Boolean = true,
         val maxConcurrency: Int = 0,
-        val dryRun: Boolean = false
+        val dryRun: Boolean = false,
     ) : Command
 
-    data class ListAlgorithmsCommand(val mode: String) : Command
-    data class ListProfilesCommand(val configFile: String) : Command
-    data class ListPresetsCommand(val configFile: String) : Command
-    data class ConfigValidateCommand(val configFile: String) : Command
-    data class ConfigPrintCommand(val configFile: String, val profile: String? = null) : Command
+    private data class RunCommandDraft(
+        var mode: String? = null,
+        var algorithms: List<String> = emptyList(),
+        var preset: String? = null,
+        var profile: String? = null,
+        var randomSeed: Long? = null,
+        var taskCounts: List<Int> = emptyList(),
+        var runs: Int? = null,
+        var configFile: String? = null,
+        var verbose: Boolean = false,
+        var outputDir: String? = null,
+        var useCoroutines: Boolean = true,
+        var maxConcurrency: Int = 0,
+        var dryRun: Boolean = false,
+    ) {
+        fun toCommand(): RunCommand =
+            RunCommand(
+                mode = mode,
+                algorithms = algorithms,
+                preset = preset,
+                profile = profile,
+                randomSeed = randomSeed,
+                taskCounts = taskCounts,
+                runs = runs,
+                configFile = configFile,
+                verbose = verbose,
+                outputDir = outputDir,
+                useCoroutines = useCoroutines,
+                maxConcurrency = maxConcurrency,
+                dryRun = dryRun,
+            )
+    }
+
+    private data class RunOption(
+        val names: Set<String>,
+        val hasValue: Boolean,
+        val apply: (RunCommandDraft, String?, String) -> Unit,
+    )
+
+    data class ListAlgorithmsCommand(
+        val mode: String,
+    ) : Command
+
+    data class ListProfilesCommand(
+        val configFile: String,
+    ) : Command
+
+    data class ListPresetsCommand(
+        val configFile: String,
+    ) : Command
+
+    data class ConfigValidateCommand(
+        val configFile: String,
+    ) : Command
+
+    data class ConfigPrintCommand(
+        val configFile: String,
+        val profile: String? = null,
+    ) : Command
+
     data object HelpCommand : Command
 
     fun parse(): Command {
@@ -49,7 +106,7 @@ class CliParser(private val args: Array<String>) {
         val command = args[0].lowercase()
         legacyModes[command]?.let { replacement ->
             throw IllegalArgumentException(
-                "旧入口 \"$command\" 已停用。请使用: $replacement ${args.drop(1).joinToString(" ")}".trim()
+                "旧入口 \"$command\" 已停用。请使用: $replacement ${args.drop(1).joinToString(" ")}".trim(),
             )
         }
 
@@ -58,150 +115,91 @@ class CliParser(private val args: Array<String>) {
             "list" -> parseList(args.drop(1))
             "config" -> parseConfig(args.drop(1))
             else -> throw IllegalArgumentException(
-                "未知命令: $command。可用命令: run, list, config。运行 --help 查看示例。"
+                "未知命令: $command。可用命令: run, list, config。运行 --help 查看示例。",
             )
         }
     }
 
     private fun parseRun(tokens: List<String>): RunCommand {
-        var mode: String? = null
-        var algorithms = emptyList<String>()
-        var preset: String? = null
-        var profile: String? = null
-        var randomSeed: Long? = null
-        var taskCounts = emptyList<Int>()
-        var runs: Int? = null
-        var configFile: String? = null
-        var verbose = false
-        var outputDir: String? = null
-        var useCoroutines = true
-        var maxConcurrency = 0
-        var dryRun = false
-
+        val draft = RunCommandDraft()
+        val options = runOptions().flatMap { option -> option.names.map { it to option } }.toMap()
         var i = 0
         while (i < tokens.size) {
             val token = tokens[i]
+            val inlineName = inlineOptionName(token)
+            val option = options[inlineName ?: token]
             when {
-                token == "--mode" -> {
-                    mode = normalizeMode(readValue(tokens, i, token))
-                    i += 2
-                }
-                token.startsWith("--mode=") -> {
-                    mode = normalizeMode(token.substringAfter("="))
-                    i++
-                }
-                token == "--algorithms" || token == "-a" -> {
-                    algorithms = parseNameList(readValue(tokens, i, token))
-                    i += 2
-                }
-                token.startsWith("--algorithms=") -> {
-                    algorithms = parseNameList(token.substringAfter("="))
-                    i++
-                }
-                token == "--preset" -> {
-                    preset = readValue(tokens, i, token)
-                    i += 2
-                }
-                token.startsWith("--preset=") -> {
-                    preset = token.substringAfter("=")
-                    i++
-                }
-                token == "--profile" || token == "-p" -> {
-                    profile = readValue(tokens, i, token)
-                    i += 2
-                }
-                token.startsWith("--profile=") -> {
-                    profile = token.substringAfter("=")
-                    i++
-                }
-                token == "--seed" || token == "-s" -> {
-                    randomSeed = parseLong(readValue(tokens, i, token), token)
-                    i += 2
-                }
-                token.startsWith("--seed=") -> {
-                    randomSeed = parseLong(token.substringAfter("="), "--seed")
-                    i++
-                }
-                token == "--runs" || token == "-r" -> {
-                    runs = parsePositiveInt(readValue(tokens, i, token), token)
-                    i += 2
-                }
-                token.startsWith("--runs=") -> {
-                    runs = parsePositiveInt(token.substringAfter("="), "--runs")
-                    i++
-                }
-                token == "--tasks" || token == "-t" -> {
-                    taskCounts = parseTaskCounts(readValue(tokens, i, token))
-                    i += 2
-                }
-                token.startsWith("--tasks=") -> {
-                    taskCounts = parseTaskCounts(token.substringAfter("="))
-                    i++
-                }
-                token == "--config" || token == "-c" -> {
-                    configFile = readValue(tokens, i, token)
-                    i += 2
-                }
-                token.startsWith("--config=") -> {
-                    configFile = token.substringAfter("=")
-                    i++
-                }
-                token == "--output" || token == "-o" -> {
-                    outputDir = readValue(tokens, i, token)
-                    i += 2
-                }
-                token.startsWith("--output=") -> {
-                    outputDir = token.substringAfter("=")
-                    i++
-                }
-                token == "--sequential" || token == "-S" -> {
-                    useCoroutines = false
-                    i++
-                }
-                token == "--concurrency" || token == "-C" -> {
-                    maxConcurrency = parsePositiveInt(readValue(tokens, i, token), token)
-                    i += 2
-                }
-                token.startsWith("--concurrency=") -> {
-                    maxConcurrency = parsePositiveInt(token.substringAfter("="), "--concurrency")
-                    i++
-                }
-                token == "--dry-run" -> {
-                    dryRun = true
-                    i++
-                }
-                token == "--verbose" || token == "-v" -> {
-                    verbose = true
-                    i++
+                option != null -> {
+                    val value = optionValue(option, tokens, i, token, inlineName)
+                    option.apply(draft, value, inlineName ?: token)
+                    i += if (option.hasValue && inlineName == null) 2 else 1
                 }
                 token.startsWith("-") -> throw IllegalArgumentException("未知参数: $token")
                 else -> throw IllegalArgumentException("意外的位置参数: $token。请使用命名参数，例如 run --mode batch -a RANDOM")
             }
         }
 
-        val resolvedMode = mode?.let { normalizeMode(it) }
+        val command = draft.toCommand()
+        val resolvedMode = command.mode?.let { normalizeMode(it) }
         if (resolvedMode != null && resolvedMode !in supportedModes) {
             throw IllegalArgumentException("无效运行模式: $resolvedMode。可用模式: ${supportedModes.joinToString(", ")}")
         }
-        if (algorithms.isNotEmpty() && !preset.isNullOrBlank()) {
+        if (command.algorithms.isNotEmpty() && !command.preset.isNullOrBlank()) {
             throw IllegalArgumentException("--preset 与 --algorithms/-a 互斥，请只指定一种算法选择方式")
         }
 
-        return RunCommand(
-            mode = resolvedMode,
-            algorithms = algorithms,
-            preset = preset,
-            profile = profile,
-            randomSeed = randomSeed,
-            taskCounts = taskCounts,
-            runs = runs,
-            configFile = configFile,
-            verbose = verbose,
-            outputDir = outputDir,
-            useCoroutines = useCoroutines,
-            maxConcurrency = maxConcurrency,
-            dryRun = dryRun
+        return command.copy(mode = resolvedMode)
+    }
+
+    private fun runOptions(): List<RunOption> =
+        listOf(
+            valueOption("--mode") { draft, value, _ -> draft.mode = normalizeMode(value) },
+            valueOption("--algorithms", "-a") { draft, value, _ -> draft.algorithms = parseNameList(value) },
+            valueOption("--preset") { draft, value, _ -> draft.preset = value },
+            valueOption("--profile", "-p") { draft, value, _ -> draft.profile = value },
+            valueOption("--seed", "-s") { draft, value, option -> draft.randomSeed = parseLong(value, option) },
+            valueOption("--runs", "-r") { draft, value, option -> draft.runs = parsePositiveInt(value, option) },
+            valueOption("--tasks", "-t") { draft, value, _ -> draft.taskCounts = parseTaskCounts(value) },
+            valueOption("--config", "-c") { draft, value, _ -> draft.configFile = value },
+            valueOption("--output", "-o") { draft, value, _ -> draft.outputDir = value },
+            flagOption("--sequential", "-S") { draft -> draft.useCoroutines = false },
+            valueOption("--concurrency", "-C") { draft, value, option ->
+                draft.maxConcurrency = parsePositiveInt(value, option)
+            },
+            flagOption("--dry-run") { draft -> draft.dryRun = true },
+            flagOption("--verbose", "-v") { draft -> draft.verbose = true },
         )
+
+    private fun valueOption(
+        vararg names: String,
+        apply: (RunCommandDraft, String, String) -> Unit,
+    ): RunOption =
+        RunOption(names.toSet(), hasValue = true) { draft, value, option ->
+            apply(draft, requireNotNull(value), option)
+        }
+
+    private fun flagOption(
+        vararg names: String,
+        apply: (RunCommandDraft) -> Unit,
+    ): RunOption = RunOption(names.toSet(), hasValue = false) { draft, _, _ -> apply(draft) }
+
+    private fun inlineOptionName(token: String): String? =
+        token
+            .takeIf { it.startsWith("--") && it.contains("=") }
+            ?.substringBefore("=")
+
+    private fun optionValue(
+        option: RunOption,
+        tokens: List<String>,
+        index: Int,
+        token: String,
+        inlineName: String?,
+    ): String? {
+        if (!option.hasValue) {
+            require(inlineName == null) { "未知参数: $token" }
+            return null
+        }
+        return inlineName?.let { token.substringAfter("=") } ?: readValue(tokens, index, token)
     }
 
     private fun parseList(tokens: List<String>): Command {
@@ -230,7 +228,10 @@ class CliParser(private val args: Array<String>) {
         }
     }
 
-    private fun parseRequiredMode(tokens: List<String>, commandName: String): String {
+    private fun parseRequiredMode(
+        tokens: List<String>,
+        commandName: String,
+    ): String {
         var mode: String? = null
         var i = 0
         while (i < tokens.size) {
@@ -254,11 +255,15 @@ class CliParser(private val args: Array<String>) {
         return resolvedMode
     }
 
-    private fun parseRequiredConfig(tokens: List<String>, commandName: String): String {
-        return parseConfigAndOptionalProfile(tokens, commandName).first
-    }
+    private fun parseRequiredConfig(
+        tokens: List<String>,
+        commandName: String,
+    ): String = parseConfigAndOptionalProfile(tokens, commandName).first
 
-    private fun parseConfigAndOptionalProfile(tokens: List<String>, commandName: String): Pair<String, String?> {
+    private fun parseConfigAndOptionalProfile(
+        tokens: List<String>,
+        commandName: String,
+    ): Pair<String, String?> {
         var configFile: String? = null
         var profile: String? = null
         var i = 0
@@ -287,15 +292,18 @@ class CliParser(private val args: Array<String>) {
         return (configFile ?: throw IllegalArgumentException("$commandName 需要 --config FILE")) to profile
     }
 
-    private fun readValue(tokens: List<String>, index: Int, option: String): String {
+    private fun readValue(
+        tokens: List<String>,
+        index: Int,
+        option: String,
+    ): String {
         if (index + 1 >= tokens.size) {
             throw IllegalArgumentException("$option 参数需要指定值")
         }
         return tokens[index + 1]
     }
 
-    private fun parseNameList(value: String): List<String> =
-        value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    private fun parseNameList(value: String): List<String> = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 
     private fun parseTaskCounts(value: String): List<Int> =
         parseNameList(value).map { part ->
@@ -303,11 +311,17 @@ class CliParser(private val args: Array<String>) {
                 ?: throw IllegalArgumentException("无效的任务数: $part。任务数必须是大于 0 的整数")
         }
 
-    private fun parsePositiveInt(value: String, option: String): Int =
+    private fun parsePositiveInt(
+        value: String,
+        option: String,
+    ): Int =
         value.toIntOrNull()?.takeIf { it > 0 }
             ?: throw IllegalArgumentException("$option 必须是大于 0 的整数: $value")
 
-    private fun parseLong(value: String, option: String): Long =
+    private fun parseLong(
+        value: String,
+        option: String,
+    ): Long =
         value.toLongOrNull()
             ?: throw IllegalArgumentException("$option 必须是整数: $value")
 }

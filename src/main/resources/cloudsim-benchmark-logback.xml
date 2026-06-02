@@ -37,12 +37,12 @@
 
     <!-- CloudSim Plus 日志级别 -->
     <logger name="org.cloudsimplus" level="INFO"/>
-    
+
     <!-- 项目日志配置 -->
     <logger name="datacenter" level="INFO"/>
     <logger name="scheduler" level="INFO"/>
     <logger name="config" level="INFO"/>
-    
+
     <!-- 结果日志（用于记录实验结果） -->
     <logger name="RESULTS" level="INFO" additivity="false">
         <appender-ref ref="RESULTS"/>
@@ -55,4 +55,3 @@
         <appender-ref ref="FILE"/>
     </root>
 </configuration>
-

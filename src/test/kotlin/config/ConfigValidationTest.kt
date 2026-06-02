@@ -1,16 +1,16 @@
 package config
 
-import org.junit.jupiter.api.*
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.fail
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 
 /**
  * 配置验证测试
  */
 class ConfigValidationTest {
-
     @Test
     fun `should create valid default config`() {
         // Given
@@ -28,14 +28,16 @@ class ConfigValidationTest {
     @Test
     fun `should validate batch config parameters`() {
         // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            batch = ExperimentConfig.createDefault().batch.copy(
-                cloudletCount = -1,
-                population = 0,
-                maxIter = -5,
-                runs = 0
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                batch =
+                    ExperimentConfig.createDefault().batch.copy(
+                        cloudletCount = -1,
+                        population = 0,
+                        maxIter = -5,
+                        runs = 0,
+                    ),
             )
-        )
 
         // When - Then
         try {
@@ -52,14 +54,16 @@ class ConfigValidationTest {
     @Test
     fun `should validate realtime config parameters`() {
         // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            realtime = ExperimentConfig.createDefault().realtime.copy(
-                cloudletCount = 0,
-                simulationDuration = -1.0,
-                arrivalRate = 0.0,
-                runs = -1
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                realtime =
+                    ExperimentConfig.createDefault().realtime.copy(
+                        cloudletCount = 0,
+                        simulationDuration = -1.0,
+                        arrivalRate = 0.0,
+                        runs = -1,
+                    ),
             )
-        )
 
         // When - Then
         try {
@@ -75,73 +79,76 @@ class ConfigValidationTest {
 
     @Test
     fun `should validate realtime cloud semantics config parameters`() {
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            realtime = ExperimentConfig.createDefault().realtime.copy(
-                scheduling = RealtimeSchedulingConfig(
-                    decisionDelay = -1.0,
-                    decisionJitter = -0.1,
-                    failureRate = 1.2,
-                    retryLimit = -1,
-                    retryDelay = -2.0,
-                    retryBackoffMultiplier = 0.5,
-                    queuePolicy = "fastest",
-                    priorityLevels = 0,
-                    highPriorityRatio = 1.1,
-                    deadlineFactor = -0.1,
-                    vmQueueCapacity = -1,
-                    overloadFailureMultiplier = -0.2,
-                    scaleOutQueueThreshold = -1,
-                    scaleInIdleTime = -1.0,
-                    maxDynamicVms = -1,
-                    vmColdStartDelay = -1.0,
-                    scaleOutCost = -1.0,
-                    scaleInProtectionTime = -1.0,
-                    networkLatency = -0.1,
-                    imagePullDelay = -0.1,
-                    ioWeight = -0.1,
-                    ramWeight = -0.1,
-                    bwWeight = -0.1,
-                    runtimeFailureRate = 1.5,
-                    nodeFailureRate = -0.1,
-                    checkpointInterval = -1.0,
-                    migrationDelay = -1.0,
-                    timeoutAction = "pause",
-                    preemptionPolicy = "random",
-                    preemptionMinPriorityGap = -1,
-                    preemptionMaxPerTask = -1,
-                    preemptionDelay = -0.1,
-                    preemptionPenalty = -0.1,
-                    tenantCount = 0,
-                    tenantQuota = listOf(1, -1),
-                    tenantWeights = listOf(1.0, 0.0),
-                    tenantFairnessPolicy = "lottery",
-                    tenantSchedulingPolicy = "lottery",
-                    tenantBurstAllowance = -1,
-                    tenantSlaPenaltyWeight = -0.1,
-                    tenantCostBudget = listOf(10.0, -1.0),
-                    topologyPolicy = "random",
-                    regionCount = 0,
-                    racksPerRegion = 0,
-                    hostsPerRack = 0,
-                    localRegion = 2,
-                    crossRackLatency = -0.1,
-                    crossRegionLatency = -0.1,
-                    crossRegionCost = -0.1,
-                    hostFailureRate = 1.1,
-                    rackFailureRate = -0.1,
-                    regionFailureRate = 1.2,
-                    hostCountPerRack = 0,
-                    hostCpuCapacity = -1.0,
-                    hostRamCapacity = -1.0,
-                    hostBwCapacity = -1.0,
-                    hostIoCapacity = -1.0,
-                    crossRackBandwidth = -1.0,
-                    crossRegionBandwidth = -1.0,
-                    dataLocalityPolicy = "nearest",
-                    imageCacheCapacity = -1
-                )
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                realtime =
+                    ExperimentConfig.createDefault().realtime.copy(
+                        scheduling =
+                            RealtimeSchedulingConfig(
+                                decisionDelay = -1.0,
+                                decisionJitter = -0.1,
+                                failureRate = 1.2,
+                                retryLimit = -1,
+                                retryDelay = -2.0,
+                                retryBackoffMultiplier = 0.5,
+                                queuePolicy = "fastest",
+                                priorityLevels = 0,
+                                highPriorityRatio = 1.1,
+                                deadlineFactor = -0.1,
+                                vmQueueCapacity = -1,
+                                overloadFailureMultiplier = -0.2,
+                                scaleOutQueueThreshold = -1,
+                                scaleInIdleTime = -1.0,
+                                maxDynamicVms = -1,
+                                vmColdStartDelay = -1.0,
+                                scaleOutCost = -1.0,
+                                scaleInProtectionTime = -1.0,
+                                networkLatency = -0.1,
+                                imagePullDelay = -0.1,
+                                ioWeight = -0.1,
+                                ramWeight = -0.1,
+                                bwWeight = -0.1,
+                                runtimeFailureRate = 1.5,
+                                nodeFailureRate = -0.1,
+                                checkpointInterval = -1.0,
+                                migrationDelay = -1.0,
+                                timeoutAction = "pause",
+                                preemptionPolicy = "random",
+                                preemptionMinPriorityGap = -1,
+                                preemptionMaxPerTask = -1,
+                                preemptionDelay = -0.1,
+                                preemptionPenalty = -0.1,
+                                tenantCount = 0,
+                                tenantQuota = listOf(1, -1),
+                                tenantWeights = listOf(1.0, 0.0),
+                                tenantFairnessPolicy = "lottery",
+                                tenantSchedulingPolicy = "lottery",
+                                tenantBurstAllowance = -1,
+                                tenantSlaPenaltyWeight = -0.1,
+                                tenantCostBudget = listOf(10.0, -1.0),
+                                topologyPolicy = "random",
+                                regionCount = 0,
+                                racksPerRegion = 0,
+                                hostsPerRack = 0,
+                                localRegion = 2,
+                                crossRackLatency = -0.1,
+                                crossRegionLatency = -0.1,
+                                crossRegionCost = -0.1,
+                                hostFailureRate = 1.1,
+                                rackFailureRate = -0.1,
+                                regionFailureRate = 1.2,
+                                hostCountPerRack = 0,
+                                hostCpuCapacity = -1.0,
+                                hostRamCapacity = -1.0,
+                                hostBwCapacity = -1.0,
+                                hostIoCapacity = -1.0,
+                                crossRackBandwidth = -1.0,
+                                crossRegionBandwidth = -1.0,
+                                dataLocalityPolicy = "nearest",
+                                imageCacheCapacity = -1,
+                            ),
+                    ),
             )
-        )
 
         try {
             ExperimentConfig.validate(invalidConfig)
@@ -217,12 +224,14 @@ class ConfigValidationTest {
     @Test
     fun `should validate optimizer config parameters`() {
         // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            optimizer = ExperimentConfig.createDefault().optimizer.copy(
-                population = -1,
-                maxIter = 0
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                optimizer =
+                    ExperimentConfig.createDefault().optimizer.copy(
+                        population = -1,
+                        maxIter = 0,
+                    ),
             )
-        )
 
         // When - Then
         try {
@@ -261,12 +270,13 @@ class ConfigValidationTest {
     @Test
     fun `should create valid objective weights config`() {
         // Given
-        val weights = ObjectiveWeightsConfig(
-            cost = 0.3,
-            totalTime = 0.4,
-            loadBalance = 0.2,
-            makespan = 0.1
-        )
+        val weights =
+            ObjectiveWeightsConfig(
+                cost = 0.3,
+                totalTime = 0.4,
+                loadBalance = 0.2,
+                makespan = 0.1,
+            )
 
         // When - Then
         assertThat(weights.cost).isEqualTo(0.3)
@@ -291,7 +301,7 @@ class ConfigValidationTest {
     fun `should handle invalid generator type gracefully`() {
         // Given - When
         val type = ExperimentConfig.parseGeneratorType("INVALID_TYPE")
-        
+
         // Then
         assertThat(type).isEqualTo(CloudletGeneratorType.LOG_NORMAL)
     }
@@ -307,12 +317,13 @@ class ConfigValidationTest {
     @Test
     fun `should validate google trace config parameters`() {
         // Given
-        val config = GoogleTraceConfig(
-            filePath = "test/path.csv",
-            maxTasks = 100,
-            timeWindowStart = 1000L,
-            timeWindowEnd = 2000L
-        )
+        val config =
+            GoogleTraceConfig(
+                filePath = "test/path.csv",
+                maxTasks = 100,
+                timeWindowStart = 1000L,
+                timeWindowEnd = 2000L,
+            )
 
         // When - Then
         assertThat(config.filePath).isEqualTo("test/path.csv")

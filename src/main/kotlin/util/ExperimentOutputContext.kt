@@ -13,17 +13,16 @@ data class ExperimentOutputContext(
     val baseResultsDir: File = File("runs"),
     val csvEnabled: Boolean = true,
     val csvDelimiter: String = ",",
-    private val writeLocks: ConcurrentHashMap<String, Mutex> = ConcurrentHashMap()
+    private val writeLocks: ConcurrentHashMap<String, Mutex> = ConcurrentHashMap(),
 ) {
     private val dateTimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
 
-    fun csvLine(values: Iterable<Any?>): String {
-        return values.joinToString(csvDelimiter) { value ->
-            escapeCsv(value?.toString().orEmpty())
-        }
-    }
+    fun csvLine(values: Iterable<Any?>): String = CsvRowWriter(csvDelimiter).line(values)
 
-    fun generateResultFileName(fileName: String, suffix: String = ".csv"): File {
+    fun generateResultFileName(
+        fileName: String,
+        suffix: String = ".csv",
+    ): File {
         val resolvedName = if (fileName.endsWith(suffix)) fileName else fileName + suffix
         return experimentDir?.let { File(it, resolvedName) }
             ?: File(ensureBaseDirectory(), "${fileName}_${LocalDateTime.now().format(dateTimeFormatter)}$suffix")
@@ -54,7 +53,19 @@ data class ExperimentOutputContext(
     suspend fun saveAlgorithmTrialResult(
         algorithmName: String,
         trial: Int,
-        metrics: Map<String, Double>
+        metrics: Map<String, Double>,
+    ) {
+        saveAlgorithmTrialRow(
+            algorithmName = algorithmName,
+            headers = listOf("Trial") + metrics.keys.toList(),
+            row = listOf(trial) + metrics.values,
+        )
+    }
+
+    suspend fun saveAlgorithmTrialRow(
+        algorithmName: String,
+        headers: List<String>,
+        row: List<Any?>,
     ) {
         val dir = experimentDir ?: return
         if (!csvEnabled) return
@@ -65,32 +76,35 @@ data class ExperimentOutputContext(
 
         lock.withLock {
             val isNew = !file.exists()
+            val schema = CsvTableSchema(headers)
+            val csvWriter = CsvRowWriter(csvDelimiter)
             java.io.FileOutputStream(file, true).bufferedWriter().use { writer ->
                 if (isNew) {
-                    writer.write(csvLine(listOf("Trial") + metrics.keys.toList()) + "\n")
+                    csvWriter.writeHeader(writer, schema)
                 }
-                writer.write(csvLine(listOf(trial) + metrics.values.map { String.format("%.6f", it) }) + "\n")
+                csvWriter.writeRow(writer, schema, row)
             }
         }
     }
 
-    fun saveSummaryResults(
-        summaryData: List<Map<String, Any>>,
-        headers: List<String>
+    fun saveSummaryRows(
+        rows: List<List<Any?>>,
+        headers: List<String>,
     ) {
         val dir = experimentDir ?: return
         if (!csvEnabled) return
 
         val summaryFile = File(dir, "summary_avg.csv")
-        summaryFile.bufferedWriter().use { writer ->
-            writer.write(csvLine(headers) + "\n")
-            for (row in summaryData) {
-                writer.write(csvLine(headers.map { header ->
-                    val value = row[header]
-                    if (value is Double) String.format("%.6f", value) else value.toString()
-                }) + "\n")
-            }
-        }
+        val schema = CsvTableSchema(headers)
+        CsvRowWriter(csvDelimiter).writeTable(summaryFile, schema, rows)
+    }
+
+    fun saveSummaryResults(
+        summaryData: List<Map<String, Any?>>,
+        headers: List<String>,
+    ) {
+        val schema = CsvTableSchema(headers)
+        saveSummaryRows(summaryData.map(schema::rowFrom), headers)
     }
 
     private fun ensureBaseDirectory(): File {
@@ -100,27 +114,24 @@ data class ExperimentOutputContext(
         return baseResultsDir
     }
 
-    private fun escapeCsv(value: String): String {
-        val needsQuotes = value.contains(csvDelimiter) || value.contains('"') || value.contains('\n') || value.contains('\r')
-        if (!needsQuotes) return value
-        return "\"" + value.replace("\"", "\"\"") + "\""
-    }
-
     companion object {
         private val experimentNameFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
 
-        fun from(systemConfig: SystemConfig, experimentDir: File?): ExperimentOutputContext =
+        fun from(
+            systemConfig: SystemConfig,
+            experimentDir: File?,
+        ): ExperimentOutputContext =
             ExperimentOutputContext(
                 experimentDir = experimentDir,
                 baseResultsDir = File(systemConfig.output.resultsDir),
                 csvEnabled = systemConfig.output.csv.enabled,
-                csvDelimiter = systemConfig.output.csv.delimiter
+                csvDelimiter = systemConfig.output.csv.delimiter,
             )
 
         fun createExperiment(
             systemConfig: SystemConfig,
             mode: String,
-            experimentName: String? = null
+            experimentName: String? = null,
         ): ExperimentOutputContext {
             val baseResultsDir = File(systemConfig.output.resultsDir)
             val experimentDir = createExperimentDirectory(baseResultsDir, mode, experimentName)
@@ -130,22 +141,28 @@ data class ExperimentOutputContext(
         fun createExperimentDirectory(
             baseResultsDir: File,
             mode: String,
-            experimentName: String? = null
+            experimentName: String? = null,
         ): File {
             val modeDir = File(baseResultsDir, mode.lowercase()).also(File::mkdirs)
-            val resolvedName = experimentName
-                ?: "exp${findNextExperimentNumber(modeDir)}_${LocalDateTime.now().format(experimentNameFormatter)}"
+            val resolvedName =
+                experimentName
+                    ?: "exp${findNextExperimentNumber(modeDir)}_${LocalDateTime.now().format(experimentNameFormatter)}"
             return File(modeDir, resolvedName).also(File::mkdirs)
         }
 
         private fun findNextExperimentNumber(modeDir: File): Int {
-            val existingDirs = modeDir.listFiles { file ->
-                file.isDirectory && file.name.startsWith("exp")
-            } ?: emptyArray()
+            val existingDirs =
+                modeDir.listFiles { file ->
+                    file.isDirectory && file.name.startsWith("exp")
+                } ?: emptyArray()
 
             return existingDirs
-                .mapNotNull { it.name.substringAfter("exp").substringBefore("_").toIntOrNull() }
-                .maxOrNull()
+                .mapNotNull {
+                    it.name
+                        .substringAfter("exp")
+                        .substringBefore("_")
+                        .toIntOrNull()
+                }.maxOrNull()
                 ?.plus(1)
                 ?: 1
         }

@@ -1,6 +1,6 @@
 package config
 
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.File
@@ -8,29 +8,41 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
 class ConfigurationManagerIntegrationTest {
-
     @Test
     fun `load profiles only config successfully`() {
-        val configFile = createTempTomlFile("""
-            defaultProfile = "batch_profile"
+        val configFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "batch_profile"
 
-            [profiles.batch_profile]
-            mode = "batch"
-            algorithms = ["RANDOM", "PSO"]
-            runs = 1
+                [profiles.batch_profile]
+                mode = "batch"
+                algorithms = ["RANDOM", "PSO"]
+                runs = 1
 
-            [profiles.batch_profile.batch]
-            cloudletCount = 100
-            population = 30
-            maxIter = 50
-        """.trimIndent())
+                [profiles.batch_profile.batch]
+                cloudletCount = 100
+                population = 30
+                maxIter = 50
+                """.trimIndent(),
+            )
 
         try {
             val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
 
             assertEquals("batch_profile", configs.experimentConfig.defaultProfile)
-            assertEquals(100, configs.experimentConfig.profiles["batch_profile"]?.batch?.cloudletCount)
-            assertEquals(2, configs.experimentConfig.profiles["batch_profile"]?.algorithms?.size)
+            assertEquals(
+                100,
+                configs.experimentConfig.profiles["batch_profile"]
+                    ?.batch
+                    ?.cloudletCount,
+            )
+            assertEquals(
+                2,
+                configs.experimentConfig.profiles["batch_profile"]
+                    ?.algorithms
+                    ?.size,
+            )
         } finally {
             configFile.delete()
         }
@@ -38,31 +50,39 @@ class ConfigurationManagerIntegrationTest {
 
     @Test
     fun `load system plus profiles config successfully`() {
-        val configFile = createTempTomlFile("""
-            defaultProfile = "realtime_profile"
+        val configFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "realtime_profile"
 
-            [output]
-            resultsDir = "integration-test-runs"
+                [output]
+                resultsDir = "integration-test-runs"
 
-            [logging]
-            level = "DEBUG"
+                [logging]
+                level = "DEBUG"
 
-            [profiles.realtime_profile]
-            mode = "realtime"
-            algorithms = ["MIN_LOAD"]
-            runs = 3
+                [profiles.realtime_profile]
+                mode = "realtime"
+                algorithms = ["MIN_LOAD"]
+                runs = 3
 
-            [profiles.realtime_profile.realtime]
-            cloudletCount = 200
-            simulationDuration = 1000.0
-        """.trimIndent())
+                [profiles.realtime_profile.realtime]
+                cloudletCount = 200
+                simulationDuration = 1000.0
+                """.trimIndent(),
+            )
 
         try {
             val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
 
             assertEquals("integration-test-runs", configs.systemConfig.output.resultsDir)
             assertEquals("DEBUG", configs.systemConfig.logging.level)
-            assertEquals(200, configs.experimentConfig.profiles["realtime_profile"]?.realtime?.cloudletCount)
+            assertEquals(
+                200,
+                configs.experimentConfig.profiles["realtime_profile"]
+                    ?.realtime
+                    ?.cloudletCount,
+            )
             assertEquals(3, configs.experimentConfig.profiles["realtime_profile"]?.runs)
         } finally {
             configFile.delete()
@@ -71,11 +91,14 @@ class ConfigurationManagerIntegrationTest {
 
     @Test
     fun `loadFromSingleFile with invalid config throws exception`() {
-        val configFile = createTempTomlFile("""
-            mode = "batch"
-            [batch]
-            cloudletCount = 100
-        """.trimIndent())
+        val configFile =
+            createTempTomlFile(
+                """
+                mode = "batch"
+                [batch]
+                cloudletCount = 100
+                """.trimIndent(),
+            )
 
         try {
             assertThrows<IllegalArgumentException> {

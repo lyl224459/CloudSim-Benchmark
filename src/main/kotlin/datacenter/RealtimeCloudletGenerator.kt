@@ -4,8 +4,9 @@ import config.CloudletGenConfig
 import config.GoogleTraceConfig
 import config.RealtimeArrivalConfig
 import datacenter.generator.CloudletGeneratorFactory
+import datacenter.generator.GoogleTraceCloudletGenerator
 import org.cloudsimplus.cloudlets.Cloudlet
-import java.util.*
+import java.util.Random
 
 /**
  * 实时云任务生成器
@@ -13,40 +14,52 @@ import java.util.*
  */
 class RealtimeCloudletGenerator(
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
-    private val arrivalRate: Double = 10.0,  // 平均每秒到达的任务数（泊松分布）
+    private val arrivalRate: Double = 10.0, // 平均每秒到达的任务数（泊松分布）
     private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE,
     private val arrivalConfig: RealtimeArrivalConfig = RealtimeArrivalConfig(),
-    private val googleTraceConfig: GoogleTraceConfig? = null
+    private val googleTraceConfig: GoogleTraceConfig? = null,
 ) {
     private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random, googleTraceConfig)
-    
+
     /**
      * 创建实时云任务列表（带到达时间）
-     * 
+     *
      * @param userId 用户ID
      * @param count 任务数量
      * @param simulationDuration 仿真持续时间（秒）
      * @return 云任务列表，已设置到达时间
      */
     fun createRealtimeCloudlets(
-        userId: Int, 
+        userId: Int,
         count: Int = config.DatacenterConfig.DEFAULT_CLOUDLET_N,
-        simulationDuration: Double = 1000.0
-    ): List<Cloudlet> {
-        val baseCloudlets = strategy.createCloudlets(userId, count, random)
+        simulationDuration: Double = 1000.0,
+    ): List<Cloudlet> = createRealtimeCloudletBatch(userId, count, simulationDuration).cloudlets
+
+    fun createRealtimeCloudletBatch(
+        userId: Int,
+        count: Int = config.DatacenterConfig.DEFAULT_CLOUDLET_N,
+        simulationDuration: Double = 1000.0,
+    ): RealtimeCloudletBatch {
+        val baseSpecs =
+            when (strategy) {
+                is GoogleTraceCloudletGenerator -> strategy.createCloudletSpecs(userId, count, random)
+                else -> strategy.createCloudlets(userId, count, random).map(::RealtimeCloudletSpec)
+            }
         val arrivalTimes = generateArrivalTimes(count, simulationDuration)
 
-        val cloudlets = mutableListOf<Cloudlet>()
-        for ((index, arrivalTime) in arrivalTimes.withIndex()) {
-            if (index >= baseCloudlets.size) break
-            val cloudlet = baseCloudlets[index]
-            cloudlet.setSubmissionDelay(arrivalTime)
-            cloudlets.add(cloudlet)
-        }
-        return cloudlets
+        return RealtimeCloudletBatch(
+            arrivalTimes.mapIndexedNotNull { index, arrivalTime ->
+                baseSpecs.getOrNull(index)?.also { spec ->
+                    spec.cloudlet.setSubmissionDelay(arrivalTime)
+                }
+            },
+        )
     }
 
-    internal fun generateArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+    internal fun generateArrivalTimes(
+        count: Int,
+        simulationDuration: Double,
+    ): List<Double> {
         if (count <= 0 || simulationDuration <= 0.0) {
             return emptyList()
         }
@@ -58,7 +71,10 @@ class RealtimeCloudletGenerator(
         }
     }
 
-    private fun generatePoissonArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+    private fun generatePoissonArrivalTimes(
+        count: Int,
+        simulationDuration: Double,
+    ): List<Double> {
         val times = mutableListOf<Double>()
         var currentTime = 0.0
 
@@ -72,12 +88,16 @@ class RealtimeCloudletGenerator(
         return times
     }
 
-    private fun generateUniformArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
-        val interval = if (arrivalRate > 0.0) {
-            1.0 / arrivalRate
-        } else {
-            simulationDuration / count.toDouble()
-        }
+    private fun generateUniformArrivalTimes(
+        count: Int,
+        simulationDuration: Double,
+    ): List<Double> {
+        val interval =
+            if (arrivalRate > 0.0) {
+                1.0 / arrivalRate
+            } else {
+                simulationDuration / count.toDouble()
+            }
         val times = mutableListOf<Double>()
         var currentTime = interval
         repeat(count) {
@@ -90,7 +110,10 @@ class RealtimeCloudletGenerator(
         return times
     }
 
-    private fun generateBurstArrivalTimes(count: Int, simulationDuration: Double): List<Double> {
+    private fun generateBurstArrivalTimes(
+        count: Int,
+        simulationDuration: Double,
+    ): List<Double> {
         val times = mutableListOf<Double>()
         val burstWindow = arrivalConfig.burstDuration.coerceAtLeast(1.0)
         val cycleWindow = (burstWindow * 2.0).coerceAtLeast(burstWindow + 1.0)
@@ -98,11 +121,12 @@ class RealtimeCloudletGenerator(
 
         repeat(count) {
             val positionInCycle = currentTime % cycleWindow
-            val activeRate = if (positionInCycle <= burstWindow) {
-                arrivalRate * arrivalConfig.burstIntensity
-            } else {
-                (arrivalRate / arrivalConfig.burstIntensity).coerceAtLeast(0.1)
-            }
+            val activeRate =
+                if (positionInCycle <= burstWindow) {
+                    arrivalRate * arrivalConfig.burstIntensity
+                } else {
+                    (arrivalRate / arrivalConfig.burstIntensity).coerceAtLeast(0.1)
+                }
 
             currentTime += exponentialInterArrival(activeRate)
             if (currentTime > simulationDuration) {
@@ -118,4 +142,3 @@ class RealtimeCloudletGenerator(
         return -Math.log(1.0 - random.nextDouble()) / safeRate
     }
 }
-

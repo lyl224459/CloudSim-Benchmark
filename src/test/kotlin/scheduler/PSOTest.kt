@@ -2,20 +2,20 @@ package scheduler
 
 import datacenter.ObjectiveFunction
 import datacenter.SchedulerObjectiveFunction
+import org.assertj.core.api.Assertions.assertThat
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.cloudlets.CloudletSimple
+import org.cloudsimplus.utilizationmodels.UtilizationModelFull
 import org.cloudsimplus.vms.Vm
 import org.cloudsimplus.vms.VmSimple
-import org.junit.jupiter.api.*
-import org.assertj.core.api.Assertions.assertThat
-import java.util.*
-import org.cloudsimplus.utilizationmodels.UtilizationModelFull
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import java.util.Random
 
 /**
  * PSO算法测试
  */
 class PSOTest {
-
     private lateinit var mockObjectiveFunction: ObjectiveFunction
     private lateinit var cloudlets: List<Cloudlet>
     private lateinit var vms: List<Vm>
@@ -169,12 +169,11 @@ class PSOTest {
     }
 
     // 辅助方法：创建模拟虚拟机
-    private fun createMockVms(count: Int): List<Vm> {
-        return (0 until count).map { i ->
+    private fun createMockVms(count: Int): List<Vm> =
+        (0 until count).map { i ->
             VmSimple(1000.0 + i * 500, 1)
                 .setRam(2048L)
                 .setBw(1000L)
                 .setSize(10000L)
         }
-    }
 }

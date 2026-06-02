@@ -1,16 +1,15 @@
 package util
 
-import org.junit.jupiter.api.*
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.assertj.core.api.Assertions.within
-import org.assertj.core.data.Offset
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 /**
  * 统计计算测试
  */
 class StatisticalTest {
-
     private lateinit var values: DoubleArray
     private lateinit var intValues: IntArray
 

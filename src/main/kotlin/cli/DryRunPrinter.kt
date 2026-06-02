@@ -18,11 +18,12 @@ object DryRunPrinter {
     private val prettyJson = Json { prettyPrint = true }
 
     fun printAlgorithms(mode: String) {
-        val algorithms = when (normalizeMode(mode)) {
-            "batch" -> AlgorithmRegistry.forMode(AlgorithmMode.BATCH).map { it.name }
-            "realtime" -> AlgorithmRegistry.forMode(AlgorithmMode.REALTIME).map { it.name }
-            else -> throw IllegalArgumentException("list algorithms 只接受 batch 或 realtime")
-        }
+        val algorithms =
+            when (normalizeMode(mode)) {
+                "batch" -> AlgorithmRegistry.forMode(AlgorithmMode.BATCH).map { it.name }
+                "realtime" -> AlgorithmRegistry.forMode(AlgorithmMode.REALTIME).map { it.name }
+                else -> throw IllegalArgumentException("list algorithms 只接受 batch 或 realtime")
+            }
         Logger.result("可用算法 ({}): {}", mode, algorithms.joinToString(", "))
     }
 
@@ -33,11 +34,12 @@ object DryRunPrinter {
         }
         Logger.result("可用 profiles:")
         config.profiles.toSortedMap().forEach { (name, profile) ->
-            val selection = when {
-                profile.algorithms.isNotEmpty() -> "algorithms=${profile.algorithms.joinToString(", ")}"
-                !profile.preset.isNullOrBlank() -> "preset=${profile.preset}"
-                else -> "(未指定)"
-            }
+            val selection =
+                when {
+                    profile.algorithms.isNotEmpty() -> "algorithms=${profile.algorithms.joinToString(", ")}"
+                    !profile.preset.isNullOrBlank() -> "preset=${profile.preset}"
+                    else -> "(未指定)"
+                }
             Logger.result("  {} -> mode={}, {}", name, profile.mode, selection)
         }
         config.defaultProfile?.let { Logger.result("默认 profile: {}", it) }
@@ -109,13 +111,16 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.preemptionPenalty,
                 resolved.realtime.scheduling.multiTenantEnabled,
                 resolved.realtime.scheduling.tenantCount,
-                resolved.realtime.scheduling.tenantQuota.joinToString(","),
-                resolved.realtime.scheduling.tenantWeights.joinToString(","),
+                resolved.realtime.scheduling.tenantQuota
+                    .joinToString(","),
+                resolved.realtime.scheduling.tenantWeights
+                    .joinToString(","),
                 resolved.realtime.scheduling.tenantFairnessPolicy,
                 resolved.realtime.scheduling.tenantSchedulingPolicy,
                 resolved.realtime.scheduling.tenantBurstAllowance,
                 resolved.realtime.scheduling.tenantSlaPenaltyWeight,
-                resolved.realtime.scheduling.tenantCostBudget.joinToString(","),
+                resolved.realtime.scheduling.tenantCostBudget
+                    .joinToString(","),
                 resolved.realtime.scheduling.topologyEnabled,
                 resolved.realtime.scheduling.topologyPolicy,
                 resolved.realtime.scheduling.regionCount,
@@ -127,7 +132,7 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.crossRegionCost,
                 resolved.realtime.scheduling.hostFailureRate,
                 resolved.realtime.scheduling.rackFailureRate,
-                resolved.realtime.scheduling.regionFailureRate
+                resolved.realtime.scheduling.regionFailureRate,
             )
             Logger.result(
                 "物理拓扑/数据本地性: physicalTopologyEnabled={}, dataLocalityEnabled={}, imageCacheEnabled={}, hostCountPerRack={}, hostCpuCapacity={}, hostRamCapacity={}, hostBwCapacity={}, hostIoCapacity={}, crossRackBandwidth={}, crossRegionBandwidth={}, dataLocalityPolicy={}, imageCacheCapacity={}",
@@ -142,152 +147,160 @@ object DryRunPrinter {
                 resolved.realtime.scheduling.crossRackBandwidth,
                 resolved.realtime.scheduling.crossRegionBandwidth,
                 resolved.realtime.scheduling.dataLocalityPolicy,
-                resolved.realtime.scheduling.imageCacheCapacity
+                resolved.realtime.scheduling.imageCacheCapacity,
             )
         }
         Logger.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
     }
 
-    fun resolvedJson(resolved: ResolvedExperimentConfig, experimentDir: File?, timestamp: String): String {
+    fun resolvedJson(
+        resolved: ResolvedExperimentConfig,
+        experimentDir: File?,
+        timestamp: String,
+    ): String {
         val config = resolved.experimentConfig
-        val json = buildJsonObject {
-            put("mode", resolved.mode)
-            put("profile", resolved.profileName ?: "")
-            put("timestamp", timestamp)
-            experimentDir?.let { put("experimentDir", it.absolutePath) }
-            put("outputDir", resolved.output.resultsDir)
-            put("randomSeed", resolved.randomSeed)
-            put("runs", resolved.runs)
-            put("preset", resolved.presetName ?: "")
-            putJsonArray("algorithms") {
-                resolved.selectedAlgorithmNames.forEach { add(JsonPrimitive(it)) }
-            }
-            putJsonObject("algorithmSettings") {
-                resolved.algorithms.forEach { algorithm ->
-                    putJsonObject(algorithm.name) {
-                        put("population", algorithm.settings.population)
-                        put("maxIter", algorithm.settings.maxIter)
+        val json =
+            buildJsonObject {
+                put("mode", resolved.mode)
+                put("profile", resolved.profileName ?: "")
+                put("timestamp", timestamp)
+                experimentDir?.let { put("experimentDir", it.absolutePath) }
+                put("outputDir", resolved.output.resultsDir)
+                put("randomSeed", resolved.randomSeed)
+                put("runs", resolved.runs)
+                put("preset", resolved.presetName ?: "")
+                putJsonArray("algorithms") {
+                    resolved.selectedAlgorithmNames.forEach { add(JsonPrimitive(it)) }
+                }
+                putJsonObject("algorithmSettings") {
+                    resolved.algorithms.forEach { algorithm ->
+                        putJsonObject(algorithm.name) {
+                            put("population", algorithm.settings.population)
+                            put("maxIter", algorithm.settings.maxIter)
+                        }
                     }
                 }
-            }
-            putJsonObject("batch") {
-                put("cloudletCount", config.batch.cloudletCount)
-                putJsonArray("cloudletCounts") { config.batch.cloudletCounts.forEach { add(JsonPrimitive(it)) } }
-                put("generatorType", config.batch.generatorType.name)
-                putJsonObject("objective") {
-                    put("cost", config.batch.objectiveWeights.cost)
-                    put("totalTime", config.batch.objectiveWeights.totalTime)
-                    put("loadBalance", config.batch.objectiveWeights.loadBalance)
-                    put("makespan", config.batch.objectiveWeights.makespan)
-                }
-            }
-            putJsonObject("realtime") {
-                put("cloudletCount", config.realtime.cloudletCount)
-                putJsonArray("cloudletCounts") { config.realtime.cloudletCounts.forEach { add(JsonPrimitive(it)) } }
-                put("simulationDuration", config.realtime.simulationDuration)
-                put("arrivalRate", config.realtime.arrivalRate)
-                put("generatorType", config.realtime.generatorType.name)
-                putJsonObject("objective") {
-                    put("cost", config.realtime.objectiveWeights.cost)
-                    put("totalTime", config.realtime.objectiveWeights.totalTime)
-                    put("loadBalance", config.realtime.objectiveWeights.loadBalance)
-                    put("makespan", config.realtime.objectiveWeights.makespan)
-                }
-                putJsonObject("arrival") {
-                    put("distribution", config.realtime.arrival.distribution)
-                    put("burstIntensity", config.realtime.arrival.burstIntensity)
-                    put("burstDuration", config.realtime.arrival.burstDuration)
-                }
-                putJsonObject("scheduling") {
-                    put("strategy", config.realtime.scheduling.strategy)
-                    put("maxQueueSize", config.realtime.scheduling.maxQueueSize)
-                    put("taskTimeout", config.realtime.scheduling.taskTimeout)
-                    put("resourceReservation", config.realtime.scheduling.resourceReservation)
-                    put("decisionDelay", config.realtime.scheduling.decisionDelay)
-                    put("decisionJitter", config.realtime.scheduling.decisionJitter)
-                    put("failureRate", config.realtime.scheduling.failureRate)
-                    put("retryLimit", config.realtime.scheduling.retryLimit)
-                    put("retryDelay", config.realtime.scheduling.retryDelay)
-                    put("retryBackoffMultiplier", config.realtime.scheduling.retryBackoffMultiplier)
-                    put("queuePolicy", config.realtime.scheduling.queuePolicy)
-                    put("priorityLevels", config.realtime.scheduling.priorityLevels)
-                    put("highPriorityRatio", config.realtime.scheduling.highPriorityRatio)
-                    put("deadlineFactor", config.realtime.scheduling.deadlineFactor)
-                    put("vmQueueCapacity", config.realtime.scheduling.vmQueueCapacity)
-                    put("overloadFailureMultiplier", config.realtime.scheduling.overloadFailureMultiplier)
-                    put("autoscalingEnabled", config.realtime.scheduling.autoscalingEnabled)
-                    put("scaleOutQueueThreshold", config.realtime.scheduling.scaleOutQueueThreshold)
-                    put("scaleInIdleTime", config.realtime.scheduling.scaleInIdleTime)
-                    put("maxDynamicVms", config.realtime.scheduling.maxDynamicVms)
-                    put("vmColdStartDelay", config.realtime.scheduling.vmColdStartDelay)
-                    put("scaleOutCost", config.realtime.scheduling.scaleOutCost)
-                    put("scaleInProtectionTime", config.realtime.scheduling.scaleInProtectionTime)
-                    put("resourceModelEnabled", config.realtime.scheduling.resourceModelEnabled)
-                    put("networkLatency", config.realtime.scheduling.networkLatency)
-                    put("imagePullDelay", config.realtime.scheduling.imagePullDelay)
-                    put("ioWeight", config.realtime.scheduling.ioWeight)
-                    put("ramWeight", config.realtime.scheduling.ramWeight)
-                    put("bwWeight", config.realtime.scheduling.bwWeight)
-                    put("runtimeFailureRate", config.realtime.scheduling.runtimeFailureRate)
-                    put("nodeFailureRate", config.realtime.scheduling.nodeFailureRate)
-                    put("checkpointInterval", config.realtime.scheduling.checkpointInterval)
-                    put("migrationDelay", config.realtime.scheduling.migrationDelay)
-                    put("timeoutAction", config.realtime.scheduling.timeoutAction)
-                    put("preemptionEnabled", config.realtime.scheduling.preemptionEnabled)
-                    put("preemptionPolicy", config.realtime.scheduling.preemptionPolicy)
-                    put("preemptionMinPriorityGap", config.realtime.scheduling.preemptionMinPriorityGap)
-                    put("preemptionMaxPerTask", config.realtime.scheduling.preemptionMaxPerTask)
-                    put("preemptionDelay", config.realtime.scheduling.preemptionDelay)
-                    put("preemptionPenalty", config.realtime.scheduling.preemptionPenalty)
-                    put("multiTenantEnabled", config.realtime.scheduling.multiTenantEnabled)
-                    put("tenantCount", config.realtime.scheduling.tenantCount)
-                    putJsonArray("tenantQuota") {
-                        config.realtime.scheduling.tenantQuota.forEach { add(JsonPrimitive(it)) }
+                putJsonObject("batch") {
+                    put("cloudletCount", config.batch.cloudletCount)
+                    putJsonArray("cloudletCounts") { config.batch.cloudletCounts.forEach { add(JsonPrimitive(it)) } }
+                    put("generatorType", config.batch.generatorType.name)
+                    putJsonObject("objective") {
+                        put("cost", config.batch.objectiveWeights.cost)
+                        put("totalTime", config.batch.objectiveWeights.totalTime)
+                        put("loadBalance", config.batch.objectiveWeights.loadBalance)
+                        put("makespan", config.batch.objectiveWeights.makespan)
                     }
-                    putJsonArray("tenantWeights") {
-                        config.realtime.scheduling.tenantWeights.forEach { add(JsonPrimitive(it)) }
+                }
+                putJsonObject("realtime") {
+                    put("cloudletCount", config.realtime.cloudletCount)
+                    putJsonArray("cloudletCounts") { config.realtime.cloudletCounts.forEach { add(JsonPrimitive(it)) } }
+                    put("simulationDuration", config.realtime.simulationDuration)
+                    put("arrivalRate", config.realtime.arrivalRate)
+                    put("generatorType", config.realtime.generatorType.name)
+                    putJsonObject("objective") {
+                        put("cost", config.realtime.objectiveWeights.cost)
+                        put("totalTime", config.realtime.objectiveWeights.totalTime)
+                        put("loadBalance", config.realtime.objectiveWeights.loadBalance)
+                        put("makespan", config.realtime.objectiveWeights.makespan)
                     }
-                    put("tenantFairnessPolicy", config.realtime.scheduling.tenantFairnessPolicy)
-                    put("tenantSchedulingPolicy", config.realtime.scheduling.tenantSchedulingPolicy)
-                    put("tenantBurstAllowance", config.realtime.scheduling.tenantBurstAllowance)
-                    put("tenantSlaPenaltyWeight", config.realtime.scheduling.tenantSlaPenaltyWeight)
-                    putJsonArray("tenantCostBudget") {
-                        config.realtime.scheduling.tenantCostBudget.forEach { add(JsonPrimitive(it)) }
+                    putJsonObject("arrival") {
+                        put("distribution", config.realtime.arrival.distribution)
+                        put("burstIntensity", config.realtime.arrival.burstIntensity)
+                        put("burstDuration", config.realtime.arrival.burstDuration)
                     }
-                    put("topologyEnabled", config.realtime.scheduling.topologyEnabled)
-                    put("topologyPolicy", config.realtime.scheduling.topologyPolicy)
-                    put("regionCount", config.realtime.scheduling.regionCount)
-                    put("racksPerRegion", config.realtime.scheduling.racksPerRegion)
-                    put("hostsPerRack", config.realtime.scheduling.hostsPerRack)
-                    put("localRegion", config.realtime.scheduling.localRegion)
-                    put("crossRackLatency", config.realtime.scheduling.crossRackLatency)
-                    put("crossRegionLatency", config.realtime.scheduling.crossRegionLatency)
-                    put("crossRegionCost", config.realtime.scheduling.crossRegionCost)
-                    put("hostFailureRate", config.realtime.scheduling.hostFailureRate)
-                    put("rackFailureRate", config.realtime.scheduling.rackFailureRate)
-                    put("regionFailureRate", config.realtime.scheduling.regionFailureRate)
-                    put("physicalTopologyEnabled", config.realtime.scheduling.physicalTopologyEnabled)
-                    put("dataLocalityEnabled", config.realtime.scheduling.dataLocalityEnabled)
-                    put("imageCacheEnabled", config.realtime.scheduling.imageCacheEnabled)
-                    put("hostCountPerRack", config.realtime.scheduling.hostCountPerRack)
-                    put("hostCpuCapacity", config.realtime.scheduling.hostCpuCapacity)
-                    put("hostRamCapacity", config.realtime.scheduling.hostRamCapacity)
-                    put("hostBwCapacity", config.realtime.scheduling.hostBwCapacity)
-                    put("hostIoCapacity", config.realtime.scheduling.hostIoCapacity)
-                    put("crossRackBandwidth", config.realtime.scheduling.crossRackBandwidth)
-                    put("crossRegionBandwidth", config.realtime.scheduling.crossRegionBandwidth)
-                    put("dataLocalityPolicy", config.realtime.scheduling.dataLocalityPolicy)
-                    put("imageCacheCapacity", config.realtime.scheduling.imageCacheCapacity)
+                    putJsonObject("scheduling") {
+                        put("strategy", config.realtime.scheduling.strategy)
+                        put("maxQueueSize", config.realtime.scheduling.maxQueueSize)
+                        put("taskTimeout", config.realtime.scheduling.taskTimeout)
+                        put("resourceReservation", config.realtime.scheduling.resourceReservation)
+                        put("decisionDelay", config.realtime.scheduling.decisionDelay)
+                        put("decisionJitter", config.realtime.scheduling.decisionJitter)
+                        put("failureRate", config.realtime.scheduling.failureRate)
+                        put("retryLimit", config.realtime.scheduling.retryLimit)
+                        put("retryDelay", config.realtime.scheduling.retryDelay)
+                        put("retryBackoffMultiplier", config.realtime.scheduling.retryBackoffMultiplier)
+                        put("queuePolicy", config.realtime.scheduling.queuePolicy)
+                        put("priorityLevels", config.realtime.scheduling.priorityLevels)
+                        put("highPriorityRatio", config.realtime.scheduling.highPriorityRatio)
+                        put("deadlineFactor", config.realtime.scheduling.deadlineFactor)
+                        put("vmQueueCapacity", config.realtime.scheduling.vmQueueCapacity)
+                        put("overloadFailureMultiplier", config.realtime.scheduling.overloadFailureMultiplier)
+                        put("autoscalingEnabled", config.realtime.scheduling.autoscalingEnabled)
+                        put("scaleOutQueueThreshold", config.realtime.scheduling.scaleOutQueueThreshold)
+                        put("scaleInIdleTime", config.realtime.scheduling.scaleInIdleTime)
+                        put("maxDynamicVms", config.realtime.scheduling.maxDynamicVms)
+                        put("vmColdStartDelay", config.realtime.scheduling.vmColdStartDelay)
+                        put("scaleOutCost", config.realtime.scheduling.scaleOutCost)
+                        put("scaleInProtectionTime", config.realtime.scheduling.scaleInProtectionTime)
+                        put("resourceModelEnabled", config.realtime.scheduling.resourceModelEnabled)
+                        put("networkLatency", config.realtime.scheduling.networkLatency)
+                        put("imagePullDelay", config.realtime.scheduling.imagePullDelay)
+                        put("ioWeight", config.realtime.scheduling.ioWeight)
+                        put("ramWeight", config.realtime.scheduling.ramWeight)
+                        put("bwWeight", config.realtime.scheduling.bwWeight)
+                        put("runtimeFailureRate", config.realtime.scheduling.runtimeFailureRate)
+                        put("nodeFailureRate", config.realtime.scheduling.nodeFailureRate)
+                        put("checkpointInterval", config.realtime.scheduling.checkpointInterval)
+                        put("migrationDelay", config.realtime.scheduling.migrationDelay)
+                        put("timeoutAction", config.realtime.scheduling.timeoutAction)
+                        put("preemptionEnabled", config.realtime.scheduling.preemptionEnabled)
+                        put("preemptionPolicy", config.realtime.scheduling.preemptionPolicy)
+                        put("preemptionMinPriorityGap", config.realtime.scheduling.preemptionMinPriorityGap)
+                        put("preemptionMaxPerTask", config.realtime.scheduling.preemptionMaxPerTask)
+                        put("preemptionDelay", config.realtime.scheduling.preemptionDelay)
+                        put("preemptionPenalty", config.realtime.scheduling.preemptionPenalty)
+                        put("multiTenantEnabled", config.realtime.scheduling.multiTenantEnabled)
+                        put("tenantCount", config.realtime.scheduling.tenantCount)
+                        putJsonArray("tenantQuota") {
+                            config.realtime.scheduling.tenantQuota
+                                .forEach { add(JsonPrimitive(it)) }
+                        }
+                        putJsonArray("tenantWeights") {
+                            config.realtime.scheduling.tenantWeights
+                                .forEach { add(JsonPrimitive(it)) }
+                        }
+                        put("tenantFairnessPolicy", config.realtime.scheduling.tenantFairnessPolicy)
+                        put("tenantSchedulingPolicy", config.realtime.scheduling.tenantSchedulingPolicy)
+                        put("tenantBurstAllowance", config.realtime.scheduling.tenantBurstAllowance)
+                        put("tenantSlaPenaltyWeight", config.realtime.scheduling.tenantSlaPenaltyWeight)
+                        putJsonArray("tenantCostBudget") {
+                            config.realtime.scheduling.tenantCostBudget
+                                .forEach { add(JsonPrimitive(it)) }
+                        }
+                        put("topologyEnabled", config.realtime.scheduling.topologyEnabled)
+                        put("topologyPolicy", config.realtime.scheduling.topologyPolicy)
+                        put("regionCount", config.realtime.scheduling.regionCount)
+                        put("racksPerRegion", config.realtime.scheduling.racksPerRegion)
+                        put("hostsPerRack", config.realtime.scheduling.hostsPerRack)
+                        put("localRegion", config.realtime.scheduling.localRegion)
+                        put("crossRackLatency", config.realtime.scheduling.crossRackLatency)
+                        put("crossRegionLatency", config.realtime.scheduling.crossRegionLatency)
+                        put("crossRegionCost", config.realtime.scheduling.crossRegionCost)
+                        put("hostFailureRate", config.realtime.scheduling.hostFailureRate)
+                        put("rackFailureRate", config.realtime.scheduling.rackFailureRate)
+                        put("regionFailureRate", config.realtime.scheduling.regionFailureRate)
+                        put("physicalTopologyEnabled", config.realtime.scheduling.physicalTopologyEnabled)
+                        put("dataLocalityEnabled", config.realtime.scheduling.dataLocalityEnabled)
+                        put("imageCacheEnabled", config.realtime.scheduling.imageCacheEnabled)
+                        put("hostCountPerRack", config.realtime.scheduling.hostCountPerRack)
+                        put("hostCpuCapacity", config.realtime.scheduling.hostCpuCapacity)
+                        put("hostRamCapacity", config.realtime.scheduling.hostRamCapacity)
+                        put("hostBwCapacity", config.realtime.scheduling.hostBwCapacity)
+                        put("hostIoCapacity", config.realtime.scheduling.hostIoCapacity)
+                        put("crossRackBandwidth", config.realtime.scheduling.crossRackBandwidth)
+                        put("crossRegionBandwidth", config.realtime.scheduling.crossRegionBandwidth)
+                        put("dataLocalityPolicy", config.realtime.scheduling.dataLocalityPolicy)
+                        put("imageCacheCapacity", config.realtime.scheduling.imageCacheCapacity)
+                    }
+                }
+                putJsonObject("csv") {
+                    put("enabled", resolved.output.csvEnabled)
+                    put("delimiter", resolved.output.csvDelimiter)
+                }
+                putJsonArray("taskCounts") {
+                    resolved.taskCounts.forEach { add(JsonPrimitive(it)) }
                 }
             }
-            putJsonObject("csv") {
-                put("enabled", resolved.output.csvEnabled)
-                put("delimiter", resolved.output.csvDelimiter)
-            }
-            putJsonArray("taskCounts") {
-                resolved.taskCounts.forEach { add(JsonPrimitive(it)) }
-            }
-        }
         return prettyJson.encodeToString(JsonObject.serializer(), json)
     }
 

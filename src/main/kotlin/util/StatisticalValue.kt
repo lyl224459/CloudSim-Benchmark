@@ -10,7 +10,7 @@ data class StatisticalValue(
     val mean: Double,
     val stdDev: Double,
     val min: Double,
-    val max: Double
+    val max: Double,
 ) {
     init {
         // 数据验证
@@ -22,13 +22,9 @@ data class StatisticalValue(
         require(min <= mean && mean <= max) { "平均值必须在最小值和最大值之间" }
     }
 
-    override fun toString(): String {
-        return String.format("%.2f ± %.2f", mean, stdDev)
-    }
+    override fun toString(): String = String.format("%.2f ± %.2f", mean, stdDev)
 
-    fun toStringWithRange(): String {
-        return String.format("%.2f ± %.2f [%.2f, %.2f]", mean, stdDev, min, max)
-    }
+    fun toStringWithRange(): String = String.format("%.2f ± %.2f [%.2f, %.2f]", mean, stdDev, min, max)
 
     companion object {
         /**
@@ -109,9 +105,12 @@ data class StatisticalValue(
                 if (value > max) max = value
             }
 
-            val stdDev = if (values.size >= 2) {
-                sqrt(sumSquaredDiff / (values.size - 1))
-            } else 0.0
+            val stdDev =
+                if (values.size >= 2) {
+                    sqrt(sumSquaredDiff / (values.size - 1))
+                } else {
+                    0.0
+                }
 
             return StatisticalValue(mean, stdDev, min, max)
         }
@@ -122,7 +121,10 @@ data class StatisticalValue(
          * @param operation 操作名称（用于错误消息）
          * @throws IllegalArgumentException 当数据无效时
          */
-        private fun validateArray(values: DoubleArray, operation: String) {
+        private fun validateArray(
+            values: DoubleArray,
+            operation: String,
+        ) {
             for ((index, value) in values.withIndex()) {
                 if (value.isNaN()) {
                     throw IllegalArgumentException("$operation: 数组中第${index}个元素是NaN")
@@ -134,4 +136,3 @@ data class StatisticalValue(
         }
     }
 }
-

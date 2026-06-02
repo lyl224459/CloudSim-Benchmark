@@ -1,8 +1,6 @@
 package datacenter
 
 import org.cloudsimplus.cloudlets.Cloudlet
-import java.util.Collections
-import java.util.WeakHashMap
 
 data class RealtimeTraceMetadata(
     val tenantKey: String? = null,
@@ -17,20 +15,71 @@ data class RealtimeTraceMetadata(
     val inputDataSize: Double? = null,
     val imageId: String? = null,
     val imageSize: Double? = null,
-    val retryHint: Int? = null
+    val retryHint: Int? = null,
 )
 
-object RealtimeTraceMetadataRegistry {
-    private val metadataByCloudlet = Collections.synchronizedMap(WeakHashMap<Cloudlet, RealtimeTraceMetadata>())
+data class RealtimeCloudletSpec(
+    val cloudlet: Cloudlet,
+    val traceMetadata: RealtimeTraceMetadata? = null,
+)
 
-    fun put(cloudlet: Cloudlet, metadata: RealtimeTraceMetadata) {
-        metadataByCloudlet[cloudlet] = metadata
+data class RealtimeCloudletBatch(
+    val specs: List<RealtimeCloudletSpec>,
+) {
+    val cloudlets: List<Cloudlet> = specs.map { it.cloudlet }
+
+    fun metadataProvider(): RealtimeTraceMetadataProvider =
+        MapBackedRealtimeTraceMetadataProvider(
+            specs
+                .mapNotNull { spec ->
+                    spec.traceMetadata?.let { spec.cloudlet.id to it }
+                }.toMap(),
+        )
+}
+
+fun interface RealtimeTraceMetadataProvider {
+    fun metadataFor(cloudlet: Cloudlet): RealtimeTraceMetadata?
+
+    companion object {
+        val Empty: RealtimeTraceMetadataProvider = RealtimeTraceMetadataProvider { null }
+
+        fun fromSpecs(specs: Iterable<RealtimeCloudletSpec>): RealtimeTraceMetadataProvider =
+            MapBackedRealtimeTraceMetadataProvider(
+                specs
+                    .mapNotNull { spec ->
+                        spec.traceMetadata?.let { spec.cloudlet.id to it }
+                    }.toMap(),
+            )
+    }
+}
+
+class MapBackedRealtimeTraceMetadataProvider(
+    metadataByCloudletId: Map<Long, RealtimeTraceMetadata>,
+) : RealtimeTraceMetadataProvider {
+    private val metadataByCloudletId = metadataByCloudletId.toMap()
+
+    override fun metadataFor(cloudlet: Cloudlet): RealtimeTraceMetadata? = metadataByCloudletId[cloudlet.id]
+}
+
+class MutableRealtimeTraceMetadataProvider : RealtimeTraceMetadataProvider {
+    private val metadataByCloudletId = linkedMapOf<Long, RealtimeTraceMetadata>()
+
+    fun put(
+        cloudlet: Cloudlet,
+        metadata: RealtimeTraceMetadata,
+    ) {
+        metadataByCloudletId[cloudlet.id] = metadata
     }
 
-    fun get(cloudlet: Cloudlet): RealtimeTraceMetadata? =
-        metadataByCloudlet[cloudlet]
-
-    fun clear() {
-        metadataByCloudlet.clear()
+    fun put(spec: RealtimeCloudletSpec) {
+        spec.traceMetadata?.let { put(spec.cloudlet, it) }
     }
+
+    fun putAll(specs: Iterable<RealtimeCloudletSpec>) {
+        specs.forEach(::put)
+    }
+
+    override fun metadataFor(cloudlet: Cloudlet): RealtimeTraceMetadata? = metadataByCloudletId[cloudlet.id]
+
+    fun snapshot(): Map<Long, RealtimeTraceMetadata> = metadataByCloudletId.toMap()
 }

@@ -25,19 +25,14 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
+        submodules: recursive
       
-    - name: Set up JDK 23
+    - name: Set up JDK 25
       uses: actions/setup-java@v4
       with:
-        java-version: '23'
+        java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
-
-    - name: Build Fat JAR (Compressed)
-      run: .\gradlew.bat clean fatJar --no-daemon -Pcompress=true
-      env:
-        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
-        CI: "true"
 
     - name: Prepare Release Version
       id: ver
@@ -52,26 +47,13 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=v$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Package Release Assets
-      shell: pwsh
+    - name: Build, package and smoke release assets
       run: |
-        $version = "${{ steps.ver.outputs.version }}"
-        $releaseDir = "release-artifacts"
-        New-Item -ItemType Directory -Force -Path $releaseDir
-        
-        # 1. 复制 JAR
-        $jar = Get-ChildItem -Path build/libs/cloudsim-benchmark-*-all.jar | Select-Object -First 1
-        Copy-Item -Path $jar.FullName -Destination "$releaseDir/cloudsim-benchmark-$version.jar"
-        
-        # 2. 创建 Windows 完整包 (含脚本、配置和 JAR)
-        $winDir = "cloudsim-benchmark-$version-windows"
-        New-Item -ItemType Directory -Force -Path $winDir
-        Copy-Item -Path $jar.FullName -Destination "$winDir/cloudsim-benchmark-all.jar"
-        Copy-Item -Path "run.cmd", "configs", "data", "README.md", "LICENSE" -Destination $winDir -Recurse -Force
-        Compress-Archive -Path "$winDir\*" -DestinationPath "$releaseDir/cloudsim-benchmark-$version-windows.zip" -Force
-        
-        # 3. 创建源码包
-        Compress-Archive -Path "src", "configs", "data", "*.gradle.kts", "gradle.properties", "gradle", "gradlew*", "Containerfile", "README.md", "LICENSE" -DestinationPath "$releaseDir/cloudsim-benchmark-$version-source.zip" -Force
+        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --no-configuration-cache
+        .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --no-configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
@@ -84,10 +66,11 @@ jobs:
           ### 📦 包含产物
           - **Executable JAR**: 包含所有依赖，直接通过 `java -jar` 运行。
           - **Windows Package**: 包含便捷运行脚本和默认配置。
+          - **Unix Package**: 包含 `scripts/run`、默认配置和日志配置。
           - **Source Code**: 完整开发环境源码。
           
           ### 🛠️ 运行环境
-          - JDK 23+ (推荐)
+          - JDK 25+ (推荐)
           
           ### 🐳 容器镜像
           本版本已同步发布至 GitHub Container Registry:
@@ -95,8 +78,10 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          release-artifacts/*.jar
-          release-artifacts/*.zip
+          build/release-artifacts/*.jar
+          build/release-artifacts/*.zip
+          build/release-artifacts/*.tar.gz
+          build/release-artifacts/*.txt
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -107,6 +92,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Log in to GHCR
       uses: docker/login-action@v3

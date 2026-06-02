@@ -2,7 +2,7 @@ package scheduler
 
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
-import java.util.*
+import java.util.Random
 
 /**
  * 随机调度器
@@ -12,9 +12,8 @@ class RandomScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-    
     override fun allocate(): IntArray {
         val cloudletToVm = IntArray(cloudletNum)
         for (i in 0 until cloudletNum) {
@@ -23,4 +22,3 @@ class RandomScheduler(
         return cloudletToVm
     }
 }
-

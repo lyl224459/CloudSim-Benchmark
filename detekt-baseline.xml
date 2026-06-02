@@ -1,0 +1,228 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:HHOScheduler.kt$HHO$fun execute(): IntArray</ID>
+    <ID>CyclomaticComplexMethod:RealtimeCloudResourceComponents.kt$ResourceSnapshotBuilder$fun build(request: ResourceSnapshotRequest): List&lt;RealtimeNodeState&gt;</ID>
+    <ID>CyclomaticComplexMethod:RealtimeCloudResourceComponents.kt$TopologyCandidateAnnotator$private fun placementFor( state: RealtimeNodeState, vm: Vm?, workload: RealtimeWorkloadDescriptor, activeDemand: RealtimeResourceDemand, ): RealtimePlacementDecision</ID>
+    <ID>DestructuringDeclarationWithTooManyEntries:DatacenterCreator.kt$DatacenterCreator$val (ram, bw, mips, storage, costPerSec) = when (type) { DatacenterType.LOW -&gt; { Tuple5( DatacenterConfig.RAM * DatacenterConfig.L_VM_N, DatacenterConfig.BW * DatacenterConfig.L_VM_N, DatacenterConfig.L_MIPS * DatacenterConfig.L_VM_N, DatacenterConfig.STORAGE * DatacenterConfig.L_VM_N, DatacenterConfig.L_PRICE, ) } DatacenterType.MEDIUM -&gt; { Tuple5( DatacenterConfig.RAM * DatacenterConfig.M_VM_N, DatacenterConfig.BW * DatacenterConfig.M_VM_N, DatacenterConfig.M_MIPS * DatacenterConfig.M_VM_N, DatacenterConfig.STORAGE * DatacenterConfig.M_VM_N, DatacenterConfig.M_PRICE, ) } DatacenterType.HIGH -&gt; { Tuple5( DatacenterConfig.RAM * DatacenterConfig.H_VM_N, DatacenterConfig.BW * DatacenterConfig.H_VM_N, DatacenterConfig.H_MIPS * DatacenterConfig.H_VM_N, DatacenterConfig.STORAGE * DatacenterConfig.H_VM_N, DatacenterConfig.H_PRICE, ) } }</ID>
+    <ID>ExplicitGarbageCollectionCall:RealtimePerformanceBenchmarkRunner.kt$RealtimePerformanceBenchmarkRunner$gc()</ID>
+    <ID>ImplicitDefaultLocale:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$String.format("%-12d", cloudletCount)</ID>
+    <ID>ImplicitDefaultLocale:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$String.format("%-12s", "任务数")</ID>
+    <ID>ImplicitDefaultLocale:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$String.format("%-20s", "${dft.format(value.mean)} ± ${dft.format(value.stdDev)}")</ID>
+    <ID>ImplicitDefaultLocale:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$String.format("%-20s", "-")</ID>
+    <ID>ImplicitDefaultLocale:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$String.format("%-20s", alg)</ID>
+    <ID>ImplicitDefaultLocale:ComparisonRunner.kt$ComparisonRunner$String.format( "%-12s %-16s %-8d %-8d %-15s %-15s %-15s %-15s %-15s", summary.algorithmName, summary.status, summary.successfulRuns.size, summary.failedRuns.size, result?.makespan.formatOrBlank(), result?.loadBalance.formatOrBlank(), result?.cost.formatOrBlank(), result?.totalTime.formatOrBlank(), result?.fitness.formatOrBlank(), )</ID>
+    <ID>ImplicitDefaultLocale:ComparisonRunner.kt$ComparisonRunner$String.format( "%-12s %-16s %-8s %-8s %-15s %-15s %-15s %-15s %-15s", "算法", "状态", "成功", "失败", "Makespan", "Load Balance", "Cost", "Total Time", "Fitness", )</ID>
+    <ID>ImplicitDefaultLocale:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$String.format("%-12d", cloudletCount)</ID>
+    <ID>ImplicitDefaultLocale:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$String.format("%-12s", "任务数")</ID>
+    <ID>ImplicitDefaultLocale:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$String.format("%-20s", "${dft.format(value.mean)} ± ${dft.format(value.stdDev)}")</ID>
+    <ID>ImplicitDefaultLocale:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$String.format("%-20s", "-")</ID>
+    <ID>ImplicitDefaultLocale:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$String.format("%-20s", alg)</ID>
+    <ID>ImplicitDefaultLocale:RealtimeResultExporter.kt$RealtimeResultExporter$String.format( "%-15s %-16s %-8d %-8d %-12s %-12s %-12s %-12s %-8s %-8s %-8s", summary.algorithmName, summary.status, summary.successfulRuns.size, summary.failedRuns.size, result?.makespan.formatOrBlank(), result?.loadBalance.formatOrBlank(), result?.cost.formatOrBlank(), result?.averageWaitingTime.formatOrBlank(), result?.rejectedCount?.toString().orEmpty(), result?.timeoutCount?.toString().orEmpty(), result?.failedCount?.toString().orEmpty(), )</ID>
+    <ID>ImplicitDefaultLocale:RealtimeResultExporter.kt$RealtimeResultExporter$String.format( "%-15s %-16s %-8s %-8s %-12s %-12s %-12s %-12s %-8s %-8s %-8s", "算法", "状态", "成功", "失败", "Makespan", "LB", "Cost", "AvgWait", "Reject", "Timeout", "Failed", )</ID>
+    <ID>ImplicitDefaultLocale:StatisticalValue.kt$StatisticalValue$String.format("%.2f ± %.2f [%.2f, %.2f]", mean, stdDev, min, max)</ID>
+    <ID>ImplicitDefaultLocale:StatisticalValue.kt$StatisticalValue$String.format("%.2f ± %.2f", mean, stdDev)</ID>
+    <ID>InvalidPackageDeclaration:BatchCloudletCountRunner.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:BatchRunModels.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:ComparisonRunner.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimeCloudletCountRunner.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimeExperimentRunner.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimeFailureResultFactory.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimeMetricsCollector.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimePerformanceBenchmarkRunner.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimeResultExporter.kt$package datacenter</ID>
+    <ID>InvalidPackageDeclaration:RealtimeRunModels.kt$package datacenter</ID>
+    <ID>LongMethod:CommandExecutor.kt$CommandExecutor$private suspend fun runResolvedExperiment( resolved: ResolvedExperimentConfig, outputContext: ExperimentOutputContext, )</ID>
+    <ID>LongMethod:ConfigValidationTest.kt$ConfigValidationTest$@Test fun `should validate realtime cloud semantics config parameters`()</ID>
+    <ID>LongMethod:ConfigurationManagerTest.kt$ConfigurationManagerTest$@Test fun `loadFromSingleFile reads nested profile batch objective and realtime scheduling`()</ID>
+    <ID>LongMethod:DryRunPrinter.kt$DryRunPrinter$fun printDryRun(resolved: ResolvedExperimentConfig)</ID>
+    <ID>LongMethod:DryRunPrinter.kt$DryRunPrinter$fun resolvedJson( resolved: ResolvedExperimentConfig, experimentDir: File?, timestamp: String, ): String</ID>
+    <ID>LongMethod:RealtimeCloudResourceComponents.kt$ResourceSnapshotBuilder$fun build(request: ResourceSnapshotRequest): List&lt;RealtimeNodeState&gt;</ID>
+    <ID>LongMethod:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$suspend fun runBatchExperiment()</ID>
+    <ID>LongMethod:RealtimeControllers.kt$RealtimeTenantController$fun snapshots( records: List&lt;RealtimeTaskRecord&gt;, completedCloudlets: List&lt;Cloudlet&gt; = emptyList(), ): List&lt;RealtimeTenantFairnessSnapshot&gt;</ID>
+    <ID>LongMethod:RealtimeTaskLifecycleStore.kt$RealtimeTaskLifecycleStore$private fun validateTransition( from: RealtimeTaskLifecycle, to: RealtimeTaskLifecycle, )</ID>
+    <ID>LongParameterList:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$( /** * 要测试的任务数列表 * 例如: listOf(50, 100, 200, 500, 1000) */ private val cloudletCounts: List&lt;Int&gt;, /** * 种群大小 */ private val population: Int = 30, /** * 最大迭代次数 */ private val maxIter: Int = 50, /** * 随机数种子 */ private val randomSeed: Long = 0L, /** * 已解析的算法定义 */ private val resolvedAlgorithms: List&lt;ResolvedAlgorithm&gt;, /** * 每个任务数的运行次数（用于计算平均值） */ private val runs: Int = 1, /** * 任务生成器类型 */ private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE, /** * 实验目录 */ private val experimentDir: java.io.File? = null, private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir), private val useCoroutines: Boolean = true, private val maxConcurrency: Int = 0, private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency), )</ID>
+    <ID>LongParameterList:ComparisonRunner.kt$ComparisonRunner$( private val cloudletCount: Int = config.DatacenterConfig.DEFAULT_CLOUDLET_N, private val population: Int = 30, private val maxIter: Int = 100, private val randomSeed: Long = 0L, private val runs: Int = 1, // 运行次数，默认1次 private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE, private val googleTraceConfig: config.GoogleTraceConfig? = null, private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(), private val resolvedAlgorithms: List&lt;ResolvedAlgorithm&gt;, private val experimentDir: java.io.File? = null, private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir), private val useCoroutines: Boolean = true, private val maxConcurrency: Int = 0, private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency), )</ID>
+    <ID>LongParameterList:GWOScheduler.kt$GWO$( private val optFunction: ObjectiveFunction, private val population: Int, private val lb: Double, private val ub: Double, private val dim: Int, private val maxIter: Int, private val random: Random, )</ID>
+    <ID>LongParameterList:HHOScheduler.kt$HHO$( private val optFunction: ObjectiveFunction, private val population: Int, private val lb: Double, private val ub: Double, private val dim: Int, private val maxIter: Int, private val random: Random, )</ID>
+    <ID>LongParameterList:ImprovedRLScheduler.kt$ImprovedRLScheduler$( cloudletList: List&lt;Cloudlet&gt;, vmList: List&lt;Vm&gt;, objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(), private val learningRate: Double = 0.1, private val discountFactor: Double = 0.95, private val initialExplorationRate: Double = 0.8, private val minExplorationRate: Double = 0.05, private val episodes: Int = 1000, private val random: kotlin.random.Random = kotlin.random.Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED), )</ID>
+    <ID>LongParameterList:PSOScheduler.kt$PSO$( private val optFunction: ObjectiveFunction, private val population: Int, private val lb: Double, private val ub: Double, private val dim: Int, private val maxIter: Int, private val random: Random, )</ID>
+    <ID>LongParameterList:RLScheduler.kt$RLScheduler$( cloudletList: List&lt;Cloudlet&gt;, vmList: List&lt;Vm&gt;, objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(), private val learningRate: Double = 0.1, // 学习率 α private val discountFactor: Double = 0.9, // 折扣因子 γ private val explorationRate: Double = 0.1, // 探索率 ε private val episodes: Int = 100, // 训练轮数 private val random: kotlin.random.Random = kotlin.random.Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED), )</ID>
+    <ID>LongParameterList:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel$( private val scheduling: RealtimeSchedulingConfig, private val arrivalState: RealtimeArrivalState, private val lifecycleStore: RealtimeTaskLifecycleStore, private val reservationState: RealtimeReservationState, private val metrics: RealtimeBrokerMetrics, private val vmLifecycleManager: RealtimeVmLifecycleManager, private val tenantController: RealtimeTenantController, private val topologyModel: RealtimeTopologyModel, )</ID>
+    <ID>LongParameterList:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$( /** * 要测试的任务数列表 * 例如: listOf(50, 100, 200, 500, 1000) */ private val cloudletCounts: List&lt;Int&gt;, /** * 仿真持续时间（秒） */ private val simulationDuration: Double = 500.0, /** * 平均每秒到达的任务数 */ private val arrivalRate: Double = 5.0, /** * 种群大小 */ private val population: Int = 20, /** * 最大迭代次数 */ private val maxIter: Int = 20, /** * 随机数种子 */ private val randomSeed: Long = 0L, /** * 已解析的算法定义 */ private val resolvedAlgorithms: List&lt;ResolvedAlgorithm&gt;, /** * 每个任务数的运行次数（用于计算平均值） */ private val runs: Int = 1, /** * 任务生成器类型 */ private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE, /** * 实时到达配置 */ private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(), /** * 实时调度配置 */ private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(), /** * 实验目录 */ private val experimentDir: java.io.File? = null, private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir), private val useCoroutines: Boolean = true, private val maxConcurrency: Int = 0, private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency), )</ID>
+    <ID>LongParameterList:RealtimeComparisonRunner.kt$RealtimeComparisonRunner$( private val cloudletCount: Int = 100, private val simulationDuration: Double = 1000.0, private val arrivalRate: Double = 10.0, private val population: Int = 20, private val maxIter: Int = 20, private val randomSeed: Long = 0L, private val runs: Int = 1, private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE, private val googleTraceConfig: config.GoogleTraceConfig? = null, private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(), private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(), private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(), private val resolvedAlgorithms: List&lt;ResolvedAlgorithm&gt;, private val experimentDir: java.io.File? = null, private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir), private val useCoroutines: Boolean = true, private val maxConcurrency: Int = 0, private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency), )</ID>
+    <ID>LongParameterList:RealtimeControllers.kt$RealtimeTenantController$( activeCount: Int, completedCount: Int, weight: Double, dominantResourceShare: Double, budgetUsed: Double, budgetLimit: Double?, slaPenalty: Double, )</ID>
+    <ID>LongParameterList:RealtimeTopologyModel.kt$RealtimeTopologyModel$( private val enabled: Boolean, private val regionCount: Int, private val racksPerRegion: Int, private val hostsPerRack: Int, private val localRegion: RegionId, private val crossRackLatency: Double, private val crossRegionLatency: Double, private val crossRegionCost: Double, private val hostFailureRate: Double, private val rackFailureRate: Double, private val regionFailureRate: Double, private val physicalTopologyEnabled: Boolean, private val dataLocalityEnabled: Boolean, private val imageCacheEnabled: Boolean, private val hostCpuCapacity: Double, private val hostRamCapacity: Double, private val hostBwCapacity: Double, private val hostIoCapacity: Double, private val crossRackBandwidth: Double, private val crossRegionBandwidth: Double, private val dataLocalityPolicy: DataLocalityPolicy, private val imageCacheCapacity: Int, initialVmCount: Int, )</ID>
+    <ID>LongParameterList:RealtimeTopologyModelTest.kt$RealtimeTopologyModelTest$( regionCount: Int = 2, racksPerRegion: Int = 2, hostsPerRack: Int = 1, crossRackLatency: Double = 0.1, crossRegionLatency: Double = 1.0, crossRegionCost: Double = 0.0, )</ID>
+    <ID>LongParameterList:WOAScheduler.kt$WOA$( private val optFunction: ObjectiveFunction, private val population: Int, private val lb: Double, private val ub: Double, private val dim: Int, private val maxIter: Int, private val random: Random, )</ID>
+    <ID>LoopWithTooManyJumpStatements:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager$for</ID>
+    <ID>MagicNumber:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$100</ID>
+    <ID>MagicNumber:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$80</ID>
+    <ID>MagicNumber:CommandExecutor.kt$CommandExecutor$1024</ID>
+    <ID>MagicNumber:CommandExecutor.kt$CommandExecutor$17</ID>
+    <ID>MagicNumber:CommandExecutor.kt$CommandExecutor$512</ID>
+    <ID>MagicNumber:ComparisonRunner.kt$ComparisonRunner$60</ID>
+    <ID>MagicNumber:ComparisonRunner.kt$ComparisonRunner$80</ID>
+    <ID>MagicNumber:GWOScheduler.kt$GWO$3.0</ID>
+    <ID>MagicNumber:HHOScheduler.kt$HHO$0.5</ID>
+    <ID>MagicNumber:HHOScheduler.kt$HHO$1.5</ID>
+    <ID>MagicNumber:HHOScheduler.kt$HHO$10</ID>
+    <ID>MagicNumber:HHOScheduler.kt$HHO$10.0</ID>
+    <ID>MagicNumber:HHOScheduler.kt$HHO$1e-10</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$0.8</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$1.2</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$1.5</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$100.0</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$4</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$5</ID>
+    <ID>MagicNumber:ImprovedRLScheduler.kt$ImprovedRLScheduler$5.0</ID>
+    <ID>MagicNumber:LogNormalCloudletGenerator.kt$LogNormalCloudletGenerator$10</ID>
+    <ID>MagicNumber:PSOScheduler.kt$PSO$0.2</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$0.1</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$0.2</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$0.8</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$10</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$10.0</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$100.0</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$20</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$5</ID>
+    <ID>MagicNumber:RLScheduler.kt$RLScheduler$5.0</ID>
+    <ID>MagicNumber:RealtimeCloudResourceComponents.kt$TopologyCandidateAnnotator$0.25</ID>
+    <ID>MagicNumber:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$100</ID>
+    <ID>MagicNumber:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$80</ID>
+    <ID>MagicNumber:RealtimeCloudletGenerator.kt$RealtimeCloudletGenerator$0.0001</ID>
+    <ID>MagicNumber:RealtimeCloudletGenerator.kt$RealtimeCloudletGenerator$0.1</ID>
+    <ID>MagicNumber:RealtimeControllers.kt$RealtimeFailureController$29</ID>
+    <ID>MagicNumber:RealtimeControllers.kt$RealtimeTenantController$1e-12</ID>
+    <ID>MagicNumber:RealtimeControllers.kt$RealtimeTenantController$83</ID>
+    <ID>MagicNumber:RealtimeExperimentRunner.kt$RealtimeExperimentRunner$60</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$100</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$10_000</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$1_000</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$RealtimePerformanceBenchmarkConfig$100</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$RealtimePerformanceBenchmarkConfig$10_000</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$RealtimePerformanceBenchmarkConfig$1_000</ID>
+    <ID>MagicNumber:RealtimePerformanceBenchmarkRunner.kt$RealtimePerformanceBenchmarkRunner$1_000_000</ID>
+    <ID>MagicNumber:RealtimeResourceModel.kt$RealtimeResourceModel$256.0</ID>
+    <ID>MagicNumber:RealtimeResultExporter.kt$RealtimeResultExporter$120</ID>
+    <ID>MagicNumber:RealtimeTaskMetadataFactory.kt$RealtimeTaskMetadataFactory$41</ID>
+    <ID>MagicNumber:WOAScheduler.kt$WOA$0.5</ID>
+    <ID>MaxLineLength:BatchRunOutcomeTest.kt$BatchRunOutcomeTest$BatchRunOutcome.Failed("PSO", run = 2, errorType = "IllegalStateException", errorMessage = "boom")</ID>
+    <ID>MaxLineLength:BatchRunOutcomeTest.kt$BatchRunOutcomeTest$BatchRunOutcome.Failed("WOA", run = 1, errorType = "TimeoutException", errorMessage = "timed out")</ID>
+    <ID>MaxLineLength:CliParser.kt$CliParser$private fun parseNameList(value: String): List&lt;String&gt;</ID>
+    <ID>MaxLineLength:CommandExecutor.kt$CommandExecutor$val outputContext = ExperimentOutputContext.createExperiment(resolved.systemConfig, resolved.mode, experimentName)</ID>
+    <ID>MaxLineLength:ComparisonRunner.kt$ComparisonRunner$Logger.result(" 最小 Fitness: {} ({})", bestFitness?.algorithmName.orEmpty(), bestFitness?.fitness.formatOrBlank())</ID>
+    <ID>MaxLineLength:ComparisonRunner.kt$ComparisonRunner$Logger.result(" 最小 Load Balance: {} ({})", bestLB?.algorithmName.orEmpty(), bestLB?.loadBalance.formatOrBlank())</ID>
+    <ID>MaxLineLength:ComparisonRunner.kt$ComparisonRunner$Logger.result(" 最小 Makespan: {} ({})", bestMakespan?.algorithmName.orEmpty(), bestMakespan?.makespan.formatOrBlank())</ID>
+    <ID>MaxLineLength:CsvRowWriter.kt$CsvCellFormatter$private fun Double.formatFloatingPoint(): String</ID>
+    <ID>MaxLineLength:CsvRowWriter.kt$CsvRowWriter$fun line(values: Iterable&lt;Any?&gt;): String</ID>
+    <ID>MaxLineLength:CsvRowWriter.kt$CsvRowWriter$val needsQuotes = value.contains(delimiter) || value.contains('"') || value.contains('\n') || value.contains('\r')</ID>
+    <ID>MaxLineLength:DryRunPrinter.kt$DryRunPrinter$"实时到达/调度: distribution={}, strategy={}, maxQueueSize={}, taskTimeout={}, resourceReservation={}, decisionDelay={}, decisionJitter={}, failureRate={}, retryLimit={}, retryDelay={}, retryBackoffMultiplier={}, queuePolicy={}, priorityLevels={}, highPriorityRatio={}, deadlineFactor={}, vmQueueCapacity={}, overloadFailureMultiplier={}, autoscalingEnabled={}, scaleOutQueueThreshold={}, maxDynamicVms={}, vmColdStartDelay={}, resourceModelEnabled={}, networkLatency={}, imagePullDelay={}, runtimeFailureRate={}, nodeFailureRate={}, timeoutAction={}, preemptionEnabled={}, preemptionPolicy={}, preemptionMinPriorityGap={}, preemptionMaxPerTask={}, preemptionDelay={}, preemptionPenalty={}, multiTenantEnabled={}, tenantCount={}, tenantQuota=[{}], tenantWeights=[{}], tenantFairnessPolicy={}, tenantSchedulingPolicy={}, tenantBurstAllowance={}, tenantSlaPenaltyWeight={}, tenantCostBudget=[{}], topologyEnabled={}, topologyPolicy={}, regionCount={}, racksPerRegion={}, hostsPerRack={}, localRegion={}, crossRackLatency={}, crossRegionLatency={}, crossRegionCost={}, hostFailureRate={}, rackFailureRate={}, regionFailureRate={}"</ID>
+    <ID>MaxLineLength:DryRunPrinter.kt$DryRunPrinter$"物理拓扑/数据本地性: physicalTopologyEnabled={}, dataLocalityEnabled={}, imageCacheEnabled={}, hostCountPerRack={}, hostCpuCapacity={}, hostRamCapacity={}, hostBwCapacity={}, hostIoCapacity={}, crossRackBandwidth={}, crossRegionBandwidth={}, dataLocalityPolicy={}, imageCacheCapacity={}"</ID>
+    <ID>MaxLineLength:DryRunPrinter.kt$DryRunPrinter$Logger.info(" cloudsim run --config configs/examples/single_config_example.toml --profile batch_small --dry-run")</ID>
+    <ID>MaxLineLength:DryRunPrinter.kt$DryRunPrinter$Logger.result(" {} population={} maxIter={}", algorithm.displayName, algorithm.settings.population, algorithm.settings.maxIter)</ID>
+    <ID>MaxLineLength:HHOScheduler.kt$HHO$positions[index] = rabbitLocation[j] - r2 * Math.abs(rabbitLocation[j] - 2 * r3 * positions[index])</ID>
+    <ID>MaxLineLength:ImprovedRLScheduler.kt$ImprovedRLScheduler$val nextState = if (taskIndex &lt; cloudletNum - 1) getDiscretizedState(vmCurrentLoads, taskIndex + 1) else null</ID>
+    <ID>MaxLineLength:Main.kt$internal fun parseBatchAlgorithms(algorithmNames: List&lt;String&gt;): List&lt;BatchAlgorithmType&gt;</ID>
+    <ID>MaxLineLength:RealtimeBrokerCloudSemanticsTest.kt$RealtimeBrokerCloudSemanticsTest$broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000), createCloudlet(1, length = 20_000)))</ID>
+    <ID>MaxLineLength:RealtimeBrokerPolicyComponentsTest.kt$RealtimeBrokerPolicyComponentsTest$.</ID>
+    <ID>MaxLineLength:RealtimeCloudResourceComponents.kt$ResourceSnapshotBuilder$val availableSlots = if (vmQueueCapacity &lt;= 0) Int.MAX_VALUE else max(0, vmQueueCapacity - queueDepths[index])</ID>
+    <ID>MaxLineLength:RealtimeCloudResourceComponents.kt$TopologyCandidateAnnotator$val imageHit = config.imageCacheEnabled &amp;&amp; imageId != null &amp;&amp; imageCacheByHost[location]?.contains(imageId) == true</ID>
+    <ID>MaxLineLength:RealtimeCloudResourceComponents.kt$VmCandidateScorer.Companion$CandidateScorer { (it.placement as? RealtimePlacementDecision.Accepted)?.score ?: Double.POSITIVE_INFINITY }</ID>
+    <ID>MaxLineLength:RealtimeCloudResourceComponentsTest.kt$RealtimeCloudResourceComponentsTest$RealtimeCloudletSpec(active, RealtimeTraceMetadata(requestedRam = 512.0, requestedBw = 100.0, requestedIo = 50.0))</ID>
+    <ID>MaxLineLength:RealtimeCloudResourceComponentsTest.kt$RealtimeCloudResourceComponentsTest$RealtimeCloudletSpec(incoming, RealtimeTraceMetadata(requestedRam = 600.0, requestedBw = 100.0, requestedIo = 50.0))</ID>
+    <ID>MaxLineLength:RealtimeControllers.kt$RealtimePreemptionController$val vmIndex = vmReservations[cloudlet.id] ?: victim.assignedVmIndex ?: cloudlet.vm?.id?.toInt() ?: return@mapNotNull null</ID>
+    <ID>MaxLineLength:RealtimeControllers.kt$RealtimeTenantController$record.tenantId.value to (cloudlet.finishTime - deadline) * scheduling.tenantSlaPenaltyWeight</ID>
+    <ID>MaxLineLength:RealtimeExperimentRunner.kt$RealtimeExperimentRunner$val cloudletBatch = cloudletGenerator.createRealtimeCloudletBatch(0, config.cloudletCount, config.simulationDuration)</ID>
+    <ID>MaxLineLength:RealtimeNodeModels.kt$RealtimeHostState$private fun Double.ratio(capacity: Double): Double</ID>
+    <ID>MaxLineLength:RealtimePerformanceBenchmarkRunner.kt$require(chunk.size == 2 &amp;&amp; chunk[0].startsWith("--")) { "Invalid benchmark argument list: ${joinToString(" ")}" }</ID>
+    <ID>MaxLineLength:RealtimeRunModels.kt$internal fun RealtimeRunSummary.toCloudletCountCsvRow(cloudletCount: Int): List&lt;Any?&gt;</ID>
+    <ID>MaxLineLength:RealtimeRunOutcomeTest.kt$RealtimeRunOutcomeTest$RealtimeRunOutcome.Failed("PSO-Realtime", run = 2, errorType = "IllegalStateException", errorMessage = "boom")</ID>
+    <ID>MaxLineLength:RealtimeRunOutcomeTest.kt$RealtimeRunOutcomeTest$RealtimeRunOutcome.Failed("WOA-Realtime", run = 1, errorType = "TimeoutException", errorMessage = "timed out")</ID>
+    <ID>MaxLineLength:RealtimeRunOutcomeTest.kt$RealtimeRunOutcomeTest$assertThat(RealtimeRunStatus.from(successfulRuns = 1, failedRuns = 1)).isEqualTo(RealtimeRunStatus.PARTIAL_FAILURE)</ID>
+    <ID>MaxLineLength:RealtimeTopologyModel.kt$RealtimeTopologyModel$fun costFor(location: RealtimeTopologyLocation): Double</ID>
+    <ID>MaxLineLength:RealtimeTopologyModel.kt$RealtimeTopologyModel$fun locationOf(vmIndex: Int): RealtimeTopologyLocation</ID>
+    <ID>MaxLineLength:RealtimeTraceMetadataProviderTest.kt$RealtimeTraceMetadataProviderTest$traceMetadata = RealtimeTraceMetadata(requestedRam = 512.0, requestedBw = 128.0, requestedIo = 64.0)</ID>
+    <ID>MaxLineLength:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager$fun hasLiveDynamicVms(): Boolean</ID>
+    <ID>MaxLineLength:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager$lifecycleByIndex.values.any { it.lifecycle == RealtimeVmLifecycle.PROVISIONING || it.lifecycle == RealtimeVmLifecycle.WARMING }</ID>
+    <ID>MaxLineLength:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager$private fun dynamicVmCount(): Int</ID>
+    <ID>MaxLineLength:TenantFairnessContextBuilder.kt$TenantFairnessContextBuilder$fun snapshots(records: List&lt;RealtimeTaskRecord&gt;): List&lt;RealtimeTenantFairnessSnapshot&gt;</ID>
+    <ID>MemberNameEqualsClassName:Logger.kt$Logger$/** * 主日志记录器 */ private val logger = KotlinLogging.logger {}</ID>
+    <ID>NestedBlockDepth:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$private fun printSummaryTable(results: Map&lt;Int, List&lt;BatchRunSummary&gt;&gt;)</ID>
+    <ID>NestedBlockDepth:HHOScheduler.kt$HHO$fun execute(): IntArray</ID>
+    <ID>NestedBlockDepth:PSOScheduler.kt$PSO$fun execute(): IntArray</ID>
+    <ID>NestedBlockDepth:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$private fun printSummaryTable(results: Map&lt;Int, List&lt;RealtimeRunSummary&gt;&gt;)</ID>
+    <ID>NestedBlockDepth:WOAScheduler.kt$WOA$fun execute(): IntArray</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeAdmissionController$fun decide( activeCloudletCount: Int, nodeStates: List&lt;RealtimeNodeState&gt;, ): AdmissionDecision</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeFailureController$fun submitAttempt( cloudletId: CloudletId, attempt: Int, failurePressure: Double, ): FailureDecision</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimePreemptionController$fun decide( incoming: RealtimeTaskRecord, candidates: List&lt;RealtimePreemptionCandidate&gt;, ): PreemptionDecision</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeTenantController$fun decide( incoming: RealtimeTaskRecord, activeRecords: List&lt;RealtimeTaskRecord&gt;, ): TenantAdmissionDecision</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeTenantController$fun fairnessIndex( completedCloudlets: List&lt;Cloudlet&gt;, records: List&lt;RealtimeTaskRecord&gt;, ): Double</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeTenantController$fun fairnessViolationCount(records: List&lt;RealtimeTaskRecord&gt;): Int</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeTenantController$fun retrySuccessByTenant( cloudlets: List&lt;Cloudlet&gt;, records: List&lt;RealtimeTaskRecord&gt;, ): Double</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeTenantController$private fun dominantResourceShare(records: List&lt;RealtimeTaskRecord&gt;): Double</ID>
+    <ID>ReturnCount:RealtimeControllers.kt$RealtimeTenantController$private fun jainsIndex(values: List&lt;Double&gt;): Double</ID>
+    <ID>ReturnCount:RealtimeScheduler.kt$RealtimePSOScheduler$override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int</ID>
+    <ID>ReturnCount:RealtimeScheduler.kt$RealtimeWOAScheduler$override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int</ID>
+    <ID>ReturnCount:RealtimeTaskMetadataFactory.kt$RealtimeTaskMetadataFactory$private fun deadlineFor( cloudlet: Cloudlet, arrivalTime: Double, fastestVmMips: Double?, ): Double?</ID>
+    <ID>ReturnCount:RealtimeTaskMetadataFactory.kt$RealtimeTaskMetadataFactory$private fun priorityFor( cloudlet: Cloudlet, tracePriority: Int?, ): Int</ID>
+    <ID>ReturnCount:RealtimeTopologyModel.kt$RealtimeTopologyModel$fun physicalHostMetrics(records: List&lt;RealtimeTaskRecord&gt;): RealtimePhysicalHostMetrics</ID>
+    <ID>ReturnCount:RealtimeTopologyModel.kt$RealtimeTopologyModel$fun recordSubmission( vmIndex: Int, workload: RealtimeWorkloadDescriptor, )</ID>
+    <ID>ReturnCount:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager$fun maybeScaleOut( queueDepth: Int, currentTime: Double, activeVmIndexes: Set&lt;Int&gt; = emptySet(), ): List&lt;Vm&gt;</ID>
+    <ID>ReturnCount:RealtimeVmReservationPolicy.kt$RealtimeVmReservationPolicy$private fun applyFullReservation( cloudlet: Cloudlet, selectedVmId: Int, activeCloudlets: List&lt;Cloudlet&gt;, vmList: List&lt;Vm&gt;, ): Int</ID>
+    <ID>ThrowsCount:CliParser.kt$CliParser$private fun parseConfigAndOptionalProfile( tokens: List&lt;String&gt;, commandName: String, ): Pair&lt;String, String?&gt;</ID>
+    <ID>ThrowsCount:CliParser.kt$CliParser$private fun parseRequiredMode( tokens: List&lt;String&gt;, commandName: String, ): String</ID>
+    <ID>ThrowsCount:CliParser.kt$CliParser$private fun parseRun(tokens: List&lt;String&gt;): RunCommand</ID>
+    <ID>ThrowsCount:ConfigurationManager.kt$ConfigurationManager.Companion$fun loadFromSingleFile(configPath: String): LoadedConfigs</ID>
+    <ID>TooGenericExceptionCaught:CommandExecutor.kt$CommandExecutor$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ComparisonRunner.kt$ComparisonRunner$e: Throwable</ID>
+    <ID>TooGenericExceptionCaught:ConfigurationManager.kt$ConfigurationManager.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:Logger.kt$Logger$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:Main.kt$e: Exception</ID>
+    <ID>TooManyFunctions:CliParser.kt$CliParser</ID>
+    <ID>TooManyFunctions:ComparisonRunner.kt$ComparisonRunner</ID>
+    <ID>TooManyFunctions:Logger.kt$Logger</ID>
+    <ID>TooManyFunctions:ObjectiveFunction.kt$SchedulerObjectiveFunction : ObjectiveFunction</ID>
+    <ID>TooManyFunctions:RealtimeBroker.kt$RealtimeBroker : DatacenterBrokerSimple</ID>
+    <ID>TooManyFunctions:RealtimeBroker.kt$RealtimeBroker$ArrivalWorkflowAdapter : RealtimeArrivalWorkflowContext</ID>
+    <ID>TooManyFunctions:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel</ID>
+    <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeArrivalState</ID>
+    <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeBrokerMetrics</ID>
+    <ID>TooManyFunctions:RealtimeBrokerWorkflows.kt$RealtimeArrivalWorkflowContext</ID>
+    <ID>TooManyFunctions:RealtimeControllers.kt$RealtimeTenantController</ID>
+    <ID>TooManyFunctions:RealtimeTopologyModel.kt$RealtimeTopologyModel</ID>
+    <ID>TooManyFunctions:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager</ID>
+    <ID>TooManyFunctions:RunResolver.kt$RunResolver</ID>
+    <ID>UnusedParameter:CloudletGeneratorFactory.kt$CloudletGeneratorFactory$random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)</ID>
+    <ID>UnusedParameter:DatacenterCreator.kt$DatacenterCreator$name: String</ID>
+    <ID>UnusedParameter:RealtimeControllers.kt$RealtimePreemptionController$incoming: RealtimeTaskRecord</ID>
+    <ID>UnusedPrivateMember:HHOScheduler.kt$HHO$private fun levyFlight(d: Int): DoubleArray</ID>
+    <ID>UnusedPrivateProperty:ComparisonRunner.kt$ComparisonRunner$val datacenter0 = DatacenterCreator.createDatacenter(simulation, "Datacenter0", DatacenterType.LOW)</ID>
+    <ID>UnusedPrivateProperty:ComparisonRunner.kt$ComparisonRunner$val datacenter1 = DatacenterCreator.createDatacenter(simulation, "Datacenter1", DatacenterType.MEDIUM)</ID>
+    <ID>UnusedPrivateProperty:ComparisonRunner.kt$ComparisonRunner$val datacenter2 = DatacenterCreator.createDatacenter(simulation, "Datacenter2", DatacenterType.HIGH)</ID>
+    <ID>UnusedPrivateProperty:HHOScheduler.kt$HHO$val r4 = random.nextDouble()</ID>
+    <ID>UnusedPrivateProperty:LogNormalCloudletGenerator.kt$LogNormalCloudletGenerator$i</ID>
+    <ID>UnusedPrivateProperty:UniformCloudletGenerator.kt$UniformCloudletGenerator$i</ID>
+    <ID>UseCheckOrError:CommandExecutor.kt$CommandExecutor$throw IllegalStateException("无法创建实验输出目录")</ID>
+    <ID>UseCheckOrError:CommandExecutor.kt$CommandExecutor$throw IllegalStateException("运行实验需要有效的输出目录")</ID>
+    <ID>UseCheckOrError:StatisticalValue.kt$StatisticalValue.Companion$throw IllegalStateException("无法计算最大值")</ID>
+    <ID>UseCheckOrError:StatisticalValue.kt$StatisticalValue.Companion$throw IllegalStateException("无法计算最小值")</ID>
+    <ID>UseRequire:AlgorithmRegistry.kt$AlgorithmRegistry$throw IllegalArgumentException("ALL 不能与其他算法名混用")</ID>
+    <ID>UseRequire:CliParser.kt$CliParser$throw IllegalArgumentException("$commandName 只接受 --mode batch 或 realtime")</ID>
+    <ID>UseRequire:CliParser.kt$CliParser$throw IllegalArgumentException("$option 参数需要指定值")</ID>
+    <ID>UseRequire:CliParser.kt$CliParser$throw IllegalArgumentException("--preset 与 --algorithms/-a 互斥，请只指定一种算法选择方式")</ID>
+    <ID>UseRequire:CliParser.kt$CliParser$throw IllegalArgumentException("config 命令需要子命令: validate 或 print")</ID>
+    <ID>UseRequire:CliParser.kt$CliParser$throw IllegalArgumentException("list 命令需要子命令: algorithms, profiles 或 presets")</ID>
+    <ID>UseRequire:CliParser.kt$CliParser$throw IllegalArgumentException("无效运行模式: $resolvedMode。可用模式: ${supportedModes.joinToString(", ")}")</ID>
+    <ID>UseRequire:ComparisonRunner.kt$ComparisonRunner$throw IllegalArgumentException("ComparisonRunner 需要已解析的算法列表")</ID>
+    <ID>UseRequire:ConfigurationManager.kt$ConfigurationManager.Companion$throw IllegalArgumentException("实验配置文件路径不能为空")</ID>
+    <ID>UseRequire:ConfigurationManager.kt$ConfigurationManager.Companion$throw IllegalArgumentException("配置文件不存在: $configPath")</ID>
+    <ID>UseRequire:ConfigurationManager.kt$ConfigurationManager.Companion$throw IllegalArgumentException("配置文件为空: $configPath")</ID>
+    <ID>UseRequire:ConfigurationManager.kt$ConfigurationManager.Companion$throw IllegalArgumentException("配置文件无法读取: $configPath")</ID>
+    <ID>UseRequire:ConfigurationManager.kt$ConfigurationManager.Companion$throw IllegalArgumentException("配置文件路径不能为空")</ID>
+    <ID>UseRequire:StatisticalValue.kt$StatisticalValue.Companion$throw IllegalArgumentException("$operation: 数组中第${index}个元素是NaN")</ID>
+    <ID>UseRequire:StatisticalValue.kt$StatisticalValue.Companion$throw IllegalArgumentException("$operation: 数组中第${index}个元素是无穷大")</ID>
+    <ID>UseRequire:StatisticalValue.kt$StatisticalValue.Companion$throw IllegalArgumentException("数组不能为空")</ID>
+  </CurrentIssues>
+</SmellBaseline>

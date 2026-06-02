@@ -4,7 +4,7 @@ import config.RealtimeQueuePolicy
 import config.RealtimeTopologyPolicy
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
-import java.util.*
+import java.util.Random
 
 internal const val REALTIME_OPTIMIZATION_THRESHOLD = 3
 
@@ -25,7 +25,7 @@ interface RealtimeScheduler {
     fun scheduleOnArrival(
         newCloudlet: Cloudlet,
         waitingCloudlets: List<Cloudlet>,
-        vmList: List<Vm>
+        vmList: List<Vm>,
     ): Int {
         val nodeStates = RealtimeNodeStateTracker(vmList).snapshot(waitingCloudlets, 0.0)
         return scheduleOnArrival(
@@ -34,8 +34,8 @@ interface RealtimeScheduler {
                 activeCloudlets = waitingCloudlets,
                 vmList = vmList,
                 currentTime = 0.0,
-                nodeStates = nodeStates
-            )
+                nodeStates = nodeStates,
+            ),
         )
     }
 }
@@ -44,9 +44,8 @@ interface RealtimeScheduler {
  * 实时调度器基类
  */
 abstract class RealtimeSchedulerBase(
-    protected val vmList: List<Vm>
+    protected val vmList: List<Vm>,
 ) : RealtimeScheduler {
-    
     protected val vmNum = vmList.size
 
     private val schedulerName: String
@@ -55,66 +54,75 @@ abstract class RealtimeSchedulerBase(
     init {
         SchedulerAllocationValidator.requireAvailableVms(vmNum, schedulerName)
     }
-    
+
     /**
      * 快速分配策略：将任务分配到当前负载最小的VM
      */
     protected fun findLeastLoadedVm(waitingCloudlets: List<Cloudlet>): Int {
         val vmLoads = DoubleArray(vmNum)
-        
+        val vmIndexById = vmList.mapIndexed { index, vm -> vm.id to index }.toMap()
+
         // 计算每个VM的当前负载
         for (cloudlet in waitingCloudlets) {
-            val vmId = cloudlet.vm.id.toInt()
-            if (vmId >= 0 && vmId < vmNum) {
+            val vmIndex = vmIndexById[cloudlet.vm?.id]
+            if (vmIndex != null) {
                 val length = cloudlet.length.toDouble()
-                vmLoads[vmId] += length / vmList[vmId].mips
+                vmLoads[vmIndex] += length / vmList[vmIndex].mips
             }
         }
-        
+
         // 找到负载最小的VM
         return vmLoads.indices.minByOrNull { vmLoads[it] } ?: 0
     }
 
     protected fun findLeastLoadedVm(context: RealtimeSchedulingContext): Int {
         val base = selectableNodeStates(context)
-        return base.minWithOrNull(
-            compareBy<RealtimeNodeState> { !it.acceptingWork }
-                .thenBy { it.availableTime }
-                .thenBy { it.estimatedLoad }
-                .thenBy { it.queueDepth }
-                .thenBy { it.vmIndex }
-        )?.vmIndex ?: 0
+        return base
+            .minWithOrNull(
+                compareBy<RealtimeNodeState> { !it.acceptingWork }
+                    .thenBy { it.availableTime }
+                    .thenBy { it.estimatedLoad }
+                    .thenBy { it.queueDepth }
+                    .thenBy { it.vmIndex },
+            )?.vmIndex ?: 0
     }
 
     protected fun orderedCandidateStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> {
         val base = selectableNodeStates(context)
         val preemptableVmIndexes = context.preemptionCandidates.map { it.victimVmIndex.value }.toSet()
-        val queueComparator = when (context.queuePolicy) {
-            RealtimeQueuePolicy.PRIORITY -> compareByDescending<RealtimeNodeState> { it.availableSlots }
-                .thenBy { it.availableTime }
-                .thenBy { it.estimatedLoad }
-            RealtimeQueuePolicy.DEADLINE -> compareBy<RealtimeNodeState> { projectedFinishTime(context, it) }
-                .thenBy { it.availableTime }
-                .thenBy { it.queueDepth }
-            RealtimeQueuePolicy.FIFO -> compareBy<RealtimeNodeState> { it.availableTime }
-                .thenBy { it.estimatedLoad }
-                .thenBy { it.queueDepth }
-        }
-        val topologyComparator = when (context.topologyPolicy) {
-            RealtimeTopologyPolicy.SPREAD_FAULT_DOMAINS -> compareBy<RealtimeNodeState> { it.failureDomainLoad }
-                .thenBy { it.topologyLatency }
-                .thenBy { it.topologyCost }
-            RealtimeTopologyPolicy.LATENCY_AWARE -> compareBy<RealtimeNodeState> { it.availableTime }
-                .thenBy { it.topologyLatency }
-                .thenBy { it.topologyCost }
-                .thenBy { it.failureDomainLoad }
-        }
+        val queueComparator =
+            when (context.queuePolicy) {
+                RealtimeQueuePolicy.PRIORITY ->
+                    compareByDescending<RealtimeNodeState> { it.availableSlots }
+                        .thenBy { it.availableTime }
+                        .thenBy { it.estimatedLoad }
+                RealtimeQueuePolicy.DEADLINE ->
+                    compareBy<RealtimeNodeState> { projectedFinishTime(context, it) }
+                        .thenBy { it.availableTime }
+                        .thenBy { it.queueDepth }
+                RealtimeQueuePolicy.FIFO ->
+                    compareBy<RealtimeNodeState> { it.availableTime }
+                        .thenBy { it.estimatedLoad }
+                        .thenBy { it.queueDepth }
+            }
+        val topologyComparator =
+            when (context.topologyPolicy) {
+                RealtimeTopologyPolicy.SPREAD_FAULT_DOMAINS ->
+                    compareBy<RealtimeNodeState> { it.failureDomainLoad }
+                        .thenBy { it.topologyLatency }
+                        .thenBy { it.topologyCost }
+                RealtimeTopologyPolicy.LATENCY_AWARE ->
+                    compareBy<RealtimeNodeState> { it.availableTime }
+                        .thenBy { it.topologyLatency }
+                        .thenBy { it.topologyCost }
+                        .thenBy { it.failureDomainLoad }
+            }
         return base.sortedWith(
             compareByDescending<RealtimeNodeState> { it.vmIndex in preemptableVmIndexes }
                 .thenBy { tenantAdjustedCost(context, it) }
                 .then(topologyComparator)
                 .then(queueComparator)
-                .thenBy { it.vmIndex }
+                .thenBy { it.vmIndex },
         )
     }
 
@@ -125,7 +133,31 @@ abstract class RealtimeSchedulerBase(
             context.candidateNodeStates.ifEmpty { context.nodeStates }
         }
 
-    private fun tenantAdjustedCost(context: RealtimeSchedulingContext, state: RealtimeNodeState): Double {
+    protected fun acceptingOptimizationCandidates(context: RealtimeSchedulingContext): List<RealtimeNodeState> =
+        selectableNodeStates(context).filter { it.acceptingWork }
+
+    protected fun fallbackCandidateVm(context: RealtimeSchedulingContext): Int =
+        orderedCandidateStates(context).firstOrNull { it.acceptingWork }?.vmIndex
+            ?: acceptingOptimizationCandidates(context).firstOrNull()?.vmIndex
+            ?: findLeastLoadedVm(context)
+
+    protected fun optimizedCandidateVmIndex(
+        context: RealtimeSchedulingContext,
+        candidateStates: List<RealtimeNodeState>,
+        optimizedCandidateIndex: Int,
+    ): Int {
+        val candidate = candidateStates.getOrNull(optimizedCandidateIndex)
+        return if (candidate != null && candidate.acceptingWork) {
+            candidate.vmIndex
+        } else {
+            fallbackCandidateVm(context)
+        }
+    }
+
+    private fun tenantAdjustedCost(
+        context: RealtimeSchedulingContext,
+        state: RealtimeNodeState,
+    ): Double {
         val pressure = context.tenantFairnessPressure
         return when (context.tenantSchedulingPolicy) {
             config.TenantSchedulingPolicy.QUOTA_FIRST -> 0.0
@@ -135,7 +167,10 @@ abstract class RealtimeSchedulerBase(
         }
     }
 
-    private fun projectedFinishTime(context: RealtimeSchedulingContext, state: RealtimeNodeState): Double {
+    private fun projectedFinishTime(
+        context: RealtimeSchedulingContext,
+        state: RealtimeNodeState,
+    ): Double {
         val vm = context.vmList[state.vmIndex]
         return state.availableTime + context.newCloudlet.length.toDouble() / vm.mips
     }
@@ -145,10 +180,9 @@ abstract class RealtimeSchedulerBase(
  * 实时随机调度器
  */
 class RealtimeRandomScheduler(
-    vmList: List<Vm>, 
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    vmList: List<Vm>,
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : RealtimeSchedulerBase(vmList) {
-    
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
         val candidates = selectableNodeStates(context)
         if (candidates.isEmpty()) return 0
@@ -159,12 +193,11 @@ class RealtimeRandomScheduler(
 /**
  * 实时最小负载调度器
  */
-class RealtimeMinLoadScheduler(vmList: List<Vm>) 
-    : RealtimeSchedulerBase(vmList) {
-    
-    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-        return orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
-    }
+class RealtimeMinLoadScheduler(
+    vmList: List<Vm>,
+) : RealtimeSchedulerBase(vmList) {
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
+        orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
 }
 
 /**
@@ -175,21 +208,34 @@ class RealtimePSOScheduler(
     private val population: Int = 20,
     private val maxIter: Int = 20,
     internal val objectiveWeights: config.ObjectiveWeightsConfig,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : RealtimeSchedulerBase(vmList) {
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
         // 如果有等待任务，使用PSO进行批量调度
         if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
+            val candidateStates = acceptingOptimizationCandidates(context)
+            if (candidateStates.isEmpty()) {
+                return fallbackCandidateVm(context)
+            }
             val allCloudlets = context.activeCloudlets + context.newCloudlet
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, context.vmList, objectiveWeights)
-            val pso = PSO(objFunc, population, 0.0, (context.vmList.size - 1).toDouble(),
-                allCloudlets.size, maxIter, random)
+            val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
+            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
+            val pso =
+                PSO(
+                    objFunc,
+                    population,
+                    0.0,
+                    (candidateVms.size - 1).toDouble(),
+                    allCloudlets.size,
+                    maxIter,
+                    random,
+                )
             val allocation = pso.execute()
-            return allocation[allCloudlets.size - 1]  // 返回新任务的分配
+            return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
         }
-        
+
         // 如果没有等待任务，使用最小负载策略
-        return orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
+        return fallbackCandidateVm(context)
     }
 }
 
@@ -201,18 +247,30 @@ class RealtimeWOAScheduler(
     private val population: Int = 20,
     private val maxIter: Int = 20,
     internal val objectiveWeights: config.ObjectiveWeightsConfig,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : RealtimeSchedulerBase(vmList) {
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
         if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
+            val candidateStates = acceptingOptimizationCandidates(context)
+            if (candidateStates.isEmpty()) {
+                return fallbackCandidateVm(context)
+            }
             val allCloudlets = context.activeCloudlets + context.newCloudlet
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, context.vmList, objectiveWeights)
-            val woa = WOA(objFunc, population, 0.0, (context.vmList.size - 1).toDouble(),
-                allCloudlets.size, maxIter, random)
+            val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
+            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
+            val woa =
+                WOA(
+                    objFunc,
+                    population,
+                    0.0,
+                    (candidateVms.size - 1).toDouble(),
+                    allCloudlets.size,
+                    maxIter,
+                    random,
+                )
             val allocation = woa.execute()
-            return allocation[allCloudlets.size - 1]
+            return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
         }
-        return orderedCandidateStates(context).firstOrNull()?.vmIndex ?: findLeastLoadedVm(context)
+        return fallbackCandidateVm(context)
     }
 }
-

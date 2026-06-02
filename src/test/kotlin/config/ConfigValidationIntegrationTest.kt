@@ -1,15 +1,16 @@
 package config
 
-import org.junit.jupiter.api.*
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.fail
 
 /**
  * 配置验证集成测试
  * 测试实际的配置加载和验证功能
  */
 class ConfigValidationIntegrationTest {
-
     @Test
     fun `should load and validate default config successfully`() {
         // Given - When - Then
@@ -21,9 +22,10 @@ class ConfigValidationIntegrationTest {
     @Test
     fun `should reject invalid batch config with negative cloudlet count`() {
         // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            batch = ExperimentConfig.createDefault().batch.copy(cloudletCount = -1)
-        )
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                batch = ExperimentConfig.createDefault().batch.copy(cloudletCount = -1),
+            )
 
         // When - Then
         assertThatThrownBy { ExperimentConfig.validate(invalidConfig) }
@@ -50,13 +52,19 @@ class ConfigValidationIntegrationTest {
     @Test
     fun `should accept valid custom objective weights`() {
         // Given
-        val validConfig = ExperimentConfig.createDefault().copy(
-            batch = ExperimentConfig.createDefault().batch.copy(
-                objectiveWeights = ObjectiveWeightsConfig(
-                    cost = 0.3, totalTime = 0.4, loadBalance = 0.2, makespan = 0.1
-                )
+        val validConfig =
+            ExperimentConfig.createDefault().copy(
+                batch =
+                    ExperimentConfig.createDefault().batch.copy(
+                        objectiveWeights =
+                            ObjectiveWeightsConfig(
+                                cost = 0.3,
+                                totalTime = 0.4,
+                                loadBalance = 0.2,
+                                makespan = 0.1,
+                            ),
+                    ),
             )
-        )
 
         // When - Then
         ExperimentConfig.validate(validConfig) // 不应该抛出异常
@@ -65,12 +73,14 @@ class ConfigValidationIntegrationTest {
     @Test
     fun `should provide detailed error information in ConfigValidationException`() {
         // Given
-        val invalidConfig = ExperimentConfig.createDefault().copy(
-            batch = ExperimentConfig.createDefault().batch.copy(
-                cloudletCount = -1,
-                population = 0
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                batch =
+                    ExperimentConfig.createDefault().batch.copy(
+                        cloudletCount = -1,
+                        population = 0,
+                    ),
             )
-        )
 
         // When - Then
         try {

@@ -9,14 +9,14 @@ import scheduler.RealtimeTaskRecord
 import scheduler.VmIndex
 
 class RealtimeTaskLifecycleStoreTest {
-
     @Test
     fun `value classes wrap cloudlet id and vm index safely`() {
-        val record = RealtimeTaskRecord(
-            cloudletId = 42L,
-            originalArrivalTime = 1.5,
-            assignedVmIndex = 3
-        )
+        val record =
+            RealtimeTaskRecord(
+                cloudletId = 42L,
+                originalArrivalTime = 1.5,
+                assignedVmIndex = 3,
+            )
 
         assertThat(record.id).isEqualTo(CloudletId(42L))
         assertThat(record.assignedVm).isEqualTo(VmIndex(3))

@@ -5,7 +5,7 @@ import datacenter.SchedulerObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
-import java.util.*
+import java.util.Random
 
 /**
  * 灰狼优化算法 (Grey Wolf Optimizer) - 优化版本
@@ -18,25 +18,25 @@ private class GWO(
     private val ub: Double,
     private val dim: Int,
     private val maxIter: Int,
-    private val random: Random
+    private val random: Random,
 ) {
     // 使用一维数组存储所有狼的位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
-    
+
     private val alphaPos = DoubleArray(dim)
     private var alphaScore = Double.POSITIVE_INFINITY
-    
+
     private val betaPos = DoubleArray(dim)
     private var betaScore = Double.POSITIVE_INFINITY
-    
+
     private val deltaPos = DoubleArray(dim)
     private var deltaScore = Double.POSITIVE_INFINITY
-    
+
     init {
         initializePositions()
     }
-    
+
     private fun initializePositions() {
         for (i in 0 until population) {
             val baseIndex = i * dim
@@ -83,7 +83,7 @@ private class GWO(
             }
         }
     }
-    
+
     fun execute(): IntArray {
         for (t in 0 until maxIter) {
             val a = 2.0 - t * (2.0 / maxIter.toDouble()) // a 从 2 线性递减到 0
@@ -95,26 +95,26 @@ private class GWO(
                     val r1 = random.nextDouble()
                     val r2 = random.nextDouble()
 
-                    val A1 = 2.0 * a * r1 - a
-                    val C1 = 2.0 * r2
-                    val D_alpha = Math.abs(C1 * alphaPos[j] - positions[index])
-                    val X1 = alphaPos[j] - A1 * D_alpha
+                    val a1 = 2.0 * a * r1 - a
+                    val c1 = 2.0 * r2
+                    val dAlpha = Math.abs(c1 * alphaPos[j] - positions[index])
+                    val x1 = alphaPos[j] - a1 * dAlpha
 
-                    val r1_beta = random.nextDouble()
-                    val r2_beta = random.nextDouble()
-                    val A2 = 2.0 * a * r1_beta - a
-                    val C2 = 2.0 * r2_beta
-                    val D_beta = Math.abs(C2 * betaPos[j] - positions[index])
-                    val X2 = betaPos[j] - A2 * D_beta
+                    val r1Beta = random.nextDouble()
+                    val r2Beta = random.nextDouble()
+                    val a2 = 2.0 * a * r1Beta - a
+                    val c2 = 2.0 * r2Beta
+                    val dBeta = Math.abs(c2 * betaPos[j] - positions[index])
+                    val x2 = betaPos[j] - a2 * dBeta
 
-                    val r1_delta = random.nextDouble()
-                    val r2_delta = random.nextDouble()
-                    val A3 = 2.0 * a * r1_delta - a
-                    val C3 = 2.0 * r2_delta
-                    val D_delta = Math.abs(C3 * deltaPos[j] - positions[index])
-                    val X3 = deltaPos[j] - A3 * D_delta
+                    val r1Delta = random.nextDouble()
+                    val r2Delta = random.nextDouble()
+                    val a3 = 2.0 * a * r1Delta - a
+                    val c3 = 2.0 * r2Delta
+                    val dDelta = Math.abs(c3 * deltaPos[j] - positions[index])
+                    val x3 = deltaPos[j] - a3 * dDelta
 
-                    positions[index] = (X1 + X2 + X3) / 3.0
+                    positions[index] = (x1 + x2 + x3) / 3.0
                 }
 
                 adjustAndEvaluate(i)
@@ -134,26 +134,24 @@ class GWOScheduler(
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-    
     private val gwo: GWO
-    
+
     init {
         val objFunc = objectiveFunction as SchedulerObjectiveFunction
-        gwo = GWO(
-            optFunction = objFunc,
-            population = population,
-            lb = 0.0,
-            ub = (vmNum - 1).toDouble(),
-            dim = cloudletNum,
-            maxIter = maxIter,
-            random = random
-        )
+        gwo =
+            GWO(
+                optFunction = objFunc,
+                population = population,
+                lb = 0.0,
+                ub = (vmNum - 1).toDouble(),
+                dim = cloudletNum,
+                maxIter = maxIter,
+                random = random,
+            )
         Logger.debug("使用 GWO (灰狼优化) 调度器")
     }
-    
-    override fun allocate(): IntArray {
-        return gwo.execute()
-    }
+
+    override fun allocate(): IntArray = gwo.execute()
 }

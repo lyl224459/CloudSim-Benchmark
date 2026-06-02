@@ -10,29 +10,34 @@ import kotlin.coroutines.CoroutineContext
 
 class ExperimentConcurrency(
     private val useCoroutines: Boolean = true,
-    private val maxConcurrency: Int = 0
+    private val maxConcurrency: Int = 0,
 ) {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val dispatcher: CoroutineContext =
         if (maxConcurrency > 0) Dispatchers.Default.limitedParallelism(maxConcurrency) else Dispatchers.Default
 
     val description: String
-        get() = when {
-            !useCoroutines -> "顺序执行"
-            maxConcurrency > 0 -> "协程并行（最大并发 $maxConcurrency）"
-            else -> "协程并行（默认调度器）"
-        }
+        get() =
+            when {
+                !useCoroutines -> "顺序执行"
+                maxConcurrency > 0 -> "协程并行（最大并发 $maxConcurrency）"
+                else -> "协程并行（默认调度器）"
+            }
 
-    suspend fun <T, R> map(items: Iterable<T>, block: suspend (T) -> R): List<R> {
+    suspend fun <T, R> map(
+        items: Iterable<T>,
+        block: suspend (T) -> R,
+    ): List<R> {
         val itemList = items.toList()
         if (!useCoroutines || itemList.size <= 1) {
             return itemList.map { block(it) }
         }
 
         return coroutineScope {
-            itemList.map { item ->
-                async(dispatcher) { block(item) }
-            }.awaitAll()
+            itemList
+                .map { item ->
+                    async(dispatcher) { block(item) }
+                }.awaitAll()
         }
     }
 

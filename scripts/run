@@ -49,8 +49,12 @@ else
     JAVA_CMD="java"
 fi
 
+if [ -f "cloudsim-benchmark-all.jar" ]; then
+    JAR_PATH="cloudsim-benchmark-all.jar"
+fi
+
 # 设置编码
-export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8"
+export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dlogback.configurationFile=cloudsim-benchmark-logback.xml"
 # 设置终端语言环境
 export LANG="zh_CN.UTF-8"
 export LC_ALL="zh_CN.UTF-8"
@@ -201,6 +205,7 @@ run_program() {
 
     # JVM 选项 (同步 run.cmd)
     local jvm_opts="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 \
+        -Dlogback.configurationFile=cloudsim-benchmark-logback.xml \
         --enable-native-access=ALL-UNNAMED \
         --add-opens java.base/java.lang=ALL-UNNAMED \
         --add-opens java.base/java.util=ALL-UNNAMED \

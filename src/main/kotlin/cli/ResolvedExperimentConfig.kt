@@ -8,20 +8,20 @@ import scheduler.ResolvedAlgorithm
 
 data class ResolvedProfile(
     val name: String?,
-    val presetName: String?
+    val presetName: String?,
 )
 
 data class ResolvedExecutionOptions(
     val useCoroutines: Boolean,
     val maxConcurrency: Int,
-    val dryRun: Boolean
+    val dryRun: Boolean,
 )
 
 data class ResolvedOutputConfig(
     val resultsDir: String,
     val csvEnabled: Boolean,
     val csvDelimiter: String,
-    val nameFormat: String
+    val nameFormat: String,
 )
 
 data class ResolvedExperimentConfig(
@@ -33,7 +33,7 @@ data class ResolvedExperimentConfig(
     val algorithms: List<ResolvedAlgorithm>,
     val taskCounts: List<Int>,
     val execution: ResolvedExecutionOptions,
-    val output: ResolvedOutputConfig
+    val output: ResolvedOutputConfig,
 ) {
     val selectedAlgorithmNames: List<String> = algorithms.map { it.name }
     val profileName: String? = profile.name
@@ -46,5 +46,5 @@ data class ResolvedExperimentConfig(
 
 data class LoadedRunConfigs(
     val systemConfig: SystemConfig,
-    val experimentConfig: ExperimentConfig
+    val experimentConfig: ExperimentConfig,
 )

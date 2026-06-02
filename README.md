@@ -1,8 +1,8 @@
 # CloudSim-Benchmark
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![JDK](https://img.shields.io/badge/JDK-23+-blue.svg)](https://jdk.java.net/)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.1.21-purple.svg)](https://kotlinlang.org/)
+[![JDK](https://img.shields.io/badge/JDK-25+-blue.svg)](https://jdk.java.net/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-purple.svg)](https://kotlinlang.org/)
 [![Gradle](https://img.shields.io/badge/Gradle-9.2.1-green.svg)](https://gradle.org/)
 [![CI](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml)
 
@@ -41,7 +41,7 @@ CloudSim-Benchmark 旨在解决云调度研究中实验流程繁琐、算法对�
 ## ✨ 核心特性
 
 - ✅ **丰富的算法库**：集成 PSO, WOA, GWO, HHO, 以及自研的 **Improved-RL** (改进版强化学习)。
-- ✅ **极致性能优化**：采用 **ZGC** 低延迟回收、**ND4J** 向量化计算、**Fastutil** 高性能集合。
+- ✅ **极致性能优化**：采用 **ZGC** 低延迟回收、目标函数缓存和协程并行执行。
 - ✅ **协程并行加速**：基于 Kotlin 协程实现算法与试验的并行执行，加速比可达 5x-8x。
 - ✅ **统一 CLI 接口**：全新的命名参数格式，支持 `--algorithms ALL` 一键运行，支持协程开关。
 - ✅ **结构化结果管理**：自动生成带时间戳的实验快照与分算法原始 CSV 数据。
@@ -53,7 +53,7 @@ CloudSim-Benchmark 旨在解决云调度研究中实验流程繁琐、算法对�
 ## 🛠️ 系统要求
 
 - **操作系统**: Windows (推荐), Linux, macOS
-- **JDK**: 23 或更高版本 (全面兼容 JDK 24)
+- **JDK**: 25 或更高版本
 - **内存**: 建议分配 2GB+ 堆内存 (通过 Gradle 自动配置)
 
 ---
@@ -65,11 +65,14 @@ CloudSim-Benchmark 旨在解决云调度研究中实验流程繁琐、算法对�
 ```bash
 git clone https://github.com/lyl224459/CloudSim-Benchmark.git
 cd CloudSim-Benchmark
+git submodule update --init --recursive
 ./run.cmd build    # Windows
 ./run build        # Linux/WSL
 ```
 
 Windows 脚本会自动读取系统代理（Internet Settings 中的 `ProxyEnable`/`ProxyServer`）并传递给 Gradle，首次下载 Gradle Wrapper 时无需在仓库中写死代理地址。若 JAR 不存在，`run.cmd` 会自动执行 `gradlew.bat fatJar --no-daemon`。
+
+CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。默认构建会执行 `prepareCloudSimPlusSource`，动态 fetch upstream tags 并 checkout 最新 release tag，然后把源码构建产物安装到 `build/cloudsimplus-m2`；可用 `-Pcloudsimplus.ref=<tag-or-sha>` 固定版本，`-Pcloudsimplus.offline=true` 使用当前 submodule checkout，或在受限网络里用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 为 Git/Maven 源码构建指定代理。
 
 ### 2. 运行实验 (子命令 CLI)
 
@@ -260,9 +263,45 @@ tasks = [50, 100, 200]
 
 ## 📈 实验结果与可视化
 
+实时调度 CSV 已统一使用结构化 `Status` / `ErrorType` / `ErrorMessage` 字段，并由单一指标 schema 生成列名。完整指标说明见 [Realtime 指标定义](docs/realtime-metrics.md)。
+
+### 性能基准
+
+项目提供两层性能任务：`benchmarkPerformanceSmoke` 只验证链路能跑通；`benchmarkPerformanceTrend` 使用 JMH 生成非阻断趋势报告，适合在本机或专用性能环境里观察调度算法耗时与分配趋势：
+
+```bash
+./gradlew.bat benchmarkPerformanceTrend --no-daemon --stacktrace
 ```
 
+JMH 结果写入 `build/reports/performance/jmh-results.json`，Markdown 趋势报告写入 `build/reports/performance/performance-trend.md`。报告包含 objective function 调用、PSO/WOA/GWO/HHO 固定输入、realtime 调度不同 cloudlet count 的耗时、GC 分配指标和固定 JVM/GC 参数。可用历史 JSON 生成 delta：
+
+```bash
+./gradlew.bat benchmarkPerformanceTrend ^
+  -PperformanceBaseline=build/reports/performance/previous-jmh-results.json ^
+  --no-daemon --stacktrace
 ```
+
+开发期可运行 smoke 任务验证 JSON 链路：
+
+```bash
+./gradlew.bat benchmarkPerformanceSmoke --no-daemon --stacktrace
+```
+
+旧的 `benchmarkPerformance` 任务仍保留为轻量 JSON 基准，默认覆盖 `100,1000,10000` cloudlets，并运行 `PSO,WOA,GWO,HHO,REALTIME_MIN_LOAD`。
+
+### Realtime 指标定义
+
+| 指标主题 | 关键 CSV 指标 | 含义 |
+| :--- | :--- | :--- |
+| 租户公平 | `TenantFairnessIndex`, `FairnessViolationCount` | 衡量多租户完成量与策略约束的公平程度。 |
+| DRF | `DominantResourceFairnessIndex` | 基于主导资源份额的租户公平性得分。 |
+| SLA penalty | `SlaPenalty`, `TenantSlaPenalty` | 将 deadline 延迟按全局或租户策略累计成惩罚值。 |
+| 拓扑成本 | `TopologyCost`, `AverageTopologyLatency` | 衡量跨 rack/region 放置带来的成本与延迟。 |
+| 镜像缓存/冷启动 | `ColdStartDelayTotal`, `AutoscalingCost` | 反映镜像拉取、VM 冷启动和伸缩引入的代价。 |
+| 队列深度 | `AvgQueueDepth`, `MaxQueueDepth` | 记录实时调度选择 VM 时观察到的队列压力。 |
+| Retry/Rejection | `RetryCount`, `RetrySuccessRate`, `RejectedCount`, `ResourceRejectedCount` | 统计重试成功率以及准入、容量、资源策略造成的拒绝。 |
+
+完整字段、单位、趋势和定义见 [docs/realtime-metrics.md](docs/realtime-metrics.md)。
 
 ## ⚡ 性能优化深度解析
 
@@ -274,8 +313,8 @@ tasks = [50, 100, 200]
 
 ### 2. 计算性能优化
 
-- **ND4J 向量化**: 使用 ND4J 进行矩阵运算，利用 CPU SIMD 指令集加速。
-- **Fastutil 集合**: 替代 JDK 内置集合，减少装箱拆箱开销，提升大数据量下的性能。
+- **目标函数缓存**: 调度目标函数预缓存任务长度、VM 性能与归一化边界，降低 PSO/WOA/GWO/HHO 高频 fitness 计算成本。
+- **指标聚合优化**: 实时指标由统一 schema 驱动 CSV、统计与文档，减少重复字段维护成本。
 - **协程并行**: 基于 Kotlin 协程实现算法并行执行，充分利用多核 CPU 性能。
 
 ### 3. 算法层面优化
@@ -307,7 +346,7 @@ podman build -t cloudsim-benchmark .
 - **可重现性**: 确保实验在不同机器上的结果一致
 - **资源管控**: 限制容器资源使用，避免过度消耗
 
-Containerfile 配置了完整的运行时环境，包括 JDK 23、ZGC 优化等。
+Containerfile 配置了完整的运行时环境，包括 JDK 25、ZGC 优化等。
 
 ---
 
@@ -362,15 +401,20 @@ CloudSim-Benchmark/
 
 ## 🔄 CI/CD
 
-项目配置了 GitHub Actions CI/CD，自动化构建、测试和发布流程：
+项目配置了 GitHub Actions CI/CD，自动化构建、测试和发布流程。当前主分支门禁以 `fullCheck` 为准，包含示例配置校验、格式检查、静态检查、测试、覆盖率报告和 fatJar 构建：
 
 ```yaml
 # .github/workflows/ci.yml
-- JDK 23 环境
-- Gradle 自动构建
-- 测试覆盖率检查
-- 发布到 GitHub Packages
+- Windows + JDK 25 环境
+- .\gradlew.bat clean fullCheck --no-daemon --stacktrace
+- ktlintCheck / detekt / test / jacocoTestReport / fatJar
 ```
+
+发布流程由 `.github/workflows/release.yml` 在 `v*.*.*` 标签或手动触发时执行，复用 Gradle release package tasks 生成可执行 JAR、Windows zip、Unix tar.gz、源码包和清单，并推送容器镜像到 GHCR。发布前验收清单见 `docs/release-readiness.md`。
+
+### 迁移说明
+
+旧兼容包装 `util.ResultsManager` 已删除，结果目录和 CSV 输出请使用 `util.ExperimentOutputContext`。旧常量包装 `datacenter.Constants` 已删除，数据中心参数请使用 `config.DatacenterConfig`；`datacenter.DatacenterType` 保持可用。
 
 ---
 

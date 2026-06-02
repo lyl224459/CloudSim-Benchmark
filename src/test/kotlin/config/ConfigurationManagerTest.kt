@@ -1,6 +1,8 @@
 package config
 
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.File
@@ -8,34 +10,36 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 
 class ConfigurationManagerTest {
-
     @Test
     fun `loadFromSingleFile reads profiles and system config`() {
-        val configFile = createTempTomlFile("""
-            defaultProfile = "quick"
+        val configFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "quick"
 
-            [output]
-            resultsDir = "runs/test"
+                [output]
+                resultsDir = "runs/test"
 
-            [output.csv]
-            enabled = false
-            delimiter = ";"
+                [output.csv]
+                enabled = false
+                delimiter = ";"
 
-            [logging]
-            level = "DEBUG"
-            console = false
+                [logging]
+                level = "DEBUG"
+                console = false
 
-            [profiles.quick]
-            mode = "batch"
-            algorithms = ["PSO", "WOA"]
-            runs = 2
-            outputDir = "runs/quick"
+                [profiles.quick]
+                mode = "batch"
+                algorithms = ["PSO", "WOA"]
+                runs = 2
+                outputDir = "runs/quick"
 
-            [profiles.quick.batch]
-            cloudletCount = 120
-            population = 40
-            maxIter = 80
-        """.trimIndent())
+                [profiles.quick.batch]
+                cloudletCount = 120
+                population = 40
+                maxIter = 80
+                """.trimIndent(),
+            )
 
         try {
             val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
@@ -45,7 +49,12 @@ class ConfigurationManagerTest {
             assertEquals("DEBUG", configs.systemConfig.logging.level)
             assertEquals("quick", configs.experimentConfig.defaultProfile)
             assertTrue(configs.experimentConfig.profiles.containsKey("quick"))
-            assertEquals(120, configs.experimentConfig.profiles["quick"]?.batch?.cloudletCount)
+            assertEquals(
+                120,
+                configs.experimentConfig.profiles["quick"]
+                    ?.batch
+                    ?.cloudletCount,
+            )
             assertEquals(2, configs.experimentConfig.profiles["quick"]?.runs)
             assertEquals(listOf("PSO", "WOA"), configs.experimentConfig.profiles["quick"]?.algorithms)
         } finally {
@@ -55,111 +64,114 @@ class ConfigurationManagerTest {
 
     @Test
     fun `loadFromSingleFile reads nested profile batch objective and realtime scheduling`() {
-        val configFile = createTempTomlFile("""
-            defaultProfile = "realtime_nested"
+        val configFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "realtime_nested"
 
-            [profiles.batch_nested]
-            mode = "batch"
-            algorithms = ["PSO"]
+                [profiles.batch_nested]
+                mode = "batch"
+                algorithms = ["PSO"]
 
-            [profiles.batch_nested.batch]
-            cloudletCount = 64
+                [profiles.batch_nested.batch]
+                cloudletCount = 64
 
-            [profiles.batch_nested.batch.objective]
-            cost = 0.2
-            totalTime = 0.3
-            loadBalance = 0.4
-            makespan = 0.1
+                [profiles.batch_nested.batch.objective]
+                cost = 0.2
+                totalTime = 0.3
+                loadBalance = 0.4
+                makespan = 0.1
 
-            [profiles.realtime_nested]
-            mode = "realtime"
-            algorithms = ["MIN_LOAD"]
+                [profiles.realtime_nested]
+                mode = "realtime"
+                algorithms = ["MIN_LOAD"]
 
-            [profiles.realtime_nested.realtime]
-            cloudletCount = 80
-            simulationDuration = 200.0
-            arrivalRate = 2.0
+                [profiles.realtime_nested.realtime]
+                cloudletCount = 80
+                simulationDuration = 200.0
+                arrivalRate = 2.0
 
-            [profiles.realtime_nested.realtime.arrival]
-            distribution = "burst"
-            burstIntensity = 3.5
-            burstDuration = 25.0
+                [profiles.realtime_nested.realtime.arrival]
+                distribution = "burst"
+                burstIntensity = 3.5
+                burstDuration = 25.0
 
-            [profiles.realtime_nested.realtime.scheduling]
-            strategy = "static"
-            maxQueueSize = 10
-            taskTimeout = 15.0
-            resourceReservation = "partial"
-            decisionDelay = 0.5
-            decisionJitter = 0.2
-            failureRate = 0.1
-            retryLimit = 2
-            retryDelay = 1.5
-            retryBackoffMultiplier = 2.0
-            queuePolicy = "priority"
-            priorityLevels = 4
-            highPriorityRatio = 0.25
-            deadlineFactor = 1.5
-            vmQueueCapacity = 3
-            overloadFailureMultiplier = 0.2
-            autoscalingEnabled = true
-            scaleOutQueueThreshold = 2
-            scaleInIdleTime = 10.0
-            maxDynamicVms = 3
-            vmColdStartDelay = 4.0
-            scaleOutCost = 0.25
-            scaleInProtectionTime = 8.0
-            resourceModelEnabled = true
-            networkLatency = 0.05
-            imagePullDelay = 0.5
-            ioWeight = 1.0
-            ramWeight = 0.5
-            bwWeight = 0.25
-            runtimeFailureRate = 0.03
-            nodeFailureRate = 0.02
-            checkpointInterval = 5.0
-            migrationDelay = 1.5
-            timeoutAction = "retry"
-            preemptionEnabled = true
-            preemptionPolicy = "deadline_then_priority"
-            preemptionMinPriorityGap = 2
-            preemptionMaxPerTask = 3
-            preemptionDelay = 0.4
-            preemptionPenalty = 0.7
-            multiTenantEnabled = true
-            tenantCount = 3
-            tenantQuota = [2, 1, 1]
-            tenantWeights = [1.0, 2.0, 1.0]
-            tenantFairnessPolicy = "weighted_fair"
-            tenantSchedulingPolicy = "dominant_resource_fairness"
-            tenantBurstAllowance = 2
-            tenantSlaPenaltyWeight = 1.5
-            tenantCostBudget = [10.0, 20.0, 15.0]
-            topologyEnabled = true
-            topologyPolicy = "spread_fault_domains"
-            regionCount = 4
-            racksPerRegion = 3
-            hostsPerRack = 2
-            localRegion = 1
-            crossRackLatency = 0.15
-            crossRegionLatency = 2.5
-            crossRegionCost = 0.8
-            hostFailureRate = 0.01
-            rackFailureRate = 0.02
-            regionFailureRate = 0.03
-            physicalTopologyEnabled = true
-            dataLocalityEnabled = true
-            imageCacheEnabled = true
-            hostCountPerRack = 4
-            hostCpuCapacity = 8.0
-            hostRamCapacity = 32768.0
-            hostBwCapacity = 10000.0
-            hostIoCapacity = 5000.0
-            crossRackBandwidth = 20.0
-            crossRegionBandwidth = 5.0
-            dataLocalityPolicy = "balanced"
-            imageCacheCapacity = 3
-        """.trimIndent())
+                [profiles.realtime_nested.realtime.scheduling]
+                strategy = "static"
+                maxQueueSize = 10
+                taskTimeout = 15.0
+                resourceReservation = "partial"
+                decisionDelay = 0.5
+                decisionJitter = 0.2
+                failureRate = 0.1
+                retryLimit = 2
+                retryDelay = 1.5
+                retryBackoffMultiplier = 2.0
+                queuePolicy = "priority"
+                priorityLevels = 4
+                highPriorityRatio = 0.25
+                deadlineFactor = 1.5
+                vmQueueCapacity = 3
+                overloadFailureMultiplier = 0.2
+                autoscalingEnabled = true
+                scaleOutQueueThreshold = 2
+                scaleInIdleTime = 10.0
+                maxDynamicVms = 3
+                vmColdStartDelay = 4.0
+                scaleOutCost = 0.25
+                scaleInProtectionTime = 8.0
+                resourceModelEnabled = true
+                networkLatency = 0.05
+                imagePullDelay = 0.5
+                ioWeight = 1.0
+                ramWeight = 0.5
+                bwWeight = 0.25
+                runtimeFailureRate = 0.03
+                nodeFailureRate = 0.02
+                checkpointInterval = 5.0
+                migrationDelay = 1.5
+                timeoutAction = "retry"
+                preemptionEnabled = true
+                preemptionPolicy = "deadline_then_priority"
+                preemptionMinPriorityGap = 2
+                preemptionMaxPerTask = 3
+                preemptionDelay = 0.4
+                preemptionPenalty = 0.7
+                multiTenantEnabled = true
+                tenantCount = 3
+                tenantQuota = [2, 1, 1]
+                tenantWeights = [1.0, 2.0, 1.0]
+                tenantFairnessPolicy = "weighted_fair"
+                tenantSchedulingPolicy = "dominant_resource_fairness"
+                tenantBurstAllowance = 2
+                tenantSlaPenaltyWeight = 1.5
+                tenantCostBudget = [10.0, 20.0, 15.0]
+                topologyEnabled = true
+                topologyPolicy = "spread_fault_domains"
+                regionCount = 4
+                racksPerRegion = 3
+                hostsPerRack = 2
+                localRegion = 1
+                crossRackLatency = 0.15
+                crossRegionLatency = 2.5
+                crossRegionCost = 0.8
+                hostFailureRate = 0.01
+                rackFailureRate = 0.02
+                regionFailureRate = 0.03
+                physicalTopologyEnabled = true
+                dataLocalityEnabled = true
+                imageCacheEnabled = true
+                hostCountPerRack = 4
+                hostCpuCapacity = 8.0
+                hostRamCapacity = 32768.0
+                hostBwCapacity = 10000.0
+                hostIoCapacity = 5000.0
+                crossRackBandwidth = 20.0
+                crossRegionBandwidth = 5.0
+                dataLocalityPolicy = "balanced"
+                imageCacheCapacity = 3
+                """.trimIndent(),
+            )
 
         try {
             val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
@@ -252,22 +264,76 @@ class ConfigurationManagerTest {
     }
 
     @Test
-    fun `loadFromSingleFile rejects unknown profile field`() {
-        val configFile = createTempTomlFile("""
-            defaultProfile = "bad"
+    fun `loadFromSingleFile supports standard toml dynamic maps and multiline arrays`() {
+        val configFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "batch smoke"
 
-            [profiles.bad]
-            mode = "batch"
-            unsupported = true
+                [profiles."batch smoke"]
+                mode = "batch"
+                algorithms = [
+                    "PSO",
+                    "WOA",
+                ]
+                tasks = [
+                    50,
+                    100,
+                ]
 
-            [profiles.bad.batch]
-            cloudletCount = 10
-        """.trimIndent())
+                [profiles."batch smoke".batch]
+                cloudletCounts = [50, 100, 150]
+                population = 12
+
+                [algorithms."pso realtime"]
+                enabled = true
+                description = "quoted algorithm profile"
+                population = 8
+                maxIter = 9
+
+                [presets."fast set"]
+                algorithms = ["PSO", "WOA"]
+                """.trimIndent(),
+            )
 
         try {
-            val error = assertThrows<IllegalArgumentException> {
-                ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
-            }
+            val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
+            val profile = configs.experimentConfig.profiles["batch smoke"]
+
+            assertEquals("batch smoke", configs.experimentConfig.defaultProfile)
+            assertEquals(listOf("PSO", "WOA"), profile?.algorithms)
+            assertEquals(listOf(50, 100), profile?.tasks)
+            assertEquals(listOf(50, 100, 150), profile?.batch?.cloudletCounts)
+            assertEquals(12, profile?.batch?.population)
+            assertEquals(8, configs.experimentConfig.algorithmConfigs["PSO_REALTIME"]?.population)
+            assertEquals(9, configs.experimentConfig.algorithmConfigs["PSO_REALTIME"]?.maxIter)
+            assertEquals(listOf("PSO", "WOA"), configs.experimentConfig.presets["fast set"]?.algorithms)
+        } finally {
+            configFile.delete()
+        }
+    }
+
+    @Test
+    fun `loadFromSingleFile rejects unknown profile field`() {
+        val configFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "bad"
+
+                [profiles.bad]
+                mode = "batch"
+                unsupported = true
+
+                [profiles.bad.batch]
+                cloudletCount = 10
+                """.trimIndent(),
+            )
+
+        try {
+            val error =
+                assertThrows<IllegalArgumentException> {
+                    ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
+                }
             assertTrue(error.message?.contains("未知字段") == true)
         } finally {
             configFile.delete()
@@ -276,12 +342,15 @@ class ConfigurationManagerTest {
 
     @Test
     fun `loadFromSingleFile rejects old top level schema`() {
-        val configFile = createTempTomlFile("""
-            mode = "batch"
+        val configFile =
+            createTempTomlFile(
+                """
+                mode = "batch"
 
-            [batch]
-            cloudletCount = 100
-        """.trimIndent())
+                [batch]
+                cloudletCount = 100
+                """.trimIndent(),
+            )
 
         try {
             assertThrows<IllegalArgumentException> {
@@ -308,36 +377,48 @@ class ConfigurationManagerTest {
 
     @Test
     fun `loadFromSeparateFiles uses system defaults and profile config`() {
-        val systemConfigFile = createTempTomlFile("""
-            [output]
-            resultsDir = "custom-runs"
+        val systemConfigFile =
+            createTempTomlFile(
+                """
+                [output]
+                resultsDir = "custom-runs"
 
-            [logging]
-            level = "INFO"
-        """.trimIndent())
+                [logging]
+                level = "INFO"
+                """.trimIndent(),
+            )
 
-        val experimentConfigFile = createTempTomlFile("""
-            defaultProfile = "realtime"
+        val experimentConfigFile =
+            createTempTomlFile(
+                """
+                defaultProfile = "realtime"
 
-            [profiles.realtime]
-            mode = "realtime"
-            algorithms = ["MIN_LOAD"]
-            runs = 1
+                [profiles.realtime]
+                mode = "realtime"
+                algorithms = ["MIN_LOAD"]
+                runs = 1
 
-            [profiles.realtime.realtime]
-            cloudletCount = 300
-            simulationDuration = 1000.0
-        """.trimIndent())
+                [profiles.realtime.realtime]
+                cloudletCount = 300
+                simulationDuration = 1000.0
+                """.trimIndent(),
+            )
 
         try {
-            val configs = ConfigurationManager.loadFromSeparateFiles(
-                systemConfigPath = systemConfigFile.absolutePath,
-                experimentConfigPath = experimentConfigFile.absolutePath
-            )
+            val configs =
+                ConfigurationManager.loadFromSeparateFiles(
+                    systemConfigPath = systemConfigFile.absolutePath,
+                    experimentConfigPath = experimentConfigFile.absolutePath,
+                )
 
             assertEquals("custom-runs", configs.systemConfig.output.resultsDir)
             assertEquals("INFO", configs.systemConfig.logging.level)
-            assertEquals(300, configs.experimentConfig.profiles["realtime"]?.realtime?.cloudletCount)
+            assertEquals(
+                300,
+                configs.experimentConfig.profiles["realtime"]
+                    ?.realtime
+                    ?.cloudletCount,
+            )
             assertEquals("realtime", configs.experimentConfig.defaultProfile)
         } finally {
             systemConfigFile.delete()
@@ -360,10 +441,13 @@ class ConfigurationManagerTest {
 
     @Test
     fun `loadFromSingleFile with invalid toml format throws exception`() {
-        val configFile = createTempTomlFile("""
-            This is not valid TOML content
-            [
-        """.trimIndent())
+        val configFile =
+            createTempTomlFile(
+                """
+                This is not valid TOML content
+                [
+                """.trimIndent(),
+            )
 
         try {
             assertThrows<IllegalArgumentException> {

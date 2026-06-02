@@ -5,7 +5,7 @@ import datacenter.SchedulerObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
-import java.util.*
+import java.util.Random
 
 /**
  * 粒子群优化算法 (Particle Swarm Optimization) - 优化版本
@@ -18,9 +18,8 @@ internal class PSO(
     private val ub: Double,
     private val dim: Int,
     private val maxIter: Int,
-    private val random: Random
+    private val random: Random,
 ) {
-
     // 使用一维数组存储所有数据，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val velocities = DoubleArray(population * dim)
@@ -36,18 +35,18 @@ internal class PSO(
         private const val C1 = 2.0
         private const val C2 = 2.0
     }
-    
+
     init {
         initPopulation()
     }
-    
+
     private fun initPopulation() {
         for (i in 0 until population) {
             for (j in 0 until dim) {
                 val index = i * dim + j
                 positions[index] = lb + (ub - lb) * random.nextDouble()
                 velocities[index] = random.nextDouble()
-                pBest[index] = positions[index]  // 初始化个体最优位置
+                pBest[index] = positions[index] // 初始化个体最优位置
             }
             adjustPositions(i)
         }
@@ -56,13 +55,11 @@ internal class PSO(
     private fun adjustPositions(agentIndex: Int) {
         codec.clampRoundInPlace(positions, agentIndex * dim)
     }
-    
-    private fun evaluate(particle: Int): Double {
-        return codec.evaluate(positions, particle * dim, optFunction)
-    }
-    
+
+    private fun evaluate(particle: Int): Double = codec.evaluate(positions, particle * dim, optFunction)
+
     fun execute(): IntArray {
-        val vMax = (ub - lb) * 0.2  // 速度最大值是固定的
+        val vMax = (ub - lb) * 0.2 // 速度最大值是固定的
 
         for (t in 0 until maxIter) {
             val w = W_MAX - t * (W_MAX - W_MIN) / maxIter.toDouble()
@@ -110,8 +107,8 @@ internal class PSO(
                     val r2 = random.nextDouble()
 
                     velocities[index] = w * velocities[index] +
-                            C1 * r1 * (pBest[index] - positions[index]) +
-                            C2 * r2 * (gBest[j] - positions[index])
+                        C1 * r1 * (pBest[index] - positions[index]) +
+                        C2 * r2 * (gBest[j] - positions[index])
 
                     // 速度钳制
                     when {
@@ -138,26 +135,24 @@ class PSOScheduler(
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-    
     private val pso: PSO
-    
+
     init {
         val objFunc = objectiveFunction as SchedulerObjectiveFunction
-        pso = PSO(
-            optFunction = objFunc,
-            population = population,
-            lb = 0.0,
-            ub = (vmNum - 1).toDouble(),
-            dim = cloudletNum,
-            maxIter = maxIter,
-            random = random
-        )
+        pso =
+            PSO(
+                optFunction = objFunc,
+                population = population,
+                lb = 0.0,
+                ub = (vmNum - 1).toDouble(),
+                dim = cloudletNum,
+                maxIter = maxIter,
+                random = random,
+            )
         Logger.debug("使用 PSO (粒子群优化) 调度器")
     }
-    
-    override fun allocate(): IntArray {
-        return pso.execute()
-    }
+
+    override fun allocate(): IntArray = pso.execute()
 }

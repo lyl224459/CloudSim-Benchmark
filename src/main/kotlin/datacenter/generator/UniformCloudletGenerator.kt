@@ -3,7 +3,7 @@ package datacenter.generator
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.cloudlets.CloudletSimple
 import org.cloudsimplus.utilizationmodels.UtilizationModelFull
-import java.util.*
+import java.util.Random
 
 /**
  * 均匀分布生成器
@@ -16,40 +16,43 @@ class UniformCloudletGenerator(
     private val minFileSize: Long = 10L,
     private val maxFileSize: Long = 200L,
     private val minOutputSize: Long = 10L,
-    private val maxOutputSize: Long = 200L
+    private val maxOutputSize: Long = 200L,
 ) : CloudletGeneratorStrategy {
-    
-    override fun createCloudlets(userId: Int, count: Int, random: Random): List<Cloudlet> {
+    override fun createCloudlets(
+        userId: Int,
+        count: Int,
+        random: Random,
+    ): List<Cloudlet> {
         val cloudletList = mutableListOf<Cloudlet>()
         val utilizationModel = UtilizationModelFull()
         val pesNumber = 1
-        
+
         val lengthRange = maxLength - minLength
         val fileSizeRange = maxFileSize - minFileSize
         val outputSizeRange = maxOutputSize - minOutputSize
-        
+
         for (i in 0 until count) {
             // 使用均匀分布生成执行时间（length）
             val length = (random.nextDouble() * lengthRange).toLong() + minLength
-            
+
             // 使用均匀分布生成输入文件大小
             val fileSize = (random.nextDouble() * fileSizeRange).toLong() + minFileSize
-            
+
             // 使用均匀分布生成输出文件大小
             val outputSize = (random.nextDouble() * outputSizeRange).toLong() + minOutputSize
-            
+
             // 创建云任务
-            val cloudlet = CloudletSimple(length, pesNumber)
-                .setFileSize(fileSize)
-                .setOutputSize(outputSize)
-                .setUtilizationModelCpu(utilizationModel)
-                .setUtilizationModelRam(utilizationModel)
-                .setUtilizationModelBw(utilizationModel)
-            
+            val cloudlet =
+                CloudletSimple(length, pesNumber)
+                    .setFileSize(fileSize)
+                    .setOutputSize(outputSize)
+                    .setUtilizationModelCpu(utilizationModel)
+                    .setUtilizationModelRam(utilizationModel)
+                    .setUtilizationModelBw(utilizationModel)
+
             cloudletList.add(cloudlet)
         }
-        
+
         return cloudletList
     }
 }
-

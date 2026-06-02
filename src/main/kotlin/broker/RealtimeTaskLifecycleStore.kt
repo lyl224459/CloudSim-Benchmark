@@ -12,7 +12,7 @@ data class RealtimeLifecycleStats(
     val timedOut: Int,
     val preempted: Int,
     val migrated: Int,
-    val retried: Int
+    val retried: Int,
 )
 
 class RealtimeTaskLifecycleStore {
@@ -26,7 +26,10 @@ class RealtimeTaskLifecycleStore {
 
     fun get(cloudletId: Long): RealtimeTaskRecord? = get(CloudletId(cloudletId))
 
-    fun update(id: CloudletId, transform: (RealtimeTaskRecord) -> RealtimeTaskRecord): RealtimeTaskRecord {
+    fun update(
+        id: CloudletId,
+        transform: (RealtimeTaskRecord) -> RealtimeTaskRecord,
+    ): RealtimeTaskRecord {
         val current = records[id] ?: throw IllegalArgumentException("Unknown realtime cloudlet id: ${id.value}")
         val next = transform(current)
         validateTransition(current.lifecycle, next.lifecycle)
@@ -34,7 +37,10 @@ class RealtimeTaskLifecycleStore {
         return next
     }
 
-    fun updateOrPut(record: RealtimeTaskRecord, transform: (RealtimeTaskRecord) -> RealtimeTaskRecord): RealtimeTaskRecord {
+    fun updateOrPut(
+        record: RealtimeTaskRecord,
+        transform: (RealtimeTaskRecord) -> RealtimeTaskRecord,
+    ): RealtimeTaskRecord {
         records.putIfAbsent(record.id, record)
         return update(record.id, transform)
     }
@@ -51,64 +57,84 @@ class RealtimeTaskLifecycleStore {
             timedOut = values.count { it.lifecycle == RealtimeTaskLifecycle.TIMED_OUT },
             preempted = values.sumOf { it.preemptedCount },
             migrated = values.sumOf { it.migratedCount },
-            retried = values.count { it.attempt > 0 }
+            retried = values.count { it.attempt > 0 },
         )
     }
 
-    private fun validateTransition(from: RealtimeTaskLifecycle, to: RealtimeTaskLifecycle) {
+    private fun validateTransition(
+        from: RealtimeTaskLifecycle,
+        to: RealtimeTaskLifecycle,
+    ) {
         if (from == to) return
-        val allowed = when (from) {
-            RealtimeTaskLifecycle.ARRIVED -> setOf(
-                RealtimeTaskLifecycle.PENDING_DECISION,
-                RealtimeTaskLifecycle.RETRYING,
-                RealtimeTaskLifecycle.REJECTED,
-                RealtimeTaskLifecycle.FAILED
-            )
-            RealtimeTaskLifecycle.PENDING_DECISION -> setOf(
-                RealtimeTaskLifecycle.SUBMITTED,
-                RealtimeTaskLifecycle.RUNNING,
-                RealtimeTaskLifecycle.PREEMPTED,
-                RealtimeTaskLifecycle.MIGRATING,
-                RealtimeTaskLifecycle.ARRIVED,
-                RealtimeTaskLifecycle.RETRYING,
-                RealtimeTaskLifecycle.REJECTED,
-                RealtimeTaskLifecycle.FAILED
-            )
-            RealtimeTaskLifecycle.SUBMITTED -> setOf(
-                RealtimeTaskLifecycle.RUNNING,
-                RealtimeTaskLifecycle.PREEMPTED,
-                RealtimeTaskLifecycle.MIGRATING,
-                RealtimeTaskLifecycle.RETRYING,
+        val allowed =
+            when (from) {
+                RealtimeTaskLifecycle.ARRIVED ->
+                    setOf(
+                        RealtimeTaskLifecycle.PENDING_DECISION,
+                        RealtimeTaskLifecycle.RETRYING,
+                        RealtimeTaskLifecycle.REJECTED,
+                        RealtimeTaskLifecycle.FAILED,
+                    )
+                RealtimeTaskLifecycle.PENDING_DECISION ->
+                    setOf(
+                        RealtimeTaskLifecycle.SUBMITTED,
+                        RealtimeTaskLifecycle.RUNNING,
+                        RealtimeTaskLifecycle.PREEMPTED,
+                        RealtimeTaskLifecycle.MIGRATING,
+                        RealtimeTaskLifecycle.ARRIVED,
+                        RealtimeTaskLifecycle.RETRYING,
+                        RealtimeTaskLifecycle.REJECTED,
+                        RealtimeTaskLifecycle.FAILED,
+                    )
+                RealtimeTaskLifecycle.SUBMITTED ->
+                    setOf(
+                        RealtimeTaskLifecycle.RUNNING,
+                        RealtimeTaskLifecycle.PREEMPTED,
+                        RealtimeTaskLifecycle.MIGRATING,
+                        RealtimeTaskLifecycle.RETRYING,
+                        RealtimeTaskLifecycle.COMPLETED,
+                        RealtimeTaskLifecycle.FAILED,
+                        RealtimeTaskLifecycle.CANCELLED,
+                        RealtimeTaskLifecycle.TIMED_OUT,
+                    )
+                RealtimeTaskLifecycle.RUNNING ->
+                    setOf(
+                        RealtimeTaskLifecycle.PENDING_DECISION,
+                        RealtimeTaskLifecycle.ARRIVED,
+                        RealtimeTaskLifecycle.PREEMPTED,
+                        RealtimeTaskLifecycle.MIGRATING,
+                        RealtimeTaskLifecycle.RETRYING,
+                        RealtimeTaskLifecycle.COMPLETED,
+                        RealtimeTaskLifecycle.FAILED,
+                        RealtimeTaskLifecycle.CANCELLED,
+                        RealtimeTaskLifecycle.TIMED_OUT,
+                    )
+                RealtimeTaskLifecycle.PREEMPTED ->
+                    setOf(
+                        RealtimeTaskLifecycle.MIGRATING,
+                        RealtimeTaskLifecycle.RETRYING,
+                        RealtimeTaskLifecycle.FAILED,
+                    )
+                RealtimeTaskLifecycle.MIGRATING ->
+                    setOf(
+                        RealtimeTaskLifecycle.RETRYING,
+                        RealtimeTaskLifecycle.ARRIVED,
+                        RealtimeTaskLifecycle.FAILED,
+                    )
+                RealtimeTaskLifecycle.RETRYING ->
+                    setOf(
+                        RealtimeTaskLifecycle.ARRIVED,
+                        RealtimeTaskLifecycle.PENDING_DECISION,
+                        RealtimeTaskLifecycle.REJECTED,
+                        RealtimeTaskLifecycle.FAILED,
+                    )
                 RealtimeTaskLifecycle.COMPLETED,
+                RealtimeTaskLifecycle.REJECTED,
                 RealtimeTaskLifecycle.FAILED,
                 RealtimeTaskLifecycle.CANCELLED,
-                RealtimeTaskLifecycle.TIMED_OUT
-            )
-            RealtimeTaskLifecycle.RUNNING -> setOf(
-                RealtimeTaskLifecycle.PENDING_DECISION,
-                RealtimeTaskLifecycle.ARRIVED,
-                RealtimeTaskLifecycle.PREEMPTED,
-                RealtimeTaskLifecycle.MIGRATING,
-                RealtimeTaskLifecycle.RETRYING,
-                RealtimeTaskLifecycle.COMPLETED,
-                RealtimeTaskLifecycle.FAILED,
-                RealtimeTaskLifecycle.CANCELLED,
-                RealtimeTaskLifecycle.TIMED_OUT
-            )
-            RealtimeTaskLifecycle.PREEMPTED -> setOf(RealtimeTaskLifecycle.MIGRATING, RealtimeTaskLifecycle.RETRYING, RealtimeTaskLifecycle.FAILED)
-            RealtimeTaskLifecycle.MIGRATING -> setOf(RealtimeTaskLifecycle.RETRYING, RealtimeTaskLifecycle.ARRIVED, RealtimeTaskLifecycle.FAILED)
-            RealtimeTaskLifecycle.RETRYING -> setOf(
-                RealtimeTaskLifecycle.ARRIVED,
-                RealtimeTaskLifecycle.PENDING_DECISION,
-                RealtimeTaskLifecycle.REJECTED,
-                RealtimeTaskLifecycle.FAILED
-            )
-            RealtimeTaskLifecycle.COMPLETED,
-            RealtimeTaskLifecycle.REJECTED,
-            RealtimeTaskLifecycle.FAILED,
-            RealtimeTaskLifecycle.CANCELLED,
-            RealtimeTaskLifecycle.TIMED_OUT -> emptySet()
-        }
+                RealtimeTaskLifecycle.TIMED_OUT,
+                -> emptySet()
+            }
         require(to in allowed) { "Invalid realtime task transition: $from -> $to" }
     }
 }

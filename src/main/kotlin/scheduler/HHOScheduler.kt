@@ -6,7 +6,7 @@ import org.apache.commons.math3.special.Gamma
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
-import java.util.*
+import java.util.Random
 import kotlin.math.min
 
 /**
@@ -20,18 +20,18 @@ private class HHO(
     private val ub: Double,
     private val dim: Int,
     private val maxIter: Int,
-    private val random: Random
+    private val random: Random,
 ) {
     // 使用一维数组存储所有鹰的位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val rabbitLocation = DoubleArray(dim) { (lb + ub) / 2 } // 初始化为中间值
     private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     private var rabbitEnergy = Double.POSITIVE_INFINITY
-    
+
     init {
         initPopulation()
     }
-    
+
     private fun initPopulation() {
         for (i in 0 until population) {
             val baseIndex = i * dim
@@ -44,18 +44,17 @@ private class HHO(
     }
 
     // 获取鹰i的第j维位置
-    private fun getPosition(hawk: Int, dimension: Int): Double {
-        return positions[hawk * dim + dimension]
-    }
+    private fun getPosition(
+        hawk: Int,
+        dimension: Int,
+    ): Double = positions[hawk * dim + dimension]
 
     private fun adjustPositions(agentIndex: Int) {
         codec.clampRoundInPlace(positions, agentIndex * dim)
     }
 
-    private fun evaluate(hawk: Int): Double {
-        return codec.evaluate(positions, hawk * dim, optFunction)
-    }
-    
+    private fun evaluate(hawk: Int): Double = codec.evaluate(positions, hawk * dim, optFunction)
+
     private fun updateRabbit() {
         for (i in 0 until population) {
             val fitness = evaluate(i)
@@ -69,28 +68,30 @@ private class HHO(
             }
         }
     }
-    
+
     private fun levyFlight(d: Int): DoubleArray {
         val beta = 1.5
-        val sigma = Math.pow(
-            (Gamma.gamma(1 + beta) * Math.sin(Math.PI * beta / 2)) /
+        val sigma =
+            Math.pow(
+                (Gamma.gamma(1 + beta) * Math.sin(Math.PI * beta / 2)) /
                     (Gamma.gamma((1 + beta) / 2) * beta * Math.pow(2.0, (beta - 1) / 2)),
-            1.0 / beta
-        )
+                1.0 / beta,
+            )
         val u = DoubleArray(d) { random.nextGaussian() * sigma }
         val v = DoubleArray(d) { random.nextGaussian() }
-        val levy = DoubleArray(d) { 
-            val step = u[it] / Math.pow(Math.abs(v[it]) + 1e-10, 1.0 / beta)
-            // 限制步长范围，避免过大的跳跃
-            step.coerceIn(-10.0, 10.0)
-        }
+        val levy =
+            DoubleArray(d) {
+                val step = u[it] / Math.pow(Math.abs(v[it]) + 1e-10, 1.0 / beta)
+                // 限制步长范围，避免过大的跳跃
+                step.coerceIn(-10.0, 10.0)
+            }
         return levy
     }
-    
+
     fun execute(): IntArray {
         for (t in 0 until maxIter) {
-            val E0 = 2 * random.nextDouble() - 1
-            val E = 2 * E0 * (1 - t.toDouble() / maxIter)
+            val initialEnergy = 2 * random.nextDouble() - 1
+            val escapeEnergy = 2 * initialEnergy * (1 - t.toDouble() / maxIter)
 
             for (i in 0 until population) {
                 val q = random.nextDouble()
@@ -100,14 +101,14 @@ private class HHO(
                 val r3 = random.nextDouble()
                 val r4 = random.nextDouble()
                 val baseIndex = i * dim
-                
+
                 // 保存旧位置用于回滚
                 val oldPositions = DoubleArray(dim) { j -> positions[baseIndex + j] }
 
                 for (j in 0 until dim) {
                     val index = baseIndex + j
                     when {
-                        Math.abs(E) >= 1 -> {
+                        Math.abs(escapeEnergy) >= 1 -> {
                             // 探索阶段（修复：使用正确的位置更新公式）
                             if (q >= 0.5) {
                                 // 基于随机鹰的位置
@@ -119,24 +120,24 @@ private class HHO(
                                 positions[index] = rabbitLocation[j] - r2 * Math.abs(rabbitLocation[j] - 2 * r3 * positions[index])
                             }
                         }
-                        Math.abs(E) < 1 -> {
+                        Math.abs(escapeEnergy) < 1 -> {
                             // 开发阶段（修复：使用正确的围捕公式）
-                            if (r >= 0.5 && Math.abs(E) >= 0.5) {
+                            if (r >= 0.5 && Math.abs(escapeEnergy) >= 0.5) {
                                 // 软包围
                                 val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = deltaX - E * Math.abs(deltaX)
-                            } else if (r >= 0.5 && Math.abs(E) < 0.5) {
+                                positions[index] = deltaX - escapeEnergy * Math.abs(deltaX)
+                            } else if (r >= 0.5 && Math.abs(escapeEnergy) < 0.5) {
                                 // 硬包围
                                 val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = rabbitLocation[j] - E * Math.abs(deltaX)
-                            } else if (r < 0.5 && Math.abs(E) >= 0.5) {
+                                positions[index] = rabbitLocation[j] - escapeEnergy * Math.abs(deltaX)
+                            } else if (r < 0.5 && Math.abs(escapeEnergy) >= 0.5) {
                                 // 渐进式快速俯冲软包围（延迟评估）
                                 val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = deltaX - E * Math.abs(deltaX)
+                                positions[index] = deltaX - escapeEnergy * Math.abs(deltaX)
                             } else {
                                 // 渐进式快速俯冲硬包围（延迟评估）
                                 val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = rabbitLocation[j] - E * Math.abs(deltaX)
+                                positions[index] = rabbitLocation[j] - escapeEnergy * Math.abs(deltaX)
                             }
                         }
                     }
@@ -144,7 +145,7 @@ private class HHO(
 
                 // 整体调整位置（避免逐维度调整导致的问题）
                 adjustPositions(i)
-                
+
                 // 评估新位置，如果变差则恢复
                 val newFitness = evaluate(i)
                 if (newFitness.isNaN() || newFitness.isInfinite()) {
@@ -174,26 +175,24 @@ class HHOScheduler(
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-    
     private val hho: HHO
-    
+
     init {
         val objFunc = objectiveFunction as SchedulerObjectiveFunction
-        hho = HHO(
-            optFunction = objFunc,
-            population = population,
-            lb = 0.0,
-            ub = (vmNum - 1).toDouble(),
-            dim = cloudletNum,
-            maxIter = maxIter,
-            random = random
-        )
+        hho =
+            HHO(
+                optFunction = objFunc,
+                population = population,
+                lb = 0.0,
+                ub = (vmNum - 1).toDouble(),
+                dim = cloudletNum,
+                maxIter = maxIter,
+                random = random,
+            )
         Logger.debug("使用 HHO (哈里斯鹰优化) 调度器")
     }
-    
-    override fun allocate(): IntArray {
-        return hho.execute()
-    }
+
+    override fun allocate(): IntArray = hho.execute()
 }

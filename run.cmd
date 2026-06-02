@@ -2,7 +2,13 @@
 setlocal EnableDelayedExpansion
 
 chcp 65001 >nul
-set "JAR_FILE=build\libs\cloudsim-benchmark-1.0.0-all.jar"
+set "PACKAGED_JAR=cloudsim-benchmark-all.jar"
+set "BUILD_JAR=build\libs\cloudsim-benchmark-1.0.0-all.jar"
+if exist "%PACKAGED_JAR%" (
+    set "JAR_FILE=%PACKAGED_JAR%"
+) else (
+    set "JAR_FILE=%BUILD_JAR%"
+)
 set "PROXY_GRADLE_ARGS="
 
 call :configure_system_proxy
@@ -32,7 +38,7 @@ if not exist "%JAR_FILE%" (
     if errorlevel 1 exit /b %errorlevel%
 )
 
-java -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 --enable-native-access=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar "%JAR_FILE%" %*
+java -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dlogback.configurationFile=cloudsim-benchmark-logback.xml --enable-native-access=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar "%JAR_FILE%" %*
 exit /b %errorlevel%
 
 :configure_system_proxy

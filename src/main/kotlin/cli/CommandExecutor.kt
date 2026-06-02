@@ -7,9 +7,9 @@ import datacenter.ComparisonRunner
 import datacenter.RealtimeCloudletCountRunner
 import datacenter.RealtimeComparisonRunner
 import org.slf4j.LoggerFactory
-import util.Logger
 import util.ExperimentConcurrency
 import util.ExperimentOutputContext
+import util.Logger
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -33,9 +33,10 @@ object CommandExecutor {
                 Logger.result("配置验证通过: {}", command.configFile)
             }
             is CliParser.ConfigPrintCommand -> {
-                val resolved = RunResolver.resolve(
-                    CliParser.RunCommand(configFile = command.configFile, profile = command.profile)
-                )
+                val resolved =
+                    RunResolver.resolve(
+                        CliParser.RunCommand(configFile = command.configFile, profile = command.profile),
+                    )
                 Logger.result(DryRunPrinter.resolvedJson(resolved, null, "resolved"))
             }
             is CliParser.RunCommand -> run(command)
@@ -55,8 +56,9 @@ object CommandExecutor {
         val timestamp = LocalDateTime.now().format(timestampFormatter)
         val experimentName = RunResolver.renderExperimentName(resolved, timestamp)
         val outputContext = ExperimentOutputContext.createExperiment(resolved.systemConfig, resolved.mode, experimentName)
-        val experimentDir = outputContext.experimentDir
-            ?: throw IllegalStateException("无法创建实验输出目录")
+        val experimentDir =
+            outputContext.experimentDir
+                ?: throw IllegalStateException("无法创建实验输出目录")
 
         Logger.info("实验目录: {}", experimentDir.absolutePath)
         outputContext.saveResolvedConfig(DryRunPrinter.resolvedJson(resolved, experimentDir, timestamp))
@@ -65,92 +67,101 @@ object CommandExecutor {
         Logger.info("CloudSim-Benchmark 执行完成")
     }
 
-    private suspend fun runResolvedExperiment(resolved: ResolvedExperimentConfig, outputContext: ExperimentOutputContext) {
+    private suspend fun runResolvedExperiment(
+        resolved: ResolvedExperimentConfig,
+        outputContext: ExperimentOutputContext,
+    ) {
         val config = resolved.experimentConfig
-        val experimentDir = outputContext.experimentDir
-            ?: throw IllegalStateException("运行实验需要有效的输出目录")
-        val concurrency = ExperimentConcurrency(
-            resolved.execution.useCoroutines,
-            resolved.execution.maxConcurrency
-        )
+        val experimentDir =
+            outputContext.experimentDir
+                ?: throw IllegalStateException("运行实验需要有效的输出目录")
+        val concurrency =
+            ExperimentConcurrency(
+                resolved.execution.useCoroutines,
+                resolved.execution.maxConcurrency,
+            )
 
         when (resolved.mode) {
             "batch" -> {
                 Logger.info("开始批处理调度算法对比实验...")
-                val runner = ComparisonRunner(
-                    cloudletCount = config.batch.cloudletCount,
-                    population = config.batch.population,
-                    maxIter = config.batch.maxIter,
-                    randomSeed = config.randomSeed,
-                    resolvedAlgorithms = resolved.algorithms,
-                    runs = config.batch.runs,
-                    generatorType = config.batch.generatorType,
-                    googleTraceConfig = config.batch.googleTraceConfig,
-                    objectiveWeights = config.batch.objectiveWeights,
-                    experimentDir = experimentDir,
-                    outputContext = outputContext,
-                    concurrency = concurrency
-                )
+                val runner =
+                    ComparisonRunner(
+                        cloudletCount = config.batch.cloudletCount,
+                        population = config.batch.population,
+                        maxIter = config.batch.maxIter,
+                        randomSeed = config.randomSeed,
+                        resolvedAlgorithms = resolved.algorithms,
+                        runs = config.batch.runs,
+                        generatorType = config.batch.generatorType,
+                        googleTraceConfig = config.batch.googleTraceConfig,
+                        objectiveWeights = config.batch.objectiveWeights,
+                        experimentDir = experimentDir,
+                        outputContext = outputContext,
+                        concurrency = concurrency,
+                    )
                 runner.runComparison()
                 Logger.info("批处理实验完成！")
             }
             "batch-multi" -> {
                 Logger.info("开始批处理模式批量任务数实验...")
-                val runner = BatchCloudletCountRunner(
-                    cloudletCounts = resolved.taskCounts,
-                    population = config.batch.population,
-                    maxIter = config.batch.maxIter,
-                    randomSeed = config.randomSeed,
-                    resolvedAlgorithms = resolved.algorithms,
-                    runs = config.batch.runs,
-                    generatorType = config.batch.generatorType,
-                    experimentDir = experimentDir,
-                    outputContext = outputContext,
-                    concurrency = concurrency
-                )
+                val runner =
+                    BatchCloudletCountRunner(
+                        cloudletCounts = resolved.taskCounts,
+                        population = config.batch.population,
+                        maxIter = config.batch.maxIter,
+                        randomSeed = config.randomSeed,
+                        resolvedAlgorithms = resolved.algorithms,
+                        runs = config.batch.runs,
+                        generatorType = config.batch.generatorType,
+                        experimentDir = experimentDir,
+                        outputContext = outputContext,
+                        concurrency = concurrency,
+                    )
                 runner.runExperiment()
             }
             "realtime" -> {
                 Logger.info("开始实时调度算法对比实验...")
-                val runner = RealtimeComparisonRunner(
-                    cloudletCount = config.realtime.cloudletCount,
-                    simulationDuration = config.realtime.simulationDuration,
-                    arrivalRate = config.realtime.arrivalRate,
-                    population = config.optimizer.population,
-                    maxIter = config.optimizer.maxIter,
-                    randomSeed = config.randomSeed,
-                    resolvedAlgorithms = resolved.algorithms,
-                    runs = config.realtime.runs,
-                    generatorType = config.realtime.generatorType,
-                    googleTraceConfig = config.realtime.googleTraceConfig,
-                    objectiveWeights = config.realtime.objectiveWeights,
-                    arrival = config.realtime.arrival,
-                    scheduling = config.realtime.scheduling,
-                    experimentDir = experimentDir,
-                    outputContext = outputContext,
-                    concurrency = concurrency
-                )
+                val runner =
+                    RealtimeComparisonRunner(
+                        cloudletCount = config.realtime.cloudletCount,
+                        simulationDuration = config.realtime.simulationDuration,
+                        arrivalRate = config.realtime.arrivalRate,
+                        population = config.optimizer.population,
+                        maxIter = config.optimizer.maxIter,
+                        randomSeed = config.randomSeed,
+                        resolvedAlgorithms = resolved.algorithms,
+                        runs = config.realtime.runs,
+                        generatorType = config.realtime.generatorType,
+                        googleTraceConfig = config.realtime.googleTraceConfig,
+                        objectiveWeights = config.realtime.objectiveWeights,
+                        arrival = config.realtime.arrival,
+                        scheduling = config.realtime.scheduling,
+                        experimentDir = experimentDir,
+                        outputContext = outputContext,
+                        concurrency = concurrency,
+                    )
                 runner.runComparison()
                 Logger.info("实时调度实验完成！")
             }
             "realtime-multi" -> {
                 Logger.info("开始实时调度模式批量任务数实验...")
-                val runner = RealtimeCloudletCountRunner(
-                    cloudletCounts = resolved.taskCounts,
-                    simulationDuration = config.realtime.simulationDuration,
-                    arrivalRate = config.realtime.arrivalRate,
-                    population = config.optimizer.population,
-                    maxIter = config.optimizer.maxIter,
-                    randomSeed = config.randomSeed,
-                    resolvedAlgorithms = resolved.algorithms,
-                    runs = config.realtime.runs,
-                    generatorType = config.realtime.generatorType,
-                    arrival = config.realtime.arrival,
-                    scheduling = config.realtime.scheduling,
-                    experimentDir = experimentDir,
-                    outputContext = outputContext,
-                    concurrency = concurrency
-                )
+                val runner =
+                    RealtimeCloudletCountRunner(
+                        cloudletCounts = resolved.taskCounts,
+                        simulationDuration = config.realtime.simulationDuration,
+                        arrivalRate = config.realtime.arrivalRate,
+                        population = config.optimizer.population,
+                        maxIter = config.optimizer.maxIter,
+                        randomSeed = config.randomSeed,
+                        resolvedAlgorithms = resolved.algorithms,
+                        runs = config.realtime.runs,
+                        generatorType = config.realtime.generatorType,
+                        arrival = config.realtime.arrival,
+                        scheduling = config.realtime.scheduling,
+                        experimentDir = experimentDir,
+                        outputContext = outputContext,
+                        concurrency = concurrency,
+                    )
                 runner.runBatchExperiment()
             }
             else -> throw IllegalArgumentException("未知的运行模式: ${resolved.mode}")
@@ -174,7 +185,7 @@ object CommandExecutor {
             "系统配置加载完成 - 输出目录: {}, 日志级别: {}, 控制台日志: {}",
             systemConfig.output.resultsDir,
             systemConfig.logging.level,
-            systemConfig.logging.console
+            systemConfig.logging.console,
         )
     }
 

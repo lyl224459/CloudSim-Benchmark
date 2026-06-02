@@ -1,11 +1,8 @@
 package scheduler
 
-import datacenter.ObjectiveFunction
-import datacenter.SchedulerObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
-import kotlin.math.min
 import kotlin.random.Random
 
 /**
@@ -20,13 +17,12 @@ class RLScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
-    private val learningRate: Double = 0.1,      // 学习率 α
-    private val discountFactor: Double = 0.9,    // 折扣因子 γ
-    private val explorationRate: Double = 0.1,   // 探索率 ε
-    private val episodes: Int = 100,             // 训练轮数
-    private val random: kotlin.random.Random = kotlin.random.Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val learningRate: Double = 0.1, // 学习率 α
+    private val discountFactor: Double = 0.9, // 折扣因子 γ
+    private val explorationRate: Double = 0.1, // 探索率 ε
+    private val episodes: Int = 100, // 训练轮数
+    private val random: kotlin.random.Random = kotlin.random.Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-
     // Q-table: 状态 -> 动作 -> Q值
     private val qTable = mutableMapOf<State, MutableMap<Action, Double>>()
 
@@ -75,13 +71,14 @@ class RLScheduler(
             val currentState = getStateForSchedule(schedule, taskIndex)
 
             // ε-greedy策略选择动作
-            val action = if (random.nextDouble() < explorationRate) {
-                // 探索：随机选择
-                actions.random(random)
-            } else {
-                // 利用：选择Q值最大的动作
-                getBestAction(currentState)
-            }
+            val action =
+                if (random.nextDouble() < explorationRate) {
+                    // 探索：随机选择
+                    actions.random(random)
+                } else {
+                    // 利用：选择Q值最大的动作
+                    getBestAction(currentState)
+                }
 
             // 执行动作
             schedule[taskIndex] = action.vmIndex
@@ -135,7 +132,10 @@ class RLScheduler(
     /**
      * 根据当前调度状态获取状态表示
      */
-    private fun getStateForSchedule(schedule: IntArray, currentTaskIndex: Int): State {
+    private fun getStateForSchedule(
+        schedule: IntArray,
+        currentTaskIndex: Int,
+    ): State {
         // 计算各个VM的当前负载
         val vmLoads = DoubleArray(vmNum)
 
@@ -163,7 +163,10 @@ class RLScheduler(
     /**
      * 计算奖励函数
      */
-    private fun calculateReward(state: State, action: Action): Double {
+    private fun calculateReward(
+        state: State,
+        action: Action,
+    ): Double {
         // 模拟执行动作后的负载变化
         val newVmLoads = state.vmLoads.copyOf()
         newVmLoads[action.vmIndex] = minOf(1.0, newVmLoads[action.vmIndex] + 0.2) // 增加负载（归一化）
@@ -185,28 +188,29 @@ class RLScheduler(
     /**
      * 获取最优动作
      */
-    private fun getBestAction(state: State): Action {
-        return actions.maxByOrNull { getQValue(state, it) } ?: actions.first()
-    }
+    private fun getBestAction(state: State): Action = actions.maxByOrNull { getQValue(state, it) } ?: actions.first()
 
     /**
      * 获取最大Q值
      */
-    private fun getMaxQValue(state: State): Double {
-        return actions.maxOf { getQValue(state, it) }
-    }
+    private fun getMaxQValue(state: State): Double = actions.maxOf { getQValue(state, it) }
 
     /**
      * 获取Q值
      */
-    private fun getQValue(state: State, action: Action): Double {
-        return qTable.getOrPut(state) { mutableMapOf() }.getOrDefault(action, 0.0)
-    }
+    private fun getQValue(
+        state: State,
+        action: Action,
+    ): Double = qTable.getOrPut(state) { mutableMapOf() }.getOrDefault(action, 0.0)
 
     /**
      * 设置Q值
      */
-    private fun setQValue(state: State, action: Action, value: Double) {
+    private fun setQValue(
+        state: State,
+        action: Action,
+        value: Double,
+    ) {
         qTable.getOrPut(state) { mutableMapOf() }[action] = value
     }
 
@@ -225,7 +229,7 @@ class RLScheduler(
      */
     private data class State(
         val vmLoads: DoubleArray,
-        val progress: Double // 调度进度 (0.0-1.0)
+        val progress: Double, // 调度进度 (0.0-1.0)
     ) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -245,15 +249,15 @@ class RLScheduler(
             return result
         }
 
-        override fun toString(): String {
-            return "State(vmLoads=${vmLoads.contentToString()}, progress=%.2f)".format(progress)
-        }
+        override fun toString(): String = "State(vmLoads=${vmLoads.contentToString()}, progress=%.2f)".format(progress)
     }
 
     /**
      * 动作表示
      */
-    private data class Action(val vmIndex: Int) {
+    private data class Action(
+        val vmIndex: Int,
+    ) {
         override fun toString(): String = "Action(vm=$vmIndex)"
     }
 }

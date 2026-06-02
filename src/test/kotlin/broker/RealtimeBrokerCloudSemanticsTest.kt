@@ -1,10 +1,10 @@
 package broker
 
 import config.RealtimeSchedulingConfig
-import datacenter.RealtimeTraceMetadata
-import datacenter.RealtimeTraceMetadataRegistry
 import datacenter.DatacenterCreator
 import datacenter.DatacenterType
+import datacenter.RealtimeCloudletSpec
+import datacenter.RealtimeTraceMetadata
 import org.assertj.core.api.Assertions.assertThat
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.cloudlets.CloudletSimple
@@ -13,23 +13,23 @@ import org.cloudsimplus.utilizationmodels.UtilizationModelFull
 import org.cloudsimplus.vms.Vm
 import org.cloudsimplus.vms.VmSimple
 import org.junit.jupiter.api.Test
-import scheduler.RealtimeSchedulingContext
 import scheduler.RealtimeMinLoadScheduler
 import scheduler.RealtimeSchedulerBase
+import scheduler.RealtimeSchedulingContext
 
 class RealtimeBrokerCloudSemanticsTest {
-
     @Test
     fun `decision delay postpones submission and is counted`() {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(decisionDelay = 2.0)
-        )
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(decisionDelay = 2.0),
+            )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet()))
 
@@ -44,17 +44,18 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                failureRate = 1.0,
-                retryLimit = 2,
-                retryDelay = 0.1,
-                retryBackoffMultiplier = 1.0
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    failureRate = 1.0,
+                    retryLimit = 2,
+                    retryDelay = 0.1,
+                    retryBackoffMultiplier = 1.0,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet()))
 
@@ -70,12 +71,13 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(maxQueueSize = 1, failureRate = 1.0, retryLimit = 2)
-        )
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(maxQueueSize = 1, failureRate = 1.0, retryLimit = 2),
+            )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0), createCloudlet(1)))
 
@@ -90,12 +92,13 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(vmQueueCapacity = 1, decisionDelay = 10.0, failureRate = 0.0, retryLimit = 3)
-        )
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(vmQueueCapacity = 1, decisionDelay = 10.0, failureRate = 0.0, retryLimit = 3),
+            )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000), createCloudlet(1, length = 20_000)))
 
@@ -111,12 +114,13 @@ class RealtimeBrokerCloudSemanticsTest {
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
         val cloudlet = createCloudlet(length = 20_000)
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(deadlineFactor = 0.1)
-        )
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(deadlineFactor = 0.1),
+            )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(cloudlet))
 
@@ -131,18 +135,20 @@ class RealtimeBrokerCloudSemanticsTest {
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
         val observedPriorities = mutableListOf<Int>()
-        val scheduler = object : RealtimeSchedulerBase(listOf(vm)) {
-            override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-                observedPriorities.add(context.taskMetadata.priority)
-                return 0
+        val scheduler =
+            object : RealtimeSchedulerBase(listOf(vm)) {
+                override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
+                    observedPriorities.add(context.taskMetadata.priority)
+                    return 0
+                }
             }
-        }
-        val broker = RealtimeBroker(
-            simulation,
-            scheduler,
-            listOf(vm),
-            RealtimeSchedulingConfig(queuePolicy = "priority", priorityLevels = 3, highPriorityRatio = 1.0)
-        )
+        val broker =
+            RealtimeBroker(
+                simulation,
+                scheduler,
+                listOf(vm),
+                RealtimeSchedulingConfig(queuePolicy = "priority", priorityLevels = 3, highPriorityRatio = 1.0),
+            )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(10), createCloudlet(1), createCloudlet(3)))
 
@@ -156,19 +162,20 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(vmQueueCapacity = 3, decisionDelay = 10.0, overloadFailureMultiplier = 1.0)
-        )
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(vmQueueCapacity = 3, decisionDelay = 10.0, overloadFailureMultiplier = 1.0),
+            )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(0, length = 20_000),
                 createCloudlet(1, length = 20_000),
-                createCloudlet(2, length = 20_000)
-            )
+                createCloudlet(2, length = 20_000),
+            ),
         )
 
         simulation.start()
@@ -181,19 +188,20 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                autoscalingEnabled = true,
-                scaleOutQueueThreshold = 1,
-                maxDynamicVms = 1,
-                vmColdStartDelay = 0.0,
-                scaleOutCost = 0.75,
-                vmQueueCapacity = 3
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    autoscalingEnabled = true,
+                    scaleOutQueueThreshold = 1,
+                    maxDynamicVms = 1,
+                    vmColdStartDelay = 0.0,
+                    scaleOutCost = 0.75,
+                    vmQueueCapacity = 3,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0), createCloudlet(1)))
 
@@ -209,17 +217,18 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                resourceModelEnabled = true,
-                ioWeight = 20_000.0,
-                ramWeight = 1.0,
-                bwWeight = 1.0
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    resourceModelEnabled = true,
+                    ioWeight = 20_000.0,
+                    ramWeight = 1.0,
+                    bwWeight = 1.0,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 1000)))
 
@@ -234,17 +243,18 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                runtimeFailureRate = 1.0,
-                retryLimit = 1,
-                retryDelay = 0.1,
-                checkpointInterval = 0.1
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    runtimeFailureRate = 1.0,
+                    retryLimit = 1,
+                    retryDelay = 0.1,
+                    checkpointInterval = 0.1,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000)))
 
@@ -259,17 +269,18 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                taskTimeout = 0.2,
-                timeoutAction = "retry",
-                retryLimit = 1,
-                retryDelay = 0.1
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    taskTimeout = 0.2,
+                    timeoutAction = "retry",
+                    retryLimit = 1,
+                    retryDelay = 0.1,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000)))
 
@@ -284,18 +295,19 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                multiTenantEnabled = true,
-                tenantCount = 1,
-                tenantQuota = listOf(1),
-                decisionDelay = 10.0,
-                retryLimit = 2
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    multiTenantEnabled = true,
+                    tenantCount = 1,
+                    tenantQuota = listOf(1),
+                    decisionDelay = 10.0,
+                    retryLimit = 2,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0), createCloudlet(1)))
 
@@ -311,17 +323,18 @@ class RealtimeBrokerCloudSemanticsTest {
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
         val cloudlets = listOf(createCloudlet(0), createCloudlet(1), createCloudlet(2), createCloudlet(3))
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                multiTenantEnabled = true,
-                tenantCount = 2,
-                tenantWeights = listOf(1.0, 2.0),
-                tenantFairnessPolicy = "weighted_fair"
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    multiTenantEnabled = true,
+                    tenantCount = 2,
+                    tenantWeights = listOf(1.0, 2.0),
+                    tenantFairnessPolicy = "weighted_fair",
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(cloudlets)
 
@@ -336,8 +349,7 @@ class RealtimeBrokerCloudSemanticsTest {
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
         val cloudlet = createCloudlet(42, length = 1_000, submissionDelay = 0.1)
-        RealtimeTraceMetadataRegistry.put(
-            cloudlet,
+        val traceMetadata =
             RealtimeTraceMetadata(
                 tenantKey = "trace-user",
                 tenantId = 5,
@@ -351,23 +363,23 @@ class RealtimeBrokerCloudSemanticsTest {
                 inputDataSize = 2.5,
                 imageId = "trace-image-a",
                 imageSize = 3.0,
-                retryHint = 1
+                retryHint = 1,
             )
-        )
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                multiTenantEnabled = true,
-                tenantCount = 3,
-                priorityLevels = 3,
-                deadlineFactor = 10.0,
-                resourceModelEnabled = true
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    multiTenantEnabled = true,
+                    tenantCount = 3,
+                    priorityLevels = 3,
+                    deadlineFactor = 10.0,
+                    resourceModelEnabled = true,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(cloudlet))
+        broker.submitCloudletSpecsRealtime(listOf(RealtimeCloudletSpec(cloudlet, traceMetadata)))
 
         simulation.start()
 
@@ -382,7 +394,6 @@ class RealtimeBrokerCloudSemanticsTest {
         assertThat(metadata?.imageId).isEqualTo("trace-image-a")
         assertThat(metadata?.imageSizeGb).isEqualTo(3.0)
         assertThat(metadata?.traceRetryHint).isEqualTo(1)
-        RealtimeTraceMetadataRegistry.clear()
     }
 
     @Test
@@ -391,27 +402,28 @@ class RealtimeBrokerCloudSemanticsTest {
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
         val cloudlet = createCloudlet(7, length = 1_000, submissionDelay = 0.1)
-        RealtimeTraceMetadataRegistry.put(cloudlet, RealtimeTraceMetadata(requestedCpu = 2.0))
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                physicalTopologyEnabled = true,
-                regionCount = 1,
-                racksPerRegion = 1,
-                hostCountPerRack = 1,
-                hostCpuCapacity = 1.0
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    physicalTopologyEnabled = true,
+                    regionCount = 1,
+                    racksPerRegion = 1,
+                    hostCountPerRack = 1,
+                    hostCpuCapacity = 1.0,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(cloudlet))
+        broker.submitCloudletSpecsRealtime(
+            listOf(RealtimeCloudletSpec(cloudlet, RealtimeTraceMetadata(requestedCpu = 2.0))),
+        )
 
         simulation.start()
 
         assertThat(broker.getResourceRejectedCount()).isEqualTo(1)
         assertThat(broker.getCapacityRejectedCount()).isEqualTo(0)
-        RealtimeTraceMetadataRegistry.clear()
     }
 
     @Test
@@ -421,27 +433,30 @@ class RealtimeBrokerCloudSemanticsTest {
         val vm = createVm()
         val first = createCloudlet(0, length = 20_000, submissionDelay = 0.1)
         val second = createCloudlet(1, length = 20_000, submissionDelay = 0.2)
-        RealtimeTraceMetadataRegistry.put(first, RealtimeTraceMetadata(tenantId = 0, requestedCpu = 1.0))
-        RealtimeTraceMetadataRegistry.put(second, RealtimeTraceMetadata(tenantId = 0, requestedCpu = 1.0))
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                multiTenantEnabled = true,
-                tenantCount = 1,
-                tenantCostBudget = listOf(1.5),
-                decisionDelay = 10.0
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    multiTenantEnabled = true,
+                    tenantCount = 1,
+                    tenantCostBudget = listOf(1.5),
+                    decisionDelay = 10.0,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(first, second))
+        broker.submitCloudletSpecsRealtime(
+            listOf(
+                RealtimeCloudletSpec(first, RealtimeTraceMetadata(tenantId = 0, requestedCpu = 1.0)),
+                RealtimeCloudletSpec(second, RealtimeTraceMetadata(tenantId = 0, requestedCpu = 1.0)),
+            ),
+        )
 
         simulation.start()
 
         assertThat(broker.getTenantBudgetRejectedCount()).isEqualTo(1)
         assertThat(broker.getTenantQuotaRejectedCount()).isEqualTo(0)
-        RealtimeTraceMetadataRegistry.clear()
     }
 
     @Test
@@ -449,25 +464,26 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                vmQueueCapacity = 1,
-                decisionDelay = 10.0,
-                priorityLevels = 2,
-                highPriorityRatio = 1.0,
-                preemptionEnabled = false,
-                retryLimit = 1
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    vmQueueCapacity = 1,
+                    decisionDelay = 10.0,
+                    priorityLevels = 2,
+                    highPriorityRatio = 1.0,
+                    preemptionEnabled = false,
+                    retryLimit = 1,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(0, length = 20_000, submissionDelay = 0.1),
-                createCloudlet(1, length = 20_000, submissionDelay = 0.2)
-            )
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2),
+            ),
         )
 
         simulation.start()
@@ -481,30 +497,31 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                vmQueueCapacity = 1,
-                decisionDelay = 10.0,
-                priorityLevels = 2,
-                highPriorityRatio = 1.0,
-                preemptionEnabled = true,
-                preemptionMinPriorityGap = 1,
-                preemptionMaxPerTask = 1,
-                preemptionDelay = 0.2,
-                preemptionPenalty = 0.5,
-                retryLimit = 2,
-                checkpointInterval = 1.0
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    vmQueueCapacity = 1,
+                    decisionDelay = 10.0,
+                    priorityLevels = 2,
+                    highPriorityRatio = 1.0,
+                    preemptionEnabled = true,
+                    preemptionMinPriorityGap = 1,
+                    preemptionMaxPerTask = 1,
+                    preemptionDelay = 0.2,
+                    preemptionPenalty = 0.5,
+                    retryLimit = 2,
+                    checkpointInterval = 1.0,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(0, length = 20_000, submissionDelay = 0.1),
-                createCloudlet(1, length = 20_000, submissionDelay = 0.2)
-            )
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2),
+            ),
         )
 
         simulation.start()
@@ -521,26 +538,27 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                vmQueueCapacity = 1,
-                decisionDelay = 10.0,
-                priorityLevels = 2,
-                highPriorityRatio = 1.0,
-                preemptionEnabled = true,
-                preemptionMinPriorityGap = 2,
-                retryLimit = 1
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    vmQueueCapacity = 1,
+                    decisionDelay = 10.0,
+                    priorityLevels = 2,
+                    highPriorityRatio = 1.0,
+                    preemptionEnabled = true,
+                    preemptionMinPriorityGap = 2,
+                    retryLimit = 1,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(0, length = 20_000, submissionDelay = 0.1),
-                createCloudlet(1, length = 20_000, submissionDelay = 0.2)
-            )
+                createCloudlet(1, length = 20_000, submissionDelay = 0.2),
+            ),
         )
 
         simulation.start()
@@ -554,28 +572,29 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                vmQueueCapacity = 1,
-                decisionDelay = 10.0,
-                priorityLevels = 3,
-                highPriorityRatio = 1.0,
-                preemptionEnabled = true,
-                preemptionMinPriorityGap = 1,
-                preemptionMaxPerTask = 1,
-                retryLimit = 3
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    vmQueueCapacity = 1,
+                    decisionDelay = 10.0,
+                    priorityLevels = 3,
+                    highPriorityRatio = 1.0,
+                    preemptionEnabled = true,
+                    preemptionMinPriorityGap = 1,
+                    preemptionMaxPerTask = 1,
+                    retryLimit = 3,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(5, length = 20_000, submissionDelay = 0.1),
                 createCloudlet(1, length = 20_000, submissionDelay = 0.2),
-                createCloudlet(23, length = 20_000, submissionDelay = 0.3)
-            )
+                createCloudlet(23, length = 20_000, submissionDelay = 0.3),
+            ),
         )
 
         simulation.start()
@@ -589,26 +608,27 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                vmQueueCapacity = 1,
-                decisionDelay = 10.0,
-                deadlineFactor = 1.0,
-                preemptionEnabled = true,
-                preemptionPolicy = "deadline_then_priority",
-                preemptionMaxPerTask = 1,
-                retryLimit = 2
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    vmQueueCapacity = 1,
+                    decisionDelay = 10.0,
+                    deadlineFactor = 1.0,
+                    preemptionEnabled = true,
+                    preemptionPolicy = "deadline_then_priority",
+                    preemptionMaxPerTask = 1,
+                    retryLimit = 2,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(20, length = 30_000, submissionDelay = 0.1),
-                createCloudlet(0, length = 1_000, submissionDelay = 0.2)
-            )
+                createCloudlet(0, length = 1_000, submissionDelay = 0.2),
+            ),
         )
 
         simulation.start()
@@ -621,19 +641,20 @@ class RealtimeBrokerCloudSemanticsTest {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
         val vm = createVm()
-        val broker = RealtimeBroker(
-            simulation,
-            RealtimeMinLoadScheduler(listOf(vm)),
-            listOf(vm),
-            RealtimeSchedulingConfig(
-                topologyEnabled = true,
-                regionCount = 1,
-                racksPerRegion = 1,
-                hostsPerRack = 1,
-                hostFailureRate = 1.0,
-                retryLimit = 0
+        val broker =
+            RealtimeBroker(
+                simulation,
+                RealtimeMinLoadScheduler(listOf(vm)),
+                listOf(vm),
+                RealtimeSchedulingConfig(
+                    topologyEnabled = true,
+                    regionCount = 1,
+                    racksPerRegion = 1,
+                    hostsPerRack = 1,
+                    hostFailureRate = 1.0,
+                    retryLimit = 0,
+                ),
             )
-        )
         broker.submitVmList(listOf(vm))
         broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000)))
 
@@ -649,7 +670,11 @@ class RealtimeBrokerCloudSemanticsTest {
             .setBw(1000)
             .setSize(10000)
 
-    private fun createCloudlet(id: Int = 0, length: Long = 1000, submissionDelay: Double = 0.1): Cloudlet {
+    private fun createCloudlet(
+        id: Int = 0,
+        length: Long = 1000,
+        submissionDelay: Double = 0.1,
+    ): Cloudlet {
         val utilizationModel = UtilizationModelFull()
         val cloudlet = CloudletSimple(length, 1)
         cloudlet.setId(id.toLong())
