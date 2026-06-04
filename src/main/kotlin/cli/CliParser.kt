@@ -15,6 +15,17 @@ private val legacyModes =
         "realtime_multi" to "run --mode realtime-multi",
     )
 
+private fun cliError(message: String): Nothing = throw IllegalArgumentException(message)
+
+private inline fun ensureCli(
+    condition: Boolean,
+    lazyMessage: () -> String,
+) {
+    if (!condition) {
+        cliError(lazyMessage())
+    }
+}
+
 class CliParser(
     private val args: Array<String>,
 ) {
@@ -105,7 +116,7 @@ class CliParser(
 
         val command = args[0].lowercase()
         legacyModes[command]?.let { replacement ->
-            throw IllegalArgumentException(
+            cliError(
                 "旧入口 \"$command\" 已停用。请使用: $replacement ${args.drop(1).joinToString(" ")}".trim(),
             )
         }
@@ -114,9 +125,10 @@ class CliParser(
             "run" -> parseRun(args.drop(1))
             "list" -> parseList(args.drop(1))
             "config" -> parseConfig(args.drop(1))
-            else -> throw IllegalArgumentException(
-                "未知命令: $command。可用命令: run, list, config。运行 --help 查看示例。",
-            )
+            else ->
+                cliError(
+                    "未知命令: $command。可用命令: run, list, config。运行 --help 查看示例。",
+                )
         }
     }
 
@@ -134,18 +146,18 @@ class CliParser(
                     option.apply(draft, value, inlineName ?: token)
                     i += if (option.hasValue && inlineName == null) 2 else 1
                 }
-                token.startsWith("-") -> throw IllegalArgumentException("未知参数: $token")
-                else -> throw IllegalArgumentException("意外的位置参数: $token。请使用命名参数，例如 run --mode batch -a RANDOM")
+                token.startsWith("-") -> cliError("未知参数: $token")
+                else -> cliError("意外的位置参数: $token。请使用命名参数，例如 run --mode batch -a RANDOM")
             }
         }
 
         val command = draft.toCommand()
         val resolvedMode = command.mode?.let { normalizeMode(it) }
         if (resolvedMode != null && resolvedMode !in supportedModes) {
-            throw IllegalArgumentException("无效运行模式: $resolvedMode。可用模式: ${supportedModes.joinToString(", ")}")
+            cliError("无效运行模式: $resolvedMode。可用模式: ${supportedModes.joinToString(", ")}")
         }
         if (command.algorithms.isNotEmpty() && !command.preset.isNullOrBlank()) {
-            throw IllegalArgumentException("--preset 与 --algorithms/-a 互斥，请只指定一种算法选择方式")
+            cliError("--preset 与 --algorithms/-a 互斥，请只指定一种算法选择方式")
         }
 
         return command.copy(mode = resolvedMode)
@@ -175,7 +187,7 @@ class CliParser(
         apply: (RunCommandDraft, String, String) -> Unit,
     ): RunOption =
         RunOption(names.toSet(), hasValue = true) { draft, value, option ->
-            apply(draft, requireNotNull(value), option)
+            apply(draft, value ?: cliError("$option 参数需要指定值"), option)
         }
 
     private fun flagOption(
@@ -196,7 +208,7 @@ class CliParser(
         inlineName: String?,
     ): String? {
         if (!option.hasValue) {
-            require(inlineName == null) { "未知参数: $token" }
+            ensureCli(inlineName == null) { "未知参数: $token" }
             return null
         }
         return inlineName?.let { token.substringAfter("=") } ?: readValue(tokens, index, token)
@@ -204,19 +216,19 @@ class CliParser(
 
     private fun parseList(tokens: List<String>): Command {
         if (tokens.isEmpty()) {
-            throw IllegalArgumentException("list 命令需要子命令: algorithms, profiles 或 presets")
+            cliError("list 命令需要子命令: algorithms, profiles 或 presets")
         }
         return when (tokens[0].lowercase()) {
             "algorithms" -> ListAlgorithmsCommand(parseRequiredMode(tokens.drop(1), "list algorithms"))
             "profiles" -> ListProfilesCommand(parseRequiredConfig(tokens.drop(1), "list profiles"))
             "presets" -> ListPresetsCommand(parseRequiredConfig(tokens.drop(1), "list presets"))
-            else -> throw IllegalArgumentException("未知 list 子命令: ${tokens[0]}。可用: algorithms, profiles, presets")
+            else -> cliError("未知 list 子命令: ${tokens[0]}。可用: algorithms, profiles, presets")
         }
     }
 
     private fun parseConfig(tokens: List<String>): Command {
         if (tokens.isEmpty()) {
-            throw IllegalArgumentException("config 命令需要子命令: validate 或 print")
+            cliError("config 命令需要子命令: validate 或 print")
         }
         return when (tokens[0].lowercase()) {
             "validate" -> ConfigValidateCommand(parseRequiredConfig(tokens.drop(1), "config validate"))
@@ -224,7 +236,7 @@ class CliParser(
                 val (configFile, profile) = parseConfigAndOptionalProfile(tokens.drop(1), "config print")
                 ConfigPrintCommand(configFile, profile)
             }
-            else -> throw IllegalArgumentException("未知 config 子命令: ${tokens[0]}。可用: validate, print")
+            else -> cliError("未知 config 子命令: ${tokens[0]}。可用: validate, print")
         }
     }
 
@@ -244,13 +256,13 @@ class CliParser(
                     mode = normalizeMode(tokens[i].substringAfter("="))
                     i++
                 }
-                tokens[i].startsWith("-") -> throw IllegalArgumentException("未知参数: ${tokens[i]}")
-                else -> throw IllegalArgumentException("意外的位置参数: ${tokens[i]}")
+                tokens[i].startsWith("-") -> cliError("未知参数: ${tokens[i]}")
+                else -> cliError("意外的位置参数: ${tokens[i]}")
             }
         }
-        val resolvedMode = mode ?: throw IllegalArgumentException("$commandName 需要 --mode batch|realtime")
+        val resolvedMode = mode ?: cliError("$commandName 需要 --mode batch|realtime")
         if (resolvedMode !in setOf("batch", "realtime")) {
-            throw IllegalArgumentException("$commandName 只接受 --mode batch 或 realtime")
+            cliError("$commandName 只接受 --mode batch 或 realtime")
         }
         return resolvedMode
     }
@@ -285,11 +297,11 @@ class CliParser(
                     profile = tokens[i].substringAfter("=")
                     i++
                 }
-                tokens[i].startsWith("-") -> throw IllegalArgumentException("未知参数: ${tokens[i]}")
-                else -> throw IllegalArgumentException("意外的位置参数: ${tokens[i]}")
+                tokens[i].startsWith("-") -> cliError("未知参数: ${tokens[i]}")
+                else -> cliError("意外的位置参数: ${tokens[i]}")
             }
         }
-        return (configFile ?: throw IllegalArgumentException("$commandName 需要 --config FILE")) to profile
+        return (configFile ?: cliError("$commandName 需要 --config FILE")) to profile
     }
 
     private fun readValue(
@@ -298,17 +310,21 @@ class CliParser(
         option: String,
     ): String {
         if (index + 1 >= tokens.size) {
-            throw IllegalArgumentException("$option 参数需要指定值")
+            cliError("$option 参数需要指定值")
         }
         return tokens[index + 1]
     }
 
-    private fun parseNameList(value: String): List<String> = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+    private fun parseNameList(value: String): List<String> =
+        value
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
 
     private fun parseTaskCounts(value: String): List<Int> =
         parseNameList(value).map { part ->
             part.toIntOrNull()?.takeIf { it > 0 }
-                ?: throw IllegalArgumentException("无效的任务数: $part。任务数必须是大于 0 的整数")
+                ?: cliError("无效的任务数: $part。任务数必须是大于 0 的整数")
         }
 
     private fun parsePositiveInt(
@@ -316,14 +332,14 @@ class CliParser(
         option: String,
     ): Int =
         value.toIntOrNull()?.takeIf { it > 0 }
-            ?: throw IllegalArgumentException("$option 必须是大于 0 的整数: $value")
+            ?: cliError("$option 必须是大于 0 的整数: $value")
 
     private fun parseLong(
         value: String,
         option: String,
     ): Long =
         value.toLongOrNull()
-            ?: throw IllegalArgumentException("$option 必须是整数: $value")
+            ?: cliError("$option 必须是整数: $value")
 }
 
 fun normalizeMode(mode: String): String =

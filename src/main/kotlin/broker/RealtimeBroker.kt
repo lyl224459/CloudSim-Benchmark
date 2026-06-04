@@ -457,7 +457,7 @@ class RealtimeBroker(
                 lifecycleStore.snapshot(),
                 reservationState.rawReservations(),
             )
-        return when (val decision = preemptionController.decide(incoming, candidates)) {
+        return when (val decision = preemptionController.decide(candidates)) {
             PreemptionDecision.None -> false
             is PreemptionDecision.Preempt -> {
                 val result = preemptionExecutor.preempt(decision)

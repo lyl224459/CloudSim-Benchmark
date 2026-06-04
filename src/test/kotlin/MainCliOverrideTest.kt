@@ -72,6 +72,16 @@ class MainCliOverrideTest {
     }
 
     @Test
+    fun `run parser rejects missing option values with original keyword`() {
+        val error =
+            assertThrows<IllegalArgumentException> {
+                CliParser(arrayOf("run", "--mode")).parse()
+            }
+
+        assertTrue(error.message?.contains("参数需要指定值") == true)
+    }
+
+    @Test
     fun `legacy batch command fails with migration hint`() {
         val error =
             assertThrows<IllegalArgumentException> {

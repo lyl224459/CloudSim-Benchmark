@@ -14,8 +14,12 @@ import util.Logger
 import util.StatisticalValue
 import util.mapCloudletsToVmIndexes
 import java.text.DecimalFormat
+import java.util.Locale
 import java.util.Random
 import kotlin.system.measureTimeMillis
+
+private const val SECTION_SEPARATOR_WIDTH = 60
+private const val RESULT_SEPARATOR_WIDTH = 80
 
 /**
  * 算法对比结果
@@ -70,17 +74,17 @@ class ComparisonRunner(
         runSeed: Long,
         schedulerFactory: (List<org.cloudsimplus.cloudlets.Cloudlet>, List<org.cloudsimplus.vms.Vm>) -> Scheduler,
     ): AlgorithmResult {
-        Logger.info("\n${"=".repeat(60)}")
+        Logger.info("\n${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
         Logger.info("运行算法: {}", algorithmName)
-        Logger.info("${"=".repeat(60)}")
+        Logger.info("${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
 
         // 创建仿真环境
         val simulation = CloudSimPlus()
 
         // 创建数据中心
-        val datacenter0 = DatacenterCreator.createDatacenter(simulation, "Datacenter0", DatacenterType.LOW)
-        val datacenter1 = DatacenterCreator.createDatacenter(simulation, "Datacenter1", DatacenterType.MEDIUM)
-        val datacenter2 = DatacenterCreator.createDatacenter(simulation, "Datacenter2", DatacenterType.HIGH)
+        DatacenterCreator.createDatacenter(simulation, "Datacenter0", DatacenterType.LOW)
+        DatacenterCreator.createDatacenter(simulation, "Datacenter1", DatacenterType.MEDIUM)
+        DatacenterCreator.createDatacenter(simulation, "Datacenter2", DatacenterType.HIGH)
 
         // 创建代理
         val broker = DatacenterBrokerSimple(simulation)
@@ -180,7 +184,7 @@ class ComparisonRunner(
      */
     suspend fun runComparison(): List<AlgorithmResult> =
         coroutineScope {
-            Logger.info("\n${"=".repeat(60)}")
+            Logger.info("\n${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
             Logger.info("开始算法对比实验")
             Logger.info("任务数量: {}", cloudletCount)
             Logger.info("种群大小: {}", population)
@@ -188,7 +192,7 @@ class ComparisonRunner(
             Logger.info("随机数种子: {}", randomSeed)
             Logger.info("运行次数: {}", runs)
             Logger.info("执行模式: {}", executionModeDescription())
-            Logger.info("${"=".repeat(60)}")
+            Logger.info("${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
 
             outputContext.saveExperimentInfo(
                 mapOf(
@@ -227,9 +231,7 @@ class ComparisonRunner(
         }
 
     private fun algorithmsToRun(): List<ResolvedAlgorithm> {
-        if (resolvedAlgorithms.isEmpty()) {
-            throw IllegalArgumentException("ComparisonRunner 需要已解析的算法列表")
-        }
+        require(resolvedAlgorithms.isNotEmpty()) { "ComparisonRunner 需要已解析的算法列表" }
         return resolvedAlgorithms
     }
 
@@ -246,20 +248,29 @@ class ComparisonRunner(
             result
         } catch (e: CancellationException) {
             throw e
-        } catch (e: Throwable) {
-            Logger.error("算法 {} 执行失败: {}", e, algorithm.name, e.message)
-            buildAlgorithmSummary(
-                algorithm.displayName,
-                listOf(
-                    BatchRunOutcome.Failed(
-                        algorithmName = algorithm.displayName,
-                        run = 0,
-                        errorType = e::class.simpleName ?: e::class.java.simpleName,
-                        errorMessage = e.message.orEmpty(),
-                    ),
-                ),
-            )
+        } catch (e: IllegalArgumentException) {
+            failedAlgorithmSummary(algorithm, e)
+        } catch (e: IllegalStateException) {
+            failedAlgorithmSummary(algorithm, e)
         }
+
+    private fun failedAlgorithmSummary(
+        algorithm: ResolvedAlgorithm,
+        error: RuntimeException,
+    ): BatchRunSummary {
+        Logger.error("算法 {} 执行失败: {}", error, algorithm.name, error.message)
+        return buildAlgorithmSummary(
+            algorithm.displayName,
+            listOf(
+                BatchRunOutcome.Failed(
+                    algorithmName = algorithm.displayName,
+                    run = 0,
+                    errorType = error::class.simpleName ?: error::class.java.simpleName,
+                    errorMessage = error.message.orEmpty(),
+                ),
+            ),
+        )
+    }
 
     internal fun buildAlgorithmSummary(
         algorithmName: String,
@@ -282,7 +293,7 @@ class ComparisonRunner(
      * 运行所有算法并返回统计结果（用于批量实验）
      */
     suspend fun runComparisonWithStatistics(): List<AlgorithmStatistics> {
-        Logger.info("\n${"=".repeat(60)}")
+        Logger.info("\n${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
         Logger.info("开始算法对比实验（统计模式）")
         Logger.info("任务数量: {}", cloudletCount)
         Logger.info("种群大小: {}", population)
@@ -290,7 +301,7 @@ class ComparisonRunner(
         Logger.info("随机数种子: {}", randomSeed)
         Logger.info("运行次数: {}", runs)
         Logger.info("执行模式: {}", executionModeDescription())
-        Logger.info("${"=".repeat(60)}")
+        Logger.info("${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
 
         return runComparisonSummaries()
             .sortedBy { it.algorithmName }
@@ -307,11 +318,19 @@ class ComparisonRunner(
      * 打印对比结果表格
      */
     private fun printComparisonResults(summaries: List<BatchRunSummary>) {
-        Logger.result("\n${"=".repeat(80)}")
+        printComparisonHeader()
+        printComparisonRows(summaries)
+        printBestResults(summaries.mapNotNull { it.average })
+        Logger.result("${"=".repeat(RESULT_SEPARATOR_WIDTH)}\n")
+    }
+
+    private fun printComparisonHeader() {
+        Logger.result("\n${"=".repeat(RESULT_SEPARATOR_WIDTH)}")
         Logger.result("算法对比结果汇总")
-        Logger.result("${"=".repeat(80)}")
+        Logger.result("${"=".repeat(RESULT_SEPARATOR_WIDTH)}")
         Logger.result(
             String.format(
+                Locale.ROOT,
                 "%-12s %-16s %-8s %-8s %-15s %-15s %-15s %-15s %-15s",
                 "算法",
                 "状态",
@@ -324,12 +343,15 @@ class ComparisonRunner(
                 "Fitness",
             ),
         )
-        Logger.result("-".repeat(80))
+        Logger.result("-".repeat(RESULT_SEPARATOR_WIDTH))
+    }
 
+    private fun printComparisonRows(summaries: List<BatchRunSummary>) {
         for (summary in summaries) {
             val result = summary.average
             Logger.result(
                 String.format(
+                    Locale.ROOT,
                     "%-12s %-16s %-8d %-8d %-15s %-15s %-15s %-15s %-15s",
                     summary.algorithmName,
                     summary.status,
@@ -344,21 +366,36 @@ class ComparisonRunner(
             )
         }
 
-        Logger.result("-".repeat(80))
+        Logger.result("-".repeat(RESULT_SEPARATOR_WIDTH))
+    }
 
-        // 找出最优值
-        val results = summaries.mapNotNull { it.average }
+    private fun printBestResults(results: List<AlgorithmResult>) {
         val bestMakespan = results.minByOrNull { it.makespan }
         val bestLB = results.minByOrNull { it.loadBalance }
         val bestCost = results.minByOrNull { it.cost }
         val bestFitness = results.minByOrNull { it.fitness }
 
         Logger.result("\n最优值:")
-        Logger.result("  最小 Makespan: {} ({})", bestMakespan?.algorithmName.orEmpty(), bestMakespan?.makespan.formatOrBlank())
-        Logger.result("  最小 Load Balance: {} ({})", bestLB?.algorithmName.orEmpty(), bestLB?.loadBalance.formatOrBlank())
-        Logger.result("  最小 Cost: {} ({})", bestCost?.algorithmName.orEmpty(), bestCost?.cost.formatOrBlank())
-        Logger.result("  最小 Fitness: {} ({})", bestFitness?.algorithmName.orEmpty(), bestFitness?.fitness.formatOrBlank())
-        Logger.result("${"=".repeat(80)}\n")
+        Logger.result(
+            "  最小 Makespan: {} ({})",
+            bestMakespan?.algorithmName.orEmpty(),
+            bestMakespan?.makespan.formatOrBlank(),
+        )
+        Logger.result(
+            "  最小 Load Balance: {} ({})",
+            bestLB?.algorithmName.orEmpty(),
+            bestLB?.loadBalance.formatOrBlank(),
+        )
+        Logger.result(
+            "  最小 Cost: {} ({})",
+            bestCost?.algorithmName.orEmpty(),
+            bestCost?.cost.formatOrBlank(),
+        )
+        Logger.result(
+            "  最小 Fitness: {} ({})",
+            bestFitness?.algorithmName.orEmpty(),
+            bestFitness?.fitness.formatOrBlank(),
+        )
     }
 
     /**

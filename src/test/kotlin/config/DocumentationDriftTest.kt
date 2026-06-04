@@ -76,6 +76,19 @@ class DocumentationDriftTest {
     }
 
     @Test
+    fun `release readiness detekt baseline count matches current baseline`() {
+        val docs = File("docs/release-readiness.md").readText()
+        val documentedCount =
+            Regex("""detekt-baseline\.xml.*当前\s+(\d+)\s+项""")
+                .find(docs)
+                ?.groupValues
+                ?.get(1)
+                ?.toInt()
+
+        assertThat(documentedCount).isEqualTo(currentDetektBaselineCount())
+    }
+
+    @Test
     fun `legacy compatibility wrappers have no remaining source references`() {
         val references =
             File("src")
@@ -105,4 +118,9 @@ class DocumentationDriftTest {
             .map { it.groupValues[1].trim() }
             .filter { it.isNotBlank() }
             .toList()
+
+    private fun currentDetektBaselineCount(): Int =
+        Regex("<ID>")
+            .findAll(File("detekt-baseline.xml").readText())
+            .count()
 }
