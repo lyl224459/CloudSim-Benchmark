@@ -26,11 +26,15 @@ private data class ArrivalSelectionAttempt(
     val recordPreemptionFailure: Boolean,
 )
 
-internal interface RealtimeArrivalWorkflowContext {
+internal interface RealtimeArrivalLifecycleContext {
     fun lifecycleOf(cloudlet: Cloudlet): RealtimeTaskLifecycle?
 
     fun markArrivedAfterInterruption(cloudlet: Cloudlet)
 
+    fun taskRecord(cloudlet: Cloudlet): RealtimeTaskRecord
+}
+
+internal interface RealtimeArrivalCapacityContext {
     fun refreshVmLifecycles(currentTime: Double)
 
     fun activeCloudlets(): List<Cloudlet>
@@ -46,17 +50,15 @@ internal interface RealtimeArrivalWorkflowContext {
         currentTime: Double,
     ): RealtimeSchedulingContext
 
-    fun taskRecord(cloudlet: Cloudlet): RealtimeTaskRecord
-
-    fun activeTenantRecords(): List<RealtimeTaskRecord>
-
     fun decideTenantAdmission(record: RealtimeTaskRecord): TenantAdmissionDecision
 
     fun decideCapacityAdmission(
         activeCloudletCount: Int,
         context: RealtimeSchedulingContext,
     ): AdmissionDecision
+}
 
+internal interface RealtimeArrivalPlacementContext {
     fun tryPreemptFor(
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
@@ -73,7 +75,9 @@ internal interface RealtimeArrivalWorkflowContext {
         activeCloudlets: List<Cloudlet>,
         currentTime: Double,
     ): RealtimeRejectReason
+}
 
+internal interface RealtimeArrivalSubmissionContext {
     fun rejectCloudlet(
         cloudlet: Cloudlet,
         reason: RealtimeRejectReason,
@@ -87,6 +91,12 @@ internal interface RealtimeArrivalWorkflowContext {
 
     fun recordPreemptionFailed()
 }
+
+internal interface RealtimeArrivalWorkflowContext :
+    RealtimeArrivalLifecycleContext,
+    RealtimeArrivalCapacityContext,
+    RealtimeArrivalPlacementContext,
+    RealtimeArrivalSubmissionContext
 
 internal class RealtimeArrivalWorkflow(
     private val context: RealtimeArrivalWorkflowContext,
@@ -206,7 +216,7 @@ internal interface RealtimeSubmissionWorkflowContext {
 
     fun permanentlyFailPendingSubmission(cloudlet: Cloudlet)
 
-    fun submitAcceptedCloudlet(submission: RealtimePendingSubmission)
+    fun submitAcceptedCloudlet(submission: RealtimePendingSubmission): List<RealtimeBrokerCommand>
 }
 
 internal class RealtimeSubmissionWorkflow(
@@ -229,10 +239,7 @@ internal class RealtimeSubmissionWorkflow(
                     submission.failurePressure,
                 )
         ) {
-            FailureDecision.Continue -> {
-                context.submitAcceptedCloudlet(submission)
-                emptyList()
-            }
+            FailureDecision.Continue -> context.submitAcceptedCloudlet(submission)
             is FailureDecision.Retry ->
                 listOf(
                     context.retryPendingSubmission(cloudlet, attempt, failureDecision.delay),

@@ -9,87 +9,83 @@ import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.core.events.SimEvent
 import org.cloudsimplus.vms.Vm
-import scheduler.CloudletId
-import scheduler.RealtimeNodeStateTracker
-import scheduler.RealtimeResourceModel
 import scheduler.RealtimeScheduler
-import scheduler.RealtimeSchedulingContext
-import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskMetadata
-import scheduler.RealtimeTaskRecord
 import scheduler.RealtimeTopologyMetrics
-import scheduler.RealtimeTopologyModel
-import scheduler.RealtimeVmLifecycleManager
-import java.util.Random
-
-private const val FAILURE_RANDOM_CLOUDLET_MULTIPLIER = 1_000_003L
-private const val FAILURE_RANDOM_ATTEMPT_MULTIPLIER = 9_176L
-private const val DECISION_JITTER_SALT = 11
 
 /**
  * 实时调度代理。
  *
  * 通过 CloudSim 事件在任务到达时提交 cloudlet，并在到达时调用调度器。
+ * Public CloudSim facade keeps the existing metric getter surface for compatibility.
  */
+@Suppress("TooManyFunctions")
 class RealtimeBroker(
     private val cloudSim: CloudSimPlus,
-    private val scheduler: RealtimeScheduler,
+    scheduler: RealtimeScheduler,
     initialVmList: List<Vm>,
     private val schedulingConfig: RealtimeSchedulingConfig = RealtimeSchedulingConfig(),
 ) : DatacenterBrokerSimple(cloudSim) {
     private val arrivalState = RealtimeArrivalState()
     private val lifecycleStore = RealtimeTaskLifecycleStore()
     private val reservationState = RealtimeReservationState()
-    private val topologyModel = RealtimeTopologyModel.fromConfig(schedulingConfig, initialVmList.size)
-    private val vmLifecycleManager = RealtimeVmLifecycleManager(initialVmList, schedulingConfig, topologyModel)
-    private val vmList: List<Vm> get() = vmLifecycleManager.vmList
-    private val traceMetadataProvider = MutableRealtimeTraceMetadataProvider()
-    private val nodeStateTracker =
-        RealtimeNodeStateTracker(
-            vmLifecycleManager.vmList,
-            schedulingConfig.vmQueueCapacity,
-            RealtimeResourceModel(
-                enabled = schedulingConfig.resourceModelEnabled,
-                networkLatency = schedulingConfig.networkLatency,
-                imagePullDelay = schedulingConfig.imagePullDelay,
-                ioWeight = schedulingConfig.ioWeight,
-                ramWeight = schedulingConfig.ramWeight,
-                bwWeight = schedulingConfig.bwWeight,
-                traceMetadataProvider = traceMetadataProvider,
-            ),
-            topologyModel,
+    private val brokerMetrics = RealtimeBrokerMetrics()
+    private val brokerState =
+        RealtimeBrokerStateBundle(
+            arrival = arrivalState,
+            lifecycleStore = lifecycleStore,
+            reservation = reservationState,
+            metrics = brokerMetrics,
         )
-    private val failureRandom = Random(0L)
+    private val traceMetadataProvider = MutableRealtimeTraceMetadataProvider()
+    private val deterministicSampler = RealtimeDeterministicSampler()
+    private val environment =
+        realtimeBrokerEnvironment(
+            schedulingConfig = schedulingConfig,
+            initialVmList = initialVmList,
+            traceMetadataProvider = traceMetadataProvider,
+        )
     private val admissionController = RealtimeAdmissionController(schedulingConfig)
-    private val failureController = RealtimeFailureController(schedulingConfig, ::deterministicUnit)
+    private val failureController =
+        RealtimeFailureController(
+            schedulingConfig,
+            deterministicSampler::sample,
+        )
     private val timeoutController = RealtimeTimeoutController(schedulingConfig)
     private val preemptionController = RealtimePreemptionController(schedulingConfig)
     private val tenantController = RealtimeTenantController(schedulingConfig)
-    private val taskMetadataFactory =
+    private val metadataFactory =
         RealtimeTaskMetadataFactory(
             schedulingConfig,
             traceMetadataProvider,
             tenantController,
-            ::deterministicUnit,
+            deterministicSampler::sample,
+        )
+    private val lifecycleService =
+        RealtimeBrokerLifecycleService(
+            state = brokerState,
+            metadataFactory = metadataFactory,
+            environment = environment,
         )
     private val tenantFairnessContextBuilder = TenantFairnessContextBuilder(tenantController)
     private val vmReservationPolicy = RealtimeVmReservationPolicy(schedulingConfig)
-    private val brokerMetrics = RealtimeBrokerMetrics()
     private val recoveryEstimator =
         RealtimeCloudletRecoveryEstimator(
             schedulingConfig,
             { cloudSim.clock() },
-            { vmList },
+            { environment.vmList },
         )
     private val runtimeEventController =
         RealtimeRuntimeEventController(
             schedulingConfig,
-            topologyModel,
-            { cloudletId, attempt, salt -> deterministicUnit(cloudletId, attempt, salt) },
+            environment.topologyModel,
+            deterministicSampler::sample,
             recoveryEstimator::estimatedRuntime,
         )
-    private val topologyAccountingController = RealtimeTopologyAccountingController(topologyModel, brokerMetrics)
-    private val autoscalingController = RealtimeAutoscalingController(schedulingConfig, vmLifecycleManager)
+    private val topologyAccountingController =
+        RealtimeTopologyAccountingController(environment.topologyModel, brokerMetrics)
+    private val autoscalingController =
+        RealtimeAutoscalingController(schedulingConfig, environment.vmLifecycleManager)
     private val interruptionController =
         RealtimeTaskInterruptionController(
             schedulingConfig,
@@ -98,7 +94,7 @@ class RealtimeBroker(
                 failureController,
                 timeoutController,
                 recoveryEstimator,
-                ::updateMetadata,
+                lifecycleService::updateMetadata,
             ),
         )
     private val preemptionExecutor =
@@ -108,7 +104,7 @@ class RealtimeBroker(
             RealtimePreemptionServices(
                 failureController,
                 recoveryEstimator,
-                ::updateMetadata,
+                lifecycleService::updateMetadata,
             ),
         )
     private val eventRouter = RealtimeBrokerEventRouter()
@@ -118,8 +114,56 @@ class RealtimeBroker(
             schedule = { delay, tag, data -> schedule(delay, tag, data) },
             submitVms = { vms, delay -> submitVmList(vms, delay) },
         )
-    private val arrivalWorkflow = RealtimeArrivalWorkflow(ArrivalWorkflowAdapter())
-    private val submissionWorkflow = RealtimeSubmissionWorkflow(SubmissionWorkflowAdapter())
+    private val brokerCallbacks =
+        RealtimeBrokerCallbacks(
+            clock = { cloudSim.clock() },
+            applyCommands = commandExecutor::applyAll,
+            submitCloudlet = { cloudlet -> submitCloudlet(cloudlet) },
+        )
+    private val runtimeEventPlanner =
+        RealtimeRuntimeEventPlanner(
+            state = brokerState,
+            environment = environment,
+            runtimeEventController = runtimeEventController,
+            topologyAccountingController = topologyAccountingController,
+            callbacks = brokerCallbacks,
+        )
+    private val vmSelectionFacade =
+        RealtimeVmSelectionFacade(
+            schedulingConfig = schedulingConfig,
+            state = brokerState,
+            environment = environment,
+            lifecycleService = lifecycleService,
+            policies =
+                RealtimeVmSelectionPolicies(
+                    scheduler = scheduler,
+                    tenantFairnessContextBuilder = tenantFairnessContextBuilder,
+                    reservationPolicy = vmReservationPolicy,
+                    preemption = RealtimeBrokerPreemptionComponents(preemptionController, preemptionExecutor),
+                    deterministicSampler = deterministicSampler,
+                ),
+        )
+    private val queueDepthSampler =
+        RealtimeQueueDepthSampler(
+            state = brokerState,
+            environment = environment,
+        )
+    private val submissionService =
+        RealtimeSubmissionService(
+            submissionState =
+                RealtimeSubmissionState(
+                    state = brokerState,
+                    environment = environment,
+                    lifecycleService = lifecycleService,
+                ),
+            controllers =
+                RealtimeSubmissionControllers(
+                    failureController = failureController,
+                    runtimePlanner = runtimeEventPlanner,
+                    queueDepthSampler = queueDepthSampler,
+                ),
+            callbacks = brokerCallbacks,
+        )
     private val readModel =
         RealtimeBrokerReadModel(
             schedulingConfig,
@@ -127,10 +171,31 @@ class RealtimeBroker(
             lifecycleStore,
             reservationState,
             brokerMetrics,
-            vmLifecycleManager,
+            environment.vmLifecycleManager,
             tenantController,
-            topologyModel,
+            environment.topologyModel,
         )
+    private val arrivalWorkflow =
+        RealtimeArrivalWorkflow(
+            RealtimeArrivalWorkflowAdapter(
+                core =
+                    RealtimeArrivalCoreServices(
+                        lifecycleService = lifecycleService,
+                        readModel = readModel,
+                        vmSelectionFacade = vmSelectionFacade,
+                        submissionService = submissionService,
+                        metrics = brokerMetrics,
+                    ),
+                controls =
+                    RealtimeArrivalControlServices(
+                        autoscalingController = autoscalingController,
+                        admissionServices = RealtimeAdmissionServices(admissionController, tenantController),
+                        commandExecutor = commandExecutor,
+                    ),
+            ),
+        )
+    private val submissionWorkflow =
+        RealtimeSubmissionWorkflow(RealtimeSubmissionWorkflowAdapter(submissionService))
 
     fun submitCloudletBatchRealtime(batch: RealtimeCloudletBatch) {
         submitCloudletSpecsRealtime(batch.specs)
@@ -144,14 +209,16 @@ class RealtimeBroker(
     fun submitCloudletListRealtime(cloudletList: List<Cloudlet>) {
         for (cloudlet in cloudletList) {
             arrivalState.recordArrival(cloudlet)
-            lifecycleStore.put(createMetadata(cloudlet))
+            lifecycleStore.put(lifecycleService.createMetadata(cloudlet))
         }
         val sortedCloudlets = cloudletList.sortedWith(cloudletOrdering.arrivalComparator())
         if (schedulingConfig.strategy.equals("static", ignoreCase = true)) {
             val previewWaiting = mutableListOf<Cloudlet>()
             for (cloudlet in sortedCloudlets) {
-                val context = schedulingContext(cloudlet, previewWaiting.toList(), cloudlet.submissionDelay)
-                arrivalState.preassign(cloudlet, scheduler.scheduleOnArrival(context))
+                arrivalState.preassign(
+                    cloudlet,
+                    vmSelectionFacade.staticPreviewSelection(cloudlet, previewWaiting.toList()),
+                )
                 previewWaiting.add(cloudlet)
             }
         }
@@ -265,7 +332,12 @@ class RealtimeBroker(
                     interruptionController.onRuntimeFailure(brokerEvent.payload.cloudlet, brokerEvent.payload.attempt),
                 )
             is RealtimeBrokerEvent.AutoscaleTick ->
-                applyCommands(onAutoscaleTick(brokerEvent.time))
+                applyCommands(
+                    autoscalingController.tickCommands(
+                        brokerEvent.time,
+                        vmSelectionFacade.activeVmIndexes(getActiveCloudlets()),
+                    ),
+                )
             is RealtimeBrokerEvent.Unknown ->
                 super.processEvent(brokerEvent.event)
         }
@@ -288,484 +360,4 @@ class RealtimeBroker(
             applyCommand(RealtimeBrokerCommand.ScheduleAutoscaleTick(schedulingConfig.scaleInIdleTime))
         }
     }
-
-    private fun lifecycleOf(cloudlet: Cloudlet): RealtimeTaskLifecycle? = lifecycleStore.get(cloudlet.id)?.lifecycle
-
-    private fun markArrivedAfterInterruption(cloudlet: Cloudlet) {
-        updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.ARRIVED) }
-    }
-
-    private fun activeCloudlets(): List<Cloudlet> = getActiveCloudlets()
-
-    private fun scaleOutCommands(
-        queueDepth: Int,
-        currentTime: Double,
-    ): List<RealtimeBrokerCommand> = autoscalingController.scaleOutCommands(queueDepth, currentTime, activeVmIndexes())
-
-    private fun taskRecord(cloudlet: Cloudlet) = lifecycleStore.get(cloudlet.id) ?: createMetadata(cloudlet)
-
-    private fun decideTenantAdmission(record: RealtimeTaskRecord): TenantAdmissionDecision =
-        tenantController.decide(record, activeTenantRecords())
-
-    private fun decideCapacityAdmission(
-        activeCloudletCount: Int,
-        context: RealtimeSchedulingContext,
-    ): AdmissionDecision = admissionController.decide(activeCloudletCount, context.nodeStates)
-
-    private fun selectVm(
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        currentTime: Double,
-    ): Pair<Int, Double>? = selectVmId(cloudlet, activeCloudlets, currentTime)
-
-    private fun recordDecisionDelay(delay: Double) {
-        brokerMetrics.recordDecisionDelay(delay)
-    }
-
-    private fun preparePendingSubmission(request: RealtimePendingSubmissionRequest): RealtimePendingSubmission {
-        val cloudlet = request.cloudlet
-        val boundedIndex = request.selectedVmIndex.coerceIn(vmList.indices)
-        cloudlet.setVm(vmList[boundedIndex])
-        reservationState.reserve(cloudlet, boundedIndex)
-        arrivalState.addPending(cloudlet)
-        updateMetadata(cloudlet) {
-            it.copy(
-                assignedVmIndex = boundedIndex,
-                lastDecisionDelay = request.delay,
-                lifecycle = RealtimeTaskLifecycle.PENDING_DECISION,
-            )
-        }
-        sampleQueueDepth(request.activeCloudlets, boundedIndex, request.currentTime)
-        return RealtimePendingSubmission(cloudlet, boundedIndex, request.delay, request.failurePressure)
-    }
-
-    private fun recordPreemptionFailed() {
-        brokerMetrics.recordPreemptionFailed()
-    }
-
-    private fun isPendingDecision(cloudlet: Cloudlet): Boolean =
-        lifecycleStore.get(cloudlet.id)?.lifecycle == RealtimeTaskLifecycle.PENDING_DECISION
-
-    private fun discardPending(cloudlet: Cloudlet) {
-        arrivalState.removePending(CloudletId(cloudlet.id))
-    }
-
-    private fun attemptOf(cloudlet: Cloudlet): Int = arrivalState.attemptOf(cloudlet)
-
-    private fun submitAttemptDecision(
-        cloudletId: CloudletId,
-        attempt: Int,
-        failurePressure: Double,
-    ): FailureDecision = failureController.submitAttempt(cloudletId, attempt, failurePressure)
-
-    private fun retryPendingSubmission(
-        cloudlet: Cloudlet,
-        attempt: Int,
-        delay: Double,
-    ): RealtimeBrokerCommand {
-        arrivalState.incrementAttempt(cloudlet)
-        reservationState.remove(cloudlet)
-        updateMetadata(cloudlet) {
-            it.copy(
-                attempt = attempt + 1,
-                assignedVmIndex = null,
-                lifecycle = RealtimeTaskLifecycle.RETRYING,
-            )
-        }
-        brokerMetrics.recordRetry()
-        return RealtimeBrokerCommand.ScheduleArrival(delay, cloudlet)
-    }
-
-    private fun permanentlyFailPendingSubmission(cloudlet: Cloudlet) {
-        cloudlet.setStatus(Cloudlet.Status.FAILED)
-        reservationState.remove(cloudlet)
-        updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.FAILED) }
-        brokerMetrics.recordPermanentFailure()
-    }
-
-    private fun submitAcceptedCloudlet(submission: RealtimePendingSubmission) {
-        val cloudlet = submission.cloudlet
-        cloudlet.setVm(vmList[submission.vmIndex])
-        cloudlet.setSubmissionDelay(0.0)
-        arrivalState.addWaiting(cloudlet)
-        updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.RUNNING) }
-        lifecycleStore.get(cloudlet.id)?.let { record ->
-            topologyAccountingController.recordSubmission(submission.vmIndex, record)
-        }
-        vmLifecycleManager.markBusy(submission.vmIndex, cloudSim.clock())
-        if (arrivalState.attemptOf(cloudlet) > 0) {
-            brokerMetrics.recordRetrySuccess()
-        }
-        brokerMetrics.recordSubmitted()
-        scheduleRuntimeEvents(cloudlet, submission.failurePressure)
-        submitCloudlet(cloudlet)
-    }
-
-    private fun selectVmId(
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        currentTime: Double,
-    ): Pair<Int, Double>? {
-        val strategy = schedulingConfig.strategy.lowercase()
-        val context = schedulingContext(cloudlet, activeCloudlets, currentTime)
-        val selected = schedulerSelectedVm(strategy, cloudlet, activeCloudlets, currentTime, context)
-        return selected?.let { validatedVmSelection(it, cloudlet, activeCloudlets, context) }
-    }
-
-    private fun schedulerSelectedVm(
-        strategy: String,
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        currentTime: Double,
-        context: RealtimeSchedulingContext,
-    ): Int? {
-        if (context.hasNoAcceptedCapacityCandidate()) return null
-        return if (strategy == "static") {
-            arrivalState.preassignedVmIndexOf(cloudlet)
-                ?: scheduler.scheduleOnArrival(schedulingContext(cloudlet, activeCloudlets, currentTime))
-        } else {
-            scheduler.scheduleOnArrival(context)
-        }
-    }
-
-    private fun validatedVmSelection(
-        selectedVmIndex: Int,
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        context: RealtimeSchedulingContext,
-    ): Pair<Int, Double>? {
-        val reserved = applyReservationPolicy(selectedVmIndex, cloudlet, activeCloudlets)
-        val bounded = reserved.coerceIn(vmList.indices)
-        val placementState = context.acceptedCandidates.firstOrNull { it.vmIndex == bounded }?.nodeState
-        val state = placementState ?: context.nodeStates.getOrNull(bounded)
-        return when {
-            context.nodeCandidates.isNotEmpty() && placementState == null -> null
-            state != null && !state.acceptingWork -> null
-            else -> bounded to (state?.failurePressure ?: 0.0)
-        }
-    }
-
-    private fun tryPreemptFor(
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-    ): Boolean {
-        val incoming = lifecycleStore.get(cloudlet.id) ?: createMetadata(cloudlet)
-        val candidates =
-            preemptionController.candidates(
-                incoming,
-                activeCloudlets,
-                lifecycleStore.snapshot(),
-                reservationState.rawReservations(),
-            )
-        return when (val decision = preemptionController.decide(candidates)) {
-            PreemptionDecision.None -> false
-            is PreemptionDecision.Preempt -> {
-                val result = preemptionExecutor.preempt(decision)
-                applyCommands(result.commands)
-                result.applied
-            }
-        }
-    }
-
-    private fun schedulingContext(
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        currentTime: Double,
-    ): RealtimeSchedulingContext {
-        val taskMetadata = lifecycleStore.get(cloudlet.id) ?: createMetadata(cloudlet)
-        val records = lifecycleStore.snapshot()
-        val nodeStates =
-            nodeStateTracker.snapshot(
-                activeCloudlets,
-                currentTime,
-                reservationState.rawReservations(),
-                vmLifecycleManager.snapshots(),
-                cloudlet,
-            )
-        val nodeCandidates =
-            topologyModel.candidatesFor(
-                states = nodeStates,
-                vmList = vmLifecycleManager.vmList,
-                workload = taskMetadata.workloadDescriptor(),
-                records = records,
-            )
-        return RealtimeSchedulingContext(
-            newCloudlet = cloudlet,
-            activeCloudlets = activeCloudlets,
-            vmList = vmLifecycleManager.vmList,
-            currentTime = currentTime,
-            nodeStates = nodeStates,
-            taskMetadata = taskMetadata,
-            queuePolicy = schedulingConfig.normalizedQueuePolicy(),
-            topologyPolicy = schedulingConfig.normalizedTopologyPolicy(),
-            tenantSchedulingPolicy = schedulingConfig.normalizedTenantSchedulingPolicy(),
-            tenantSnapshots = tenantFairnessContextBuilder.snapshots(records),
-            nodeCandidates = nodeCandidates,
-            preemptionCandidates =
-                preemptionController.candidates(
-                    incoming = taskMetadata,
-                    activeCloudlets = activeCloudlets,
-                    records = records,
-                    vmReservations = reservationState.rawReservations(),
-                ),
-        )
-    }
-
-    private fun decisionDelay(cloudlet: Cloudlet): Double {
-        val jitter =
-            if (schedulingConfig.decisionJitter > 0.0) {
-                deterministicUnit(
-                    cloudlet.id,
-                    arrivalState.attemptOf(cloudlet),
-                    salt = DECISION_JITTER_SALT,
-                ) * schedulingConfig.decisionJitter
-            } else {
-                0.0
-            }
-        return schedulingConfig.decisionDelay + jitter
-    }
-
-    private fun scheduleRuntimeEvents(
-        cloudlet: Cloudlet,
-        submissionFailurePressure: Double,
-    ) {
-        val attempt = arrivalState.attemptOf(cloudlet)
-        val assignedVmIndex = lifecycleStore.get(cloudlet.id)?.assignedVmIndex ?: 0
-        val pressure = runtimeFailurePressure(assignedVmIndex, submissionFailurePressure)
-        val plan =
-            runtimeEventController.planRuntimeEvents(
-                cloudlet = cloudlet,
-                attempt = attempt,
-                timing =
-                    RealtimeRuntimeEventTiming(
-                        arrivalTime = getArrivalTime(cloudlet),
-                        currentTime = cloudSim.clock(),
-                    ),
-                assignment =
-                    RealtimeRuntimeEventAssignment(
-                        vmIndex = assignedVmIndex,
-                        nodeFailurePressure = pressure,
-                    ),
-            )
-        topologyAccountingController.recordFailure(plan.topologyFailureDomain)
-        applyCommands(plan.commands)
-    }
-
-    private fun runtimeFailurePressure(
-        assignedVmIndex: Int,
-        submissionFailurePressure: Double,
-    ): Double {
-        val states =
-            nodeStateTracker.snapshot(
-                getActiveCloudlets(),
-                cloudSim.clock(),
-                reservationState.rawReservations(),
-                vmLifecycleManager.snapshots(),
-            )
-        return states.getOrNull(assignedVmIndex)?.failurePressure ?: submissionFailurePressure
-    }
-
-    private fun deterministicUnit(
-        cloudletId: CloudletId,
-        attempt: Int,
-        salt: Int,
-    ): Double {
-        failureRandom.setSeed(
-            cloudletId.value * FAILURE_RANDOM_CLOUDLET_MULTIPLIER +
-                attempt * FAILURE_RANDOM_ATTEMPT_MULTIPLIER +
-                salt,
-        )
-        return failureRandom.nextDouble()
-    }
-
-    private fun deterministicUnit(
-        cloudletId: Long,
-        attempt: Int,
-        salt: Int,
-    ): Double = deterministicUnit(CloudletId(cloudletId), attempt, salt)
-
-    private fun applyReservationPolicy(
-        selectedVmId: Int,
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-    ): Int = vmReservationPolicy.select(selectedVmId, cloudlet, activeCloudlets, vmList)
-
-    private fun createMetadata(cloudlet: Cloudlet): RealtimeTaskRecord =
-        taskMetadataFactory.create(
-            RealtimeTaskMetadataRequest(
-                cloudlet = cloudlet,
-                arrivalTime = arrivalState.arrivalTimeOf(cloudlet),
-                attempt = arrivalState.attemptOf(cloudlet),
-                fastestVmMips = vmList.maxOfOrNull { it.mips },
-            ),
-        )
-
-    private fun updateMetadata(
-        cloudlet: Cloudlet,
-        transform: (RealtimeTaskRecord) -> RealtimeTaskRecord,
-    ) {
-        lifecycleStore.updateOrPut(createMetadata(cloudlet), transform)
-    }
-
-    private fun rejectCloudlet(
-        cloudlet: Cloudlet,
-        reason: RealtimeRejectReason,
-    ) {
-        brokerMetrics.recordRejected(reason)
-        cloudlet.setStatus(Cloudlet.Status.FAILED)
-        reservationState.remove(cloudlet)
-        updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.REJECTED) }
-    }
-
-    private fun sampleQueueDepth(
-        activeCloudlets: List<Cloudlet>,
-        selectedVmIndex: Int,
-        currentTime: Double,
-    ) {
-        val states =
-            nodeStateTracker.snapshot(
-                activeCloudlets,
-                currentTime,
-                reservationState.rawReservations(),
-                vmLifecycleManager.snapshots(),
-            )
-        val selectedDepth = states.getOrNull(selectedVmIndex)?.queueDepth ?: 0
-        brokerMetrics.recordQueueDepth(selectedDepth)
-    }
-
-    private fun activeTenantRecords(): List<RealtimeTaskRecord> =
-        lifecycleStore.snapshot().filter { record ->
-            record.lifecycle == RealtimeTaskLifecycle.PENDING_DECISION ||
-                record.lifecycle == RealtimeTaskLifecycle.SUBMITTED ||
-                record.lifecycle == RealtimeTaskLifecycle.RUNNING ||
-                record.lifecycle == RealtimeTaskLifecycle.PREEMPTED ||
-                record.lifecycle == RealtimeTaskLifecycle.MIGRATING ||
-                record.lifecycle == RealtimeTaskLifecycle.RETRYING
-        }
-
-    private fun refreshVmLifecycles(currentTime: Double) {
-        autoscalingController.refresh(currentTime, activeVmIndexes())
-    }
-
-    private fun onAutoscaleTick(currentTime: Double): List<RealtimeBrokerCommand> {
-        val activeIndexes = activeVmIndexes()
-        return autoscalingController.tickCommands(currentTime, activeIndexes)
-    }
-
-    private fun latestRejectionReason(
-        cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        currentTime: Double,
-    ): RealtimeRejectReason {
-        val context = schedulingContext(cloudlet, activeCloudlets, currentTime)
-        if (context.nodeCandidates.isNotEmpty() && context.acceptedCandidates.isEmpty()) {
-            return RealtimeRejectReason.RESOURCE
-        }
-        return if (context.nodeStates.any { !it.resourceAcceptingWork }) {
-            RealtimeRejectReason.RESOURCE
-        } else {
-            RealtimeRejectReason.CAPACITY
-        }
-    }
-
-    private inner class ArrivalWorkflowAdapter : RealtimeArrivalWorkflowContext {
-        override fun lifecycleOf(cloudlet: Cloudlet): RealtimeTaskLifecycle? = this@RealtimeBroker.lifecycleOf(cloudlet)
-
-        override fun markArrivedAfterInterruption(cloudlet: Cloudlet) {
-            this@RealtimeBroker.markArrivedAfterInterruption(cloudlet)
-        }
-
-        override fun refreshVmLifecycles(currentTime: Double) = this@RealtimeBroker.refreshVmLifecycles(currentTime)
-
-        override fun activeCloudlets(): List<Cloudlet> = this@RealtimeBroker.activeCloudlets()
-
-        override fun scaleOutCommands(
-            queueDepth: Int,
-            currentTime: Double,
-        ): List<RealtimeBrokerCommand> = this@RealtimeBroker.scaleOutCommands(queueDepth, currentTime)
-
-        override fun schedulingContext(
-            cloudlet: Cloudlet,
-            activeCloudlets: List<Cloudlet>,
-            currentTime: Double,
-        ): RealtimeSchedulingContext = this@RealtimeBroker.schedulingContext(cloudlet, activeCloudlets, currentTime)
-
-        override fun taskRecord(cloudlet: Cloudlet): RealtimeTaskRecord = this@RealtimeBroker.taskRecord(cloudlet)
-
-        override fun activeTenantRecords(): List<RealtimeTaskRecord> = this@RealtimeBroker.activeTenantRecords()
-
-        override fun decideTenantAdmission(record: RealtimeTaskRecord): TenantAdmissionDecision =
-            this@RealtimeBroker.decideTenantAdmission(record)
-
-        override fun decideCapacityAdmission(
-            activeCloudletCount: Int,
-            context: RealtimeSchedulingContext,
-        ): AdmissionDecision = this@RealtimeBroker.decideCapacityAdmission(activeCloudletCount, context)
-
-        override fun tryPreemptFor(
-            cloudlet: Cloudlet,
-            activeCloudlets: List<Cloudlet>,
-        ): Boolean = this@RealtimeBroker.tryPreemptFor(cloudlet, activeCloudlets)
-
-        override fun selectVm(
-            cloudlet: Cloudlet,
-            activeCloudlets: List<Cloudlet>,
-            currentTime: Double,
-        ): Pair<Int, Double>? = this@RealtimeBroker.selectVm(cloudlet, activeCloudlets, currentTime)
-
-        override fun latestRejectionReason(
-            cloudlet: Cloudlet,
-            activeCloudlets: List<Cloudlet>,
-            currentTime: Double,
-        ): RealtimeRejectReason = this@RealtimeBroker.latestRejectionReason(cloudlet, activeCloudlets, currentTime)
-
-        override fun rejectCloudlet(
-            cloudlet: Cloudlet,
-            reason: RealtimeRejectReason,
-        ) = this@RealtimeBroker.rejectCloudlet(cloudlet, reason)
-
-        override fun decisionDelay(cloudlet: Cloudlet): Double = this@RealtimeBroker.decisionDelay(cloudlet)
-
-        override fun recordDecisionDelay(delay: Double) = this@RealtimeBroker.recordDecisionDelay(delay)
-
-        override fun preparePendingSubmission(request: RealtimePendingSubmissionRequest): RealtimePendingSubmission =
-            this@RealtimeBroker.preparePendingSubmission(request)
-
-        override fun recordPreemptionFailed() = this@RealtimeBroker.recordPreemptionFailed()
-    }
-
-    private inner class SubmissionWorkflowAdapter : RealtimeSubmissionWorkflowContext {
-        override fun isPendingDecision(cloudlet: Cloudlet): Boolean = this@RealtimeBroker.isPendingDecision(cloudlet)
-
-        override fun discardPending(cloudlet: Cloudlet) = this@RealtimeBroker.discardPending(cloudlet)
-
-        override fun attemptOf(cloudlet: Cloudlet): Int = this@RealtimeBroker.attemptOf(cloudlet)
-
-        override fun submitAttemptDecision(
-            cloudletId: CloudletId,
-            attempt: Int,
-            failurePressure: Double,
-        ): FailureDecision = this@RealtimeBroker.submitAttemptDecision(cloudletId, attempt, failurePressure)
-
-        override fun retryPendingSubmission(
-            cloudlet: Cloudlet,
-            attempt: Int,
-            delay: Double,
-        ): RealtimeBrokerCommand = this@RealtimeBroker.retryPendingSubmission(cloudlet, attempt, delay)
-
-        override fun permanentlyFailPendingSubmission(cloudlet: Cloudlet) {
-            this@RealtimeBroker.permanentlyFailPendingSubmission(cloudlet)
-        }
-
-        override fun submitAcceptedCloudlet(submission: RealtimePendingSubmission) {
-            this@RealtimeBroker.submitAcceptedCloudlet(submission)
-        }
-    }
-
-    private fun activeVmIndexes(): Set<Int> =
-        RealtimeActiveVmIndexResolver(vmList, reservationState)
-            .indexesFor(getActiveCloudlets())
 }
-
-private fun RealtimeSchedulingContext.hasNoAcceptedCapacityCandidate(): Boolean =
-    (hasCapacityLimit || nodeCandidates.isNotEmpty()) && candidateNodeStates.isEmpty()

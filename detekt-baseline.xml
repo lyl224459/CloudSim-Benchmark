@@ -147,12 +147,9 @@
     <ID>TooManyFunctions:ComparisonRunner.kt$ComparisonRunner</ID>
     <ID>TooManyFunctions:Logger.kt$Logger</ID>
     <ID>TooManyFunctions:ObjectiveFunction.kt$SchedulerObjectiveFunction : ObjectiveFunction</ID>
-    <ID>TooManyFunctions:RealtimeBroker.kt$RealtimeBroker : DatacenterBrokerSimple</ID>
-    <ID>TooManyFunctions:RealtimeBroker.kt$RealtimeBroker$ArrivalWorkflowAdapter : RealtimeArrivalWorkflowContext</ID>
     <ID>TooManyFunctions:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel</ID>
     <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeArrivalState</ID>
     <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeBrokerMetrics</ID>
-    <ID>TooManyFunctions:RealtimeBrokerWorkflows.kt$RealtimeArrivalWorkflowContext</ID>
     <ID>TooManyFunctions:RealtimeControllers.kt$RealtimeTenantController</ID>
     <ID>TooManyFunctions:RealtimeTopologyModel.kt$RealtimeTopologyModel</ID>
     <ID>TooManyFunctions:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager</ID>
