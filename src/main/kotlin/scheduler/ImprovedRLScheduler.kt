@@ -5,6 +5,20 @@ import org.cloudsimplus.vms.Vm
 import util.Logger
 import kotlin.random.Random
 
+private const val DEFAULT_IMPROVED_RL_INITIAL_EXPLORATION_RATE = 0.8
+private const val PRETRAIN_PROGRESS_BUCKETS = 5
+private const val LOAD_LEVEL_BUCKETS = 4
+private const val SHORT_TASK_LENGTH_RATIO = 0.8
+private const val LONG_TASK_LENGTH_RATIO = 1.2
+private const val SHORT_TASK_LENGTH_LEVEL = 0
+private const val MEDIUM_TASK_LENGTH_LEVEL = 1
+private const val LONG_TASK_LENGTH_LEVEL = 2
+private const val BALANCE_REWARD_MULTIPLIER = 100.0
+private const val HIGH_LOAD_AVERAGE_MULTIPLIER = 1.5
+private const val HIGH_LOAD_PENALTY = -5.0
+private const val EFFICIENCY_REWARD = 2.0
+private const val ZERO_REWARD = 0.0
+
 /**
  * 改进版强化学习调度器 (Improved RL Scheduler)
  *
@@ -14,13 +28,14 @@ import kotlin.random.Random
  * 3. 目标对齐奖励：奖励函数与全局优化目标（负载、Makespan）直接挂钩。
  * 4. 训练优化：增加训练轮数，采用 epsilon 衰减策略。
  */
+@Suppress("LongParameterList")
 class ImprovedRLScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
     private val learningRate: Double = 0.1,
     private val discountFactor: Double = 0.95,
-    private val initialExplorationRate: Double = 0.8,
+    private val initialExplorationRate: Double = DEFAULT_IMPROVED_RL_INITIAL_EXPLORATION_RATE,
     private val minExplorationRate: Double = 0.05,
     private val episodes: Int = 1000,
     private val random: kotlin.random.Random = kotlin.random.Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
@@ -45,7 +60,7 @@ class ImprovedRLScheduler(
             trainOneEpisode(currentEpsilon)
             currentEpsilon = maxOf(minExplorationRate, currentEpsilon - epsilonDecay)
 
-            if (episode % (episodes / 5) == 0) {
+            if (episode % (episodes / PRETRAIN_PROGRESS_BUCKETS) == 0) {
                 Logger.debug("进度: {}/{} | Epsilon: %.2f | Q表大小: {}", episode, episodes, currentEpsilon, qTable.size)
             }
         }
@@ -80,7 +95,12 @@ class ImprovedRLScheduler(
             val reward = calculateReward(loadBefore, action, taskDuration)
 
             // 更新 Q 值
-            val nextState = if (taskIndex < cloudletNum - 1) getDiscretizedState(vmCurrentLoads, taskIndex + 1) else null
+            val nextState =
+                if (taskIndex < cloudletNum - 1) {
+                    getDiscretizedState(vmCurrentLoads, taskIndex + 1)
+                } else {
+                    null
+                }
             val nextMaxQ = nextState?.let { getMaxQValue(it) } ?: 0.0
 
             val currentQs = qTable.getOrPut(state) { DoubleArray(vmNum) { 0.0 } }
@@ -112,19 +132,19 @@ class ImprovedRLScheduler(
     ): DiscretizedState {
         // 1. 负载离散化 (0-4级)
         val maxLoad = vmLoads.maxOrNull()?.takeIf { it > 0 } ?: 1.0
-        val loadLevels = vmLoads.map { (it / maxLoad * 4).toInt() }
+        val loadLevels = vmLoads.map { (it / maxLoad * LOAD_LEVEL_BUCKETS).toInt() }
 
         // 2. 当前任务长度等级 (0-2级: 短, 中, 长)
         val taskLength = cloudletList.getOrNull(taskIndex)?.length?.toDouble() ?: avgCloudletLength
         val lengthLevel =
             when {
-                taskLength < avgCloudletLength * 0.8 -> 0
-                taskLength > avgCloudletLength * 1.2 -> 2
-                else -> 1
+                taskLength < avgCloudletLength * SHORT_TASK_LENGTH_RATIO -> SHORT_TASK_LENGTH_LEVEL
+                taskLength > avgCloudletLength * LONG_TASK_LENGTH_RATIO -> LONG_TASK_LENGTH_LEVEL
+                else -> MEDIUM_TASK_LENGTH_LEVEL
             }
 
         // 3. 进度离散化 (0-4级)
-        val progressLevel = (taskIndex.toDouble() / cloudletNum * 4).toInt()
+        val progressLevel = (taskIndex.toDouble() / cloudletNum * LOAD_LEVEL_BUCKETS).toInt()
 
         return DiscretizedState(loadLevels, lengthLevel, progressLevel)
     }
@@ -141,16 +161,21 @@ class ImprovedRLScheduler(
         val newVar = calculateVariance(newLoads)
 
         // 1. 负载均衡增量奖励 (减少方差则为正)
-        val balanceReward = (oldVar - newVar) * 100.0
+        val balanceReward = (oldVar - newVar) * BALANCE_REWARD_MULTIPLIER
 
         // 2. 效率奖励：避免将任务分配给负载已经是最高等级的 VM
-        val efficiencyReward = if (newLoads[action] > newLoads.average() * 1.5) -5.0 else 2.0
+        val efficiencyReward =
+            if (newLoads[action] > newLoads.average() * HIGH_LOAD_AVERAGE_MULTIPLIER) {
+                HIGH_LOAD_PENALTY
+            } else {
+                EFFICIENCY_REWARD
+            }
 
         return balanceReward + efficiencyReward
     }
 
     private fun calculateVariance(loads: DoubleArray): Double {
-        if (loads.all { it == 0.0 }) return 0.0
+        if (loads.all { it == ZERO_REWARD }) return ZERO_REWARD
         val avg = loads.average()
         return loads.map { (it - avg) * (it - avg) }.average()
     }

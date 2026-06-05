@@ -24,7 +24,7 @@
 
 ## Current quality baseline
 
-- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 120 项，后续迭代逐步削减。
+- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 84 项，后续迭代逐步削减。
 - JaCoCo 已设置保守门禁：line >= 60%、branch >= 35%。
 - `benchmarkPerformanceTrend` 只生成性能趋势报告，不设置性能失败阈值。
 - 当前保留 detekt `1.23.8` 稳定版；Gradle 10 deprecation warning 待 detekt 2.x 稳定后单独治理。

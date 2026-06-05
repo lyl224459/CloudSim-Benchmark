@@ -157,28 +157,39 @@ class RealtimeTopologyModel private constructor(
         vmIndex: Int,
         workload: RealtimeWorkloadDescriptor,
     ) {
-        if (!imageCacheEnabled) return
         val imageId = workload.imageId ?: return
-        if (imageCacheCapacity <= 0) return
+        if (!canRecordImageCache()) return
         val location = locationOf(vmIndex)
         val cache = imageCacheByHost.getOrPut(location) { LinkedHashSet() }
         if (cache.remove(imageId)) {
             cache.add(imageId)
-            return
+        } else {
+            evictImagesUntilWritable(cache)
+            cache.add(imageId)
         }
+    }
+
+    private fun canRecordImageCache(): Boolean = imageCacheEnabled && imageCacheCapacity > 0
+
+    private fun evictImagesUntilWritable(cache: LinkedHashSet<String>) {
         while (cache.size >= imageCacheCapacity) {
             val oldest = cache.firstOrNull() ?: break
             cache.remove(oldest)
         }
-        cache.add(imageId)
     }
 
-    fun physicalHostMetrics(records: List<RealtimeTaskRecord>): RealtimePhysicalHostMetrics {
-        if (!physicalTopologyEnabled) return RealtimePhysicalHostMetrics(0.0, 0.0)
+    fun physicalHostMetrics(records: List<RealtimeTaskRecord>): RealtimePhysicalHostMetrics =
+        if (physicalTopologyEnabled) {
+            calculatePhysicalHostMetrics(records)
+        } else {
+            emptyPhysicalHostMetrics()
+        }
+
+    private fun calculatePhysicalHostMetrics(records: List<RealtimeTaskRecord>): RealtimePhysicalHostMetrics {
         val annotator = candidateAnnotator()
         val demandByHost = annotator.activeDemandByHost(records)
         val hosts = allLocations()
-        if (hosts.isEmpty()) return RealtimePhysicalHostMetrics(0.0, 0.0)
+        if (hosts.isEmpty()) return emptyPhysicalHostMetrics()
         val states =
             hosts.map { location ->
                 annotator.hostState(location, demandByHost[location] ?: RealtimeResourceDemand())
@@ -188,6 +199,8 @@ class RealtimeTopologyModel private constructor(
             averageFragmentation = states.map { it.fragmentation }.average(),
         )
     }
+
+    private fun emptyPhysicalHostMetrics(): RealtimePhysicalHostMetrics = RealtimePhysicalHostMetrics(0.0, 0.0)
 
     fun latencyFor(location: RealtimeTopologyLocation): Double {
         if (!enabled) return 0.0

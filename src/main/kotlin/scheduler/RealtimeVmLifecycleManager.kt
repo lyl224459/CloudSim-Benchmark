@@ -66,17 +66,14 @@ class RealtimeVmLifecycleManager(
 
     fun getColdStartDelayTotal(): Double = coldStartDelayTotal
 
-    fun hasLiveDynamicVms(): Boolean = lifecycleByIndex.values.any { it.dynamic && it.lifecycle != RealtimeVmLifecycle.TERMINATED }
+    fun hasLiveDynamicVms(): Boolean = lifecycleByIndex.values.any { it.isLiveDynamic }
 
     fun maybeScaleOut(
         queueDepth: Int,
         currentTime: Double,
         activeVmIndexes: Set<Int> = emptySet(),
     ): List<Vm> {
-        if (!scheduling.autoscalingEnabled) return emptyList()
-        if (scheduling.maxDynamicVms <= dynamicVmCount()) return emptyList()
-        if (queueDepth < scheduling.scaleOutQueueThreshold.coerceAtLeast(1)) return emptyList()
-        if (hasProvisioningVm()) return emptyList()
+        if (!canScaleOut(queueDepth)) return emptyList()
 
         val vm = createDynamicVm()
         val index = mutableVms.size
@@ -135,16 +132,13 @@ class RealtimeVmLifecycleManager(
         if (!scheduling.autoscalingEnabled) return
         if (scheduling.scaleInIdleTime <= 0.0) return
 
-        for ((index, snapshot) in lifecycleByIndex.toMap()) {
-            if (!snapshot.dynamic) continue
-            if (snapshot.lifecycle != RealtimeVmLifecycle.ACTIVE) continue
-            if (index in activeVmIndexes) continue
-            if (currentTime - snapshot.createdAt < scheduling.scaleInProtectionTime) continue
-            if (currentTime - snapshot.lastBusyAt < scheduling.scaleInIdleTime) continue
-
-            lifecycleByIndex[index] = snapshot.copy(lifecycle = RealtimeVmLifecycle.TERMINATED)
-            scaleInCount++
-        }
+        lifecycleByIndex
+            .toMap()
+            .filter { (index, snapshot) -> shouldScaleIn(index, snapshot, currentTime, activeVmIndexes) }
+            .forEach { (index, snapshot) ->
+                lifecycleByIndex[index] = snapshot.copy(lifecycle = RealtimeVmLifecycle.TERMINATED)
+                scaleInCount++
+            }
         updatePeak()
     }
 
@@ -163,10 +157,27 @@ class RealtimeVmLifecycleManager(
             .setSize(DatacenterConfig.IMAGE_SIZE)
             .setCloudletScheduler(CloudletSchedulerSpaceShared())
 
-    private fun dynamicVmCount(): Int = lifecycleByIndex.values.count { it.dynamic && it.lifecycle != RealtimeVmLifecycle.TERMINATED }
+    private fun canScaleOut(queueDepth: Int): Boolean =
+        scheduling.autoscalingEnabled &&
+            scheduling.maxDynamicVms > dynamicVmCount() &&
+            queueDepth >= scheduling.scaleOutQueueThreshold.coerceAtLeast(1) &&
+            !hasProvisioningVm()
 
-    private fun hasProvisioningVm(): Boolean =
-        lifecycleByIndex.values.any { it.lifecycle == RealtimeVmLifecycle.PROVISIONING || it.lifecycle == RealtimeVmLifecycle.WARMING }
+    private fun shouldScaleIn(
+        index: Int,
+        snapshot: RealtimeVmLifecycleSnapshot,
+        currentTime: Double,
+        activeVmIndexes: Set<Int>,
+    ): Boolean =
+        snapshot.dynamic &&
+            snapshot.lifecycle == RealtimeVmLifecycle.ACTIVE &&
+            index !in activeVmIndexes &&
+            currentTime - snapshot.createdAt >= scheduling.scaleInProtectionTime &&
+            currentTime - snapshot.lastBusyAt >= scheduling.scaleInIdleTime
+
+    private fun dynamicVmCount(): Int = lifecycleByIndex.values.count { it.isLiveDynamic }
+
+    private fun hasProvisioningVm(): Boolean = lifecycleByIndex.values.any { it.isStarting }
 
     private fun updatePeak() {
         val active =
@@ -177,4 +188,10 @@ class RealtimeVmLifecycleManager(
             }
         if (active > activeVmPeak) activeVmPeak = active
     }
+
+    private val RealtimeVmLifecycleSnapshot.isLiveDynamic: Boolean
+        get() = dynamic && lifecycle != RealtimeVmLifecycle.TERMINATED
+
+    private val RealtimeVmLifecycleSnapshot.isStarting: Boolean
+        get() = lifecycle == RealtimeVmLifecycle.PROVISIONING || lifecycle == RealtimeVmLifecycle.WARMING
 }
