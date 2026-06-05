@@ -222,13 +222,8 @@ class RealtimePSOScheduler(
             val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
             val pso =
                 PSO(
-                    objFunc,
-                    population,
-                    0.0,
-                    (candidateVms.size - 1).toDouble(),
-                    allCloudlets.size,
-                    maxIter,
-                    random,
+                    runtime = OptimizerRuntime(objFunc, population, maxIter, random),
+                    searchSpace = AssignmentSearchSpace(0.0, (candidateVms.size - 1).toDouble(), allCloudlets.size),
                 )
             val allocation = pso.execute()
             return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
@@ -260,13 +255,8 @@ class RealtimeWOAScheduler(
             val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
             val woa =
                 WOA(
-                    objFunc,
-                    population,
-                    0.0,
-                    (candidateVms.size - 1).toDouble(),
-                    allCloudlets.size,
-                    maxIter,
-                    random,
+                    runtime = OptimizerRuntime(objFunc, population, maxIter, random),
+                    searchSpace = AssignmentSearchSpace(0.0, (candidateVms.size - 1).toDouble(), allCloudlets.size),
                 )
             val allocation = woa.execute()
             return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])

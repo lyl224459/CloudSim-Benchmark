@@ -40,7 +40,11 @@ class PSOTest {
         val dim = cloudlets.size
 
         // When
-        val pso = PSO(mockObjectiveFunction, population, 0.0, (vms.size - 1).toDouble(), dim, maxIter, random)
+        val pso =
+            createPso(
+                runtime = OptimizerRuntime(mockObjectiveFunction, population, maxIter, random),
+                searchSpace = AssignmentSearchSpace(0.0, (vms.size - 1).toDouble(), dim),
+            )
 
         // Then
         assertThat(pso).isNotNull()
@@ -53,7 +57,11 @@ class PSOTest {
         val maxIter = 20
         val dim = cloudlets.size
 
-        val pso = PSO(mockObjectiveFunction, population, 0.0, (vms.size - 1).toDouble(), dim, maxIter, random)
+        val pso =
+            createPso(
+                runtime = OptimizerRuntime(mockObjectiveFunction, population, maxIter, random),
+                searchSpace = AssignmentSearchSpace(0.0, (vms.size - 1).toDouble(), dim),
+            )
 
         // When
         val result = pso.execute()
@@ -75,7 +83,11 @@ class PSOTest {
         val objectiveFunction = SchedulerObjectiveFunction(cloudlets, singleVm, config.ObjectiveWeightsConfig())
         val dim = cloudlets.size
 
-        val pso = PSO(objectiveFunction, 10, 0.0, 0.0, dim, 10, random)
+        val pso =
+            createPso(
+                runtime = OptimizerRuntime(objectiveFunction, 10, 10, random),
+                searchSpace = AssignmentSearchSpace(0.0, 0.0, dim),
+            )
 
         // When
         val result = pso.execute()
@@ -97,7 +109,11 @@ class PSOTest {
         val objectiveFunction = SchedulerObjectiveFunction(singleCloudlet, vms, config.ObjectiveWeightsConfig())
         val dim = singleCloudlet.size
 
-        val pso = PSO(objectiveFunction, 10, 0.0, (vms.size - 1).toDouble(), dim, 10, random)
+        val pso =
+            createPso(
+                runtime = OptimizerRuntime(objectiveFunction, 10, 10, random),
+                searchSpace = AssignmentSearchSpace(0.0, (vms.size - 1).toDouble(), dim),
+            )
 
         // When
         val result = pso.execute()
@@ -117,7 +133,11 @@ class PSOTest {
         val lb = 0.0
         val ub = (vms.size - 1).toDouble()
 
-        val pso = PSO(mockObjectiveFunction, population, lb, ub, dim, maxIter, random)
+        val pso =
+            createPso(
+                runtime = OptimizerRuntime(mockObjectiveFunction, population, maxIter, random),
+                searchSpace = AssignmentSearchSpace(lb, ub, dim),
+            )
 
         // When
         val result = pso.execute()
@@ -137,8 +157,16 @@ class PSOTest {
         val maxIter = 20
         val dim = cloudlets.size
 
-        val pso1 = PSO(mockObjectiveFunction, population, 0.0, (vms.size - 1).toDouble(), dim, maxIter, Random(42))
-        val pso2 = PSO(mockObjectiveFunction, population, 0.0, (vms.size - 1).toDouble(), dim, maxIter, Random(123))
+        val pso1 =
+            createPso(
+                runtime = OptimizerRuntime(mockObjectiveFunction, population, maxIter, Random(42)),
+                searchSpace = AssignmentSearchSpace(0.0, (vms.size - 1).toDouble(), dim),
+            )
+        val pso2 =
+            createPso(
+                runtime = OptimizerRuntime(mockObjectiveFunction, population, maxIter, Random(123)),
+                searchSpace = AssignmentSearchSpace(0.0, (vms.size - 1).toDouble(), dim),
+            )
 
         // When
         val result1 = pso1.execute()
@@ -154,6 +182,11 @@ class PSOTest {
         }
         assertThat(differentCount).isGreaterThan(0) // 至少有一些不同
     }
+
+    private fun createPso(
+        runtime: OptimizerRuntime,
+        searchSpace: AssignmentSearchSpace,
+    ): PSO = PSO(runtime = runtime, searchSpace = searchSpace)
 
     // 辅助方法：创建模拟云任务
     private fun createMockCloudlets(count: Int): List<Cloudlet> {

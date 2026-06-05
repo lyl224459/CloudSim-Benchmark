@@ -1,0 +1,92 @@
+package cli
+
+import config.RealtimeSchedulingConfig
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
+
+internal fun JsonObjectBuilder.putRealtimeScheduling(scheduling: RealtimeSchedulingConfig) {
+    putJsonObject("scheduling") {
+        put("strategy", scheduling.strategy)
+        put("maxQueueSize", scheduling.maxQueueSize)
+        put("taskTimeout", scheduling.taskTimeout)
+        put("resourceReservation", scheduling.resourceReservation)
+        put("decisionDelay", scheduling.decisionDelay)
+        put("decisionJitter", scheduling.decisionJitter)
+        put("failureRate", scheduling.failureRate)
+        put("retryLimit", scheduling.retryLimit)
+        put("retryDelay", scheduling.retryDelay)
+        put("retryBackoffMultiplier", scheduling.retryBackoffMultiplier)
+        put("queuePolicy", scheduling.queuePolicy)
+        put("priorityLevels", scheduling.priorityLevels)
+        put("highPriorityRatio", scheduling.highPriorityRatio)
+        put("deadlineFactor", scheduling.deadlineFactor)
+        put("vmQueueCapacity", scheduling.vmQueueCapacity)
+        put("overloadFailureMultiplier", scheduling.overloadFailureMultiplier)
+        put("autoscalingEnabled", scheduling.autoscalingEnabled)
+        put("scaleOutQueueThreshold", scheduling.scaleOutQueueThreshold)
+        put("scaleInIdleTime", scheduling.scaleInIdleTime)
+        put("maxDynamicVms", scheduling.maxDynamicVms)
+        put("vmColdStartDelay", scheduling.vmColdStartDelay)
+        put("scaleOutCost", scheduling.scaleOutCost)
+        put("scaleInProtectionTime", scheduling.scaleInProtectionTime)
+        put("resourceModelEnabled", scheduling.resourceModelEnabled)
+        put("networkLatency", scheduling.networkLatency)
+        put("imagePullDelay", scheduling.imagePullDelay)
+        put("ioWeight", scheduling.ioWeight)
+        put("ramWeight", scheduling.ramWeight)
+        put("bwWeight", scheduling.bwWeight)
+        put("runtimeFailureRate", scheduling.runtimeFailureRate)
+        put("nodeFailureRate", scheduling.nodeFailureRate)
+        put("checkpointInterval", scheduling.checkpointInterval)
+        put("migrationDelay", scheduling.migrationDelay)
+        putPreemptionAndTenantScheduling(scheduling)
+        putTopologyScheduling(scheduling)
+    }
+}
+
+private fun JsonObjectBuilder.putPreemptionAndTenantScheduling(scheduling: RealtimeSchedulingConfig) {
+    put("timeoutAction", scheduling.timeoutAction)
+    put("preemptionEnabled", scheduling.preemptionEnabled)
+    put("preemptionPolicy", scheduling.preemptionPolicy)
+    put("preemptionMinPriorityGap", scheduling.preemptionMinPriorityGap)
+    put("preemptionMaxPerTask", scheduling.preemptionMaxPerTask)
+    put("preemptionDelay", scheduling.preemptionDelay)
+    put("preemptionPenalty", scheduling.preemptionPenalty)
+    put("multiTenantEnabled", scheduling.multiTenantEnabled)
+    put("tenantCount", scheduling.tenantCount)
+    putIntArray("tenantQuota", scheduling.tenantQuota)
+    putDoubleArray("tenantWeights", scheduling.tenantWeights)
+    put("tenantFairnessPolicy", scheduling.tenantFairnessPolicy)
+    put("tenantSchedulingPolicy", scheduling.tenantSchedulingPolicy)
+    put("tenantBurstAllowance", scheduling.tenantBurstAllowance)
+    put("tenantSlaPenaltyWeight", scheduling.tenantSlaPenaltyWeight)
+    putDoubleArray("tenantCostBudget", scheduling.tenantCostBudget)
+}
+
+private fun JsonObjectBuilder.putTopologyScheduling(scheduling: RealtimeSchedulingConfig) {
+    put("topologyEnabled", scheduling.topologyEnabled)
+    put("topologyPolicy", scheduling.topologyPolicy)
+    put("regionCount", scheduling.regionCount)
+    put("racksPerRegion", scheduling.racksPerRegion)
+    put("hostsPerRack", scheduling.hostsPerRack)
+    put("localRegion", scheduling.localRegion)
+    put("crossRackLatency", scheduling.crossRackLatency)
+    put("crossRegionLatency", scheduling.crossRegionLatency)
+    put("crossRegionCost", scheduling.crossRegionCost)
+    put("hostFailureRate", scheduling.hostFailureRate)
+    put("rackFailureRate", scheduling.rackFailureRate)
+    put("regionFailureRate", scheduling.regionFailureRate)
+    put("physicalTopologyEnabled", scheduling.physicalTopologyEnabled)
+    put("dataLocalityEnabled", scheduling.dataLocalityEnabled)
+    put("imageCacheEnabled", scheduling.imageCacheEnabled)
+    put("hostCountPerRack", scheduling.hostCountPerRack)
+    put("hostCpuCapacity", scheduling.hostCpuCapacity)
+    put("hostRamCapacity", scheduling.hostRamCapacity)
+    put("hostBwCapacity", scheduling.hostBwCapacity)
+    put("hostIoCapacity", scheduling.hostIoCapacity)
+    put("crossRackBandwidth", scheduling.crossRackBandwidth)
+    put("crossRegionBandwidth", scheduling.crossRegionBandwidth)
+    put("dataLocalityPolicy", scheduling.dataLocalityPolicy)
+    put("imageCacheCapacity", scheduling.imageCacheCapacity)
+}
