@@ -49,8 +49,8 @@ jobs:
 
     - name: Build, package and smoke release assets
       run: |
-        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --no-configuration-cache
-        .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --no-configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
+        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"

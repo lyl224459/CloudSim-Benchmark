@@ -2,8 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![JDK](https://img.shields.io/badge/JDK-25+-blue.svg)](https://jdk.java.net/)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.20-purple.svg)](https://kotlinlang.org/)
-[![Gradle](https://img.shields.io/badge/Gradle-9.2.1-green.svg)](https://gradle.org/)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.3.21-purple.svg)](https://kotlinlang.org/)
+[![Gradle](https://img.shields.io/badge/Gradle-9.5.1-green.svg)](https://gradle.org/)
 [![CI](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml)
 
 **CloudSim-Benchmark** 是一个基于 [CloudSim Plus](https://cloudsimplus.org/) 和 Kotlin 开发的高性能云任务调度算法评估框架。它集成了多种启发式群体智能算法与强化学习模型，支持批处理和实时调度两种实验模式，旨在为云计算调度研究提供一个**极致快速、易于扩展、结果可靠**的实验平台。
@@ -72,7 +72,7 @@ git submodule update --init --recursive
 
 Windows 脚本会自动读取系统代理（Internet Settings 中的 `ProxyEnable`/`ProxyServer`）并传递给 Gradle，首次下载 Gradle Wrapper 时无需在仓库中写死代理地址。若 JAR 不存在，`run.cmd` 会自动执行 `gradlew.bat fatJar --no-daemon`。
 
-CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。默认构建会执行 `prepareCloudSimPlusSource`，动态 fetch upstream tags 并 checkout 最新 release tag，然后把源码构建产物安装到 `build/cloudsimplus-m2`；可用 `-Pcloudsimplus.ref=<tag-or-sha>` 固定版本，`-Pcloudsimplus.offline=true` 使用当前 submodule checkout，或在受限网络里用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 为 Git/Maven 源码构建指定代理。
+CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。默认构建会执行 `prepareCloudSimPlusSource`，动态 fetch upstream tags 并 checkout 最新 release tag；Maven 原始产物写入 `build/cloudsimplus-raw-m2`，清理 manifest 后的可解析产物写入 `build/cloudsimplus-m2`。可用 `-Pcloudsimplus.ref=<tag-or-sha>` 固定版本，`-Pcloudsimplus.offline=true` 使用当前 submodule checkout，或在受限网络里用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 为 Git/Maven 源码构建指定代理。PowerShell 下 dotted Gradle 参数需要加引号，例如 `'-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port'`。源码构建任务支持 Gradle configuration cache；如遇网络失败，优先指定代理而不是关闭 configuration cache。
 
 ### 2. 运行实验 (子命令 CLI)
 
@@ -390,6 +390,12 @@ CloudSim-Benchmark/
 4. 在 `src/main/kotlin/scheduler/AlgorithmRegistry.kt` 中注册算法定义与别名
 5. 在 `configs/algorithms.toml` 中添加算法配置
 
+### Kotlin 维护约束
+
+- 涉及 Kotlin 代码迁移、Gradle/Android/KMP 工具链迁移、Java 转 Kotlin、JPA/ORM 实体建模等专题改动时，必须先遵循本机 Codex 已安装的对应 Kotlin skill 指南。
+- 若当前专题没有匹配的本地 Kotlin skill，则按本仓库既有 Kotlin 风格执行：保持 CLI、配置字段、CSV 表头兼容，优先小步重构，并确保 `ktlintCheck`、`detekt`、`test` 和覆盖率门禁通过。
+- 新增 Kotlin 代码应优先复用现有模块边界和 helper，不引入与当前 CloudSim/调度实验无关的框架或运行时依赖。
+
 ### 扩展实验模式
 
 1. 在 `src/main/kotlin/config/ExperimentConfig.kt` 中添加 `ExperimentMode`
@@ -406,7 +412,7 @@ CloudSim-Benchmark/
 ```yaml
 # .github/workflows/ci.yml
 - Windows + JDK 25 环境
-- .\gradlew.bat clean fullCheck --no-daemon --stacktrace
+- .\gradlew.bat clean fullCheck --no-daemon --stacktrace --configuration-cache
 - ktlintCheck / detekt / test / jacocoTestReport / fatJar
 ```
 

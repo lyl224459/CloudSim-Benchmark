@@ -5,7 +5,9 @@
 ## Release gates
 
 - `.\gradlew.bat ktlintCheck detekt --no-daemon --stacktrace`
+- `.\gradlew.bat buildSrc:test --no-daemon --stacktrace`
 - `.\gradlew.bat fullCheck --no-daemon --stacktrace --rerun-tasks`
+- `.\gradlew.bat verifyCloudSimPlusSourceBuild --no-daemon --stacktrace --configuration-cache`
 - `.\gradlew.bat benchmarkPerformanceSmoke --no-daemon --stacktrace --rerun-tasks`
 - `.\gradlew.bat benchmarkPerformanceTrend --no-daemon --stacktrace`
 - `.\gradlew.bat verifyReleasePackage --no-daemon --stacktrace`
@@ -22,6 +24,6 @@
 
 ## Current quality baseline
 
-- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 169 项，后续迭代逐步削减。
+- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 168 项，后续迭代逐步削减。
 - JaCoCo 已设置保守门禁：line >= 60%、branch >= 35%。
 - `benchmarkPerformanceTrend` 只生成性能趋势报告，不设置性能失败阈值。

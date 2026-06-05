@@ -1,4 +1,5 @@
 import buildlogic.BuildCloudSimPlusFromSourceTask
+import buildlogic.CloudSimPlusBuildService
 import buildlogic.PrepareCloudSimPlusSourceTask
 import buildlogic.SanitizeCloudSimPlusJarManifestTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
@@ -12,8 +13,8 @@ import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
-    kotlin("jvm") version "2.3.20"
-    kotlin("plugin.serialization") version "2.3.20"
+    kotlin("jvm") version "2.3.21"
+    kotlin("plugin.serialization") version "2.3.21"
     application
     jacoco
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
@@ -39,6 +40,7 @@ val cloudSimPlusGroup = "org.cloudsimplus"
 val cloudSimPlusArtifact = "cloudsimplus"
 val cloudSimPlusRepositoryUrl = "https://github.com/cloudsimplus/cloudsimplus.git"
 val cloudSimPlusSubmoduleDir = layout.projectDirectory.dir("third_party/cloudsimplus")
+val cloudSimPlusRawMavenRepo = layout.buildDirectory.dir("cloudsimplus-raw-m2")
 val cloudSimPlusLocalMavenRepo = layout.buildDirectory.dir("cloudsimplus-m2")
 val cloudSimPlusVersionFile = layout.buildDirectory.file("cloudsimplus-version.txt")
 val cloudSimPlusAutoUpdate =
@@ -182,19 +184,25 @@ val prepareCloudSimPlusSource by tasks.registering(PrepareCloudSimPlusSourceTask
     versionFile.set(cloudSimPlusVersionFile)
 }
 
+val cloudSimPlusBuildLock =
+    gradle.sharedServices.registerIfAbsent("cloudSimPlusBuildLock", CloudSimPlusBuildService::class) {
+        maxParallelUsages.set(1)
+    }
+
 val buildCloudSimPlusFromSource by tasks.registering(BuildCloudSimPlusFromSourceTask::class) {
     group = "build"
-    description = "使用 CloudSim Plus submodule 源码构建并 install 到 build/cloudsimplus-m2"
+    description = "使用 CloudSim Plus submodule 源码构建并 install 到 build/cloudsimplus-raw-m2"
 
     val sourceDir = cloudSimPlusSubmoduleDir.asFile
     dependsOn(prepareCloudSimPlusSource)
+    usesService(cloudSimPlusBuildLock)
     sourceFiles.from(
         fileTree(sourceDir) {
             exclude(".git/**", "target/**")
         },
     )
     this.sourceDir.set(cloudSimPlusSubmoduleDir)
-    localMavenRepo.set(cloudSimPlusLocalMavenRepo)
+    rawMavenRepo.set(cloudSimPlusRawMavenRepo)
     networkProxy.set(cloudSimPlusNetworkProxy)
 }
 
@@ -203,7 +211,9 @@ val sanitizeCloudSimPlusJarManifest by tasks.registering(SanitizeCloudSimPlusJar
     description = "移除源码构建 CloudSim Plus jar 中不兼容 JDK 25/Windows 的 manifest Class-Path"
 
     dependsOn(buildCloudSimPlusFromSource)
-    localMavenRepo.set(cloudSimPlusLocalMavenRepo)
+    usesService(cloudSimPlusBuildLock)
+    rawMavenRepo.set(cloudSimPlusRawMavenRepo)
+    sanitizedMavenRepo.set(cloudSimPlusLocalMavenRepo)
     artifactGroup.set(cloudSimPlusGroup)
     artifactName.set(cloudSimPlusArtifact)
 }

@@ -150,7 +150,6 @@
     <ID>TooManyFunctions:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel</ID>
     <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeArrivalState</ID>
     <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeBrokerMetrics</ID>
-    <ID>TooManyFunctions:RealtimeControllers.kt$RealtimeTenantController</ID>
     <ID>TooManyFunctions:RealtimeTopologyModel.kt$RealtimeTopologyModel</ID>
     <ID>TooManyFunctions:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager</ID>
     <ID>TooManyFunctions:RunResolver.kt$RunResolver</ID>

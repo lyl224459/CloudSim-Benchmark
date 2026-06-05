@@ -23,12 +23,12 @@ COPY third_party third_party
 RUN chmod +x gradlew
 
 # 预构建 CloudSim Plus 源码依赖并预下载依赖 (利用镜像缓存)
-RUN ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --no-configuration-cache
-RUN ./gradlew dependencies --no-daemon --no-configuration-cache
+RUN ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
+RUN ./gradlew dependencies --no-daemon --configuration-cache
 
 # 复制源码并构建 fatJar
 COPY src src
-RUN ./gradlew fatJar --no-daemon --no-configuration-cache -Pcompress=true
+RUN ./gradlew fatJar --no-daemon --configuration-cache -Pcompress=true
 
 # --- 阶段 2: 运行阶段 ---
 FROM eclipse-temurin:25-jre
