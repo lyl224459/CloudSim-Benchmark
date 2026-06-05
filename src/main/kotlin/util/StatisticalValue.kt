@@ -1,6 +1,9 @@
 package util
 
+import java.util.Locale
 import kotlin.math.sqrt
+
+private const val STATISTICAL_VALUE_RANGE_FORMAT = "%.2f ± %.2f [%.2f, %.2f]"
 
 /**
  * 统计值（平均值和标准差）
@@ -22,9 +25,9 @@ data class StatisticalValue(
         require(min <= mean && mean <= max) { "平均值必须在最小值和最大值之间" }
     }
 
-    override fun toString(): String = String.format("%.2f ± %.2f", mean, stdDev)
+    override fun toString(): String = String.format(Locale.ROOT, "%.2f ± %.2f", mean, stdDev)
 
-    fun toStringWithRange(): String = String.format("%.2f ± %.2f [%.2f, %.2f]", mean, stdDev, min, max)
+    fun toStringWithRange(): String = String.format(Locale.ROOT, STATISTICAL_VALUE_RANGE_FORMAT, mean, stdDev, min, max)
 
     companion object {
         /**
@@ -46,7 +49,7 @@ data class StatisticalValue(
          * @throws IllegalArgumentException 当数组为空或只有一个元素时
          */
         fun calculateStdDev(values: DoubleArray): Double {
-            if (values.isEmpty()) throw IllegalArgumentException("数组不能为空")
+            require(values.isNotEmpty()) { "数组不能为空" }
             if (values.size < 2) return 0.0
             validateArray(values, "计算标准差")
 
@@ -68,7 +71,7 @@ data class StatisticalValue(
         fun calculateMin(values: DoubleArray): Double {
             require(values.isNotEmpty()) { "数组不能为空" }
             validateArray(values, "计算最小值")
-            return values.minOrNull() ?: throw IllegalStateException("无法计算最小值")
+            return checkNotNull(values.minOrNull()) { "无法计算最小值" }
         }
 
         /**
@@ -80,7 +83,7 @@ data class StatisticalValue(
         fun calculateMax(values: DoubleArray): Double {
             require(values.isNotEmpty()) { "数组不能为空" }
             validateArray(values, "计算最大值")
-            return values.maxOrNull() ?: throw IllegalStateException("无法计算最大值")
+            return checkNotNull(values.maxOrNull()) { "无法计算最大值" }
         }
 
         /**
@@ -126,12 +129,8 @@ data class StatisticalValue(
             operation: String,
         ) {
             for ((index, value) in values.withIndex()) {
-                if (value.isNaN()) {
-                    throw IllegalArgumentException("$operation: 数组中第${index}个元素是NaN")
-                }
-                if (value.isInfinite()) {
-                    throw IllegalArgumentException("$operation: 数组中第${index}个元素是无穷大")
-                }
+                require(!value.isNaN()) { "$operation: 数组中第${index}个元素是NaN" }
+                require(!value.isInfinite()) { "$operation: 数组中第${index}个元素是无穷大" }
             }
         }
     }

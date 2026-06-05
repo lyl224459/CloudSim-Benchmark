@@ -9,6 +9,8 @@ import util.Logger
 import java.text.DecimalFormat
 import java.util.Random
 
+private const val REALTIME_EXPERIMENT_SEPARATOR_WIDTH = 60
+
 internal data class RealtimeExperimentConfigSnapshot(
     val cloudletCount: Int,
     val simulationDuration: Double,
@@ -40,9 +42,9 @@ internal class RealtimeExperimentRunner(
     private val dft: DecimalFormat = DecimalFormat("###.##"),
 ) {
     fun run(request: RealtimeExperimentRunRequest): RealtimeAlgorithmResult {
-        Logger.info("\n${"=".repeat(60)}")
+        Logger.info("\n${"=".repeat(REALTIME_EXPERIMENT_SEPARATOR_WIDTH)}")
         Logger.info("运行实时调度算法: {}", request.algorithmName)
-        Logger.info("${"=".repeat(60)}")
+        Logger.info("${"=".repeat(REALTIME_EXPERIMENT_SEPARATOR_WIDTH)}")
 
         val context = createRunContext(request)
         Logger.info("已生成 {} 个实时任务", context.cloudletList.size)
@@ -85,7 +87,12 @@ internal class RealtimeExperimentRunner(
                 arrivalConfig = config.arrival,
                 googleTraceConfig = config.googleTraceConfig,
             )
-        val cloudletBatch = cloudletGenerator.createRealtimeCloudletBatch(0, config.cloudletCount, config.simulationDuration)
+        val cloudletBatch =
+            cloudletGenerator.createRealtimeCloudletBatch(
+                0,
+                config.cloudletCount,
+                config.simulationDuration,
+            )
         broker.submitCloudletBatchRealtime(cloudletBatch)
 
         return RealtimeExperimentRunContext(

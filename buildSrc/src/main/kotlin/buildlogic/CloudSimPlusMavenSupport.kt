@@ -45,12 +45,18 @@ internal object CloudSimPlusMavenSupport {
         proxy: String,
         existingOptions: String? = System.getenv("MAVEN_OPTS")?.takeIf(String::isNotBlank),
     ): String {
+        val trimmedExisting = existingOptions?.trim()?.takeIf(String::isNotBlank)
         val proxyOptions =
             proxy
                 .trim()
                 .takeIf(String::isNotBlank)
                 ?.let(::proxyOptions)
-        return listOfNotNull(existingOptions, proxyOptions).joinToString(" ")
+        val jdkCompatibilityOptions =
+            JDK_25_COMPATIBILITY_OPTIONS
+                .filterNot { option -> trimmedExisting.containsOption(option) }
+                .joinToString(" ")
+                .takeIf(String::isNotBlank)
+        return listOfNotNull(trimmedExisting, jdkCompatibilityOptions, proxyOptions).joinToString(" ")
     }
 
     private fun proxyOptions(proxy: String): String {
@@ -70,4 +76,16 @@ internal object CloudSimPlusMavenSupport {
     }
 
     private const val DEFAULT_PROXY_PORT = 80
+
+    private val JDK_25_COMPATIBILITY_OPTIONS =
+        listOf(
+            "--enable-native-access=ALL-UNNAMED",
+            "--sun-misc-unsafe-memory-access=allow",
+        )
+
+    private fun String?.containsOption(option: String): Boolean =
+        this
+            ?.split(Regex("\\s+"))
+            ?.contains(option)
+            ?: false
 }

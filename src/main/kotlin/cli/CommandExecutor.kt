@@ -13,6 +13,10 @@ import util.Logger
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
+private const val MIN_RECOMMENDED_JAVA_MAJOR = 17
+private const val BYTES_PER_MEBIBYTE = 1024
+private const val LOW_MEMORY_WARNING_MIB = 512
+
 object CommandExecutor {
     private val timestampFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")
 
@@ -55,10 +59,13 @@ object CommandExecutor {
 
         val timestamp = LocalDateTime.now().format(timestampFormatter)
         val experimentName = RunResolver.renderExperimentName(resolved, timestamp)
-        val outputContext = ExperimentOutputContext.createExperiment(resolved.systemConfig, resolved.mode, experimentName)
-        val experimentDir =
-            outputContext.experimentDir
-                ?: throw IllegalStateException("无法创建实验输出目录")
+        val outputContext =
+            ExperimentOutputContext.createExperiment(
+                resolved.systemConfig,
+                resolved.mode,
+                experimentName,
+            )
+        val experimentDir = checkNotNull(outputContext.experimentDir) { "无法创建实验输出目录" }
 
         Logger.info("实验目录: {}", experimentDir.absolutePath)
         outputContext.saveResolvedConfig(DryRunPrinter.resolvedJson(resolved, experimentDir, timestamp))
@@ -72,9 +79,7 @@ object CommandExecutor {
         outputContext: ExperimentOutputContext,
     ) {
         val config = resolved.experimentConfig
-        val experimentDir =
-            outputContext.experimentDir
-                ?: throw IllegalStateException("运行实验需要有效的输出目录")
+        val experimentDir = checkNotNull(outputContext.experimentDir) { "运行实验需要有效的输出目录" }
         val concurrency =
             ExperimentConcurrency(
                 resolved.execution.useCoroutines,
@@ -195,13 +200,13 @@ object CommandExecutor {
             Logger.debug("检测Java版本: {}", javaVersion)
 
             val versionParts = javaVersion.split(".").mapNotNull { it.toIntOrNull() }
-            if (versionParts.isNotEmpty() && versionParts[0] < 17) {
-                Logger.warn("建议使用Java 17或更高版本，当前版本: {}", javaVersion)
+            if (versionParts.isNotEmpty() && versionParts[0] < MIN_RECOMMENDED_JAVA_MAJOR) {
+                Logger.warn("建议使用Java {}或更高版本，当前版本: {}", MIN_RECOMMENDED_JAVA_MAJOR, javaVersion)
             }
 
-            val maxMemoryMB = Runtime.getRuntime().maxMemory() / 1024 / 1024
+            val maxMemoryMB = Runtime.getRuntime().maxMemory() / BYTES_PER_MEBIBYTE / BYTES_PER_MEBIBYTE
             Logger.debug("最大可用内存: {} MB", maxMemoryMB)
-            if (maxMemoryMB < 512) {
+            if (maxMemoryMB < LOW_MEMORY_WARNING_MIB) {
                 Logger.warn("可用内存较少 ({} MB)，可能影响大规模实验性能", maxMemoryMB)
             }
 
@@ -215,9 +220,15 @@ object CommandExecutor {
             } catch (e: ClassNotFoundException) {
                 throw IllegalStateException("找不到CloudSim Plus依赖，请检查classpath", e)
             }
-        } catch (e: Exception) {
-            Logger.error("环境验证失败: " + e.message, e)
-            throw IllegalStateException("环境验证失败: ${e.message}", e)
+        } catch (e: IllegalStateException) {
+            failEnvironmentValidation(e)
+        } catch (e: SecurityException) {
+            failEnvironmentValidation(e)
         }
+    }
+
+    private fun failEnvironmentValidation(exception: RuntimeException): Nothing {
+        Logger.error("环境验证失败: " + exception.message, exception)
+        throw IllegalStateException("环境验证失败: ${exception.message}", exception)
     }
 }

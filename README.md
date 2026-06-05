@@ -72,7 +72,7 @@ git submodule update --init --recursive
 
 Windows 脚本会自动读取系统代理（Internet Settings 中的 `ProxyEnable`/`ProxyServer`）并传递给 Gradle，首次下载 Gradle Wrapper 时无需在仓库中写死代理地址。若 JAR 不存在，`run.cmd` 会自动执行 `gradlew.bat fatJar --no-daemon`。
 
-CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。默认构建会执行 `prepareCloudSimPlusSource`，动态 fetch upstream tags 并 checkout 最新 release tag；Maven 原始产物写入 `build/cloudsimplus-raw-m2`，清理 manifest 后的可解析产物写入 `build/cloudsimplus-m2`。可用 `-Pcloudsimplus.ref=<tag-or-sha>` 固定版本，`-Pcloudsimplus.offline=true` 使用当前 submodule checkout，或在受限网络里用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 为 Git/Maven 源码构建指定代理。PowerShell 下 dotted Gradle 参数需要加引号，例如 `'-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port'`。源码构建任务支持 Gradle configuration cache；如遇网络失败，优先指定代理而不是关闭 configuration cache。
+CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。默认构建会执行 `prepareCloudSimPlusSource`，动态 fetch upstream tags 并 checkout 最新 release tag；Maven 原始产物写入 `build/cloudsimplus-raw-m2`，清理 manifest 后的可解析产物写入 `build/cloudsimplus-m2`。可用 `-Pcloudsimplus.ref=<tag-or-sha>` 固定版本，`-Pcloudsimplus.offline=true` 使用当前 submodule checkout，或在受限网络里用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 为 Git/Maven 源码构建指定代理。PowerShell 下 dotted Gradle 参数需要加引号，例如 `'-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port'`。源码构建任务支持 Gradle configuration cache；如遇网络失败，优先指定代理而不是关闭 configuration cache。Maven 源码构建会自动追加 JDK 25 兼容 JVM 参数，并保留用户已有 `MAVEN_OPTS`。
 
 ### 2. 运行实验 (子命令 CLI)
 
@@ -344,6 +344,8 @@ podman build -t cloudsim-benchmark .
 
 - **环境隔离**: 避免本地环境差异影响实验结果
 - **可重现性**: 确保实验在不同机器上的结果一致
+
+`containerImageSmoke` 在 CI 中要求 Docker 可用，Docker 缺失或镜像 smoke 失败都会阻断构建；本地开发机缺少 Docker 时会给出明确诊断并跳过该 smoke。
 - **资源管控**: 限制容器资源使用，避免过度消耗
 
 Containerfile 配置了完整的运行时环境，包括 JDK 25、ZGC 优化等。
@@ -417,6 +419,8 @@ CloudSim-Benchmark/
 ```
 
 发布流程由 `.github/workflows/release.yml` 在 `v*.*.*` 标签或手动触发时执行，复用 Gradle release package tasks 生成可执行 JAR、Windows zip、Unix tar.gz、源码包和清单，并推送容器镜像到 GHCR。发布前验收清单见 `docs/release-readiness.md`。
+
+当前保留 detekt `1.23.8` 稳定版；其 Gradle 10 deprecation warning 来自插件内部 API，待 detekt 2.x 稳定后单独升级处理。
 
 ### 迁移说明
 

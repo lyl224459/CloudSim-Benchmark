@@ -1,0 +1,40 @@
+package buildlogic
+
+import java.io.File
+import kotlin.test.Test
+import kotlin.test.assertEquals
+
+class ContainerImageSmokeSupportTest {
+    @Test
+    fun `build and run commands use explicit docker arguments`() {
+        val containerFile = File("Containerfile")
+
+        assertEquals(
+            listOf("docker", "build", "-t", "cloudsim-benchmark:smoke", "-f", containerFile.absolutePath, "."),
+            ContainerImageSmokeSupport.buildCommand(
+                dockerExecutable = "docker",
+                imageName = "cloudsim-benchmark:smoke",
+                containerFile = containerFile,
+            ),
+        )
+        assertEquals(
+            listOf("docker", "run", "--rm", "cloudsim-benchmark:smoke", "--help"),
+            ContainerImageSmokeSupport.runCommand(
+                dockerExecutable = "docker",
+                imageName = "cloudsim-benchmark:smoke",
+            ),
+        )
+    }
+
+    @Test
+    fun `missing docker message distinguishes ci from local runs`() {
+        assertEquals(
+            "Docker executable 'docker' is required for containerImageSmoke in CI.",
+            ContainerImageSmokeSupport.missingDockerMessage("docker", ci = true),
+        )
+        assertEquals(
+            "Docker executable 'docker' was not found; skipping local containerImageSmoke.",
+            ContainerImageSmokeSupport.missingDockerMessage("docker", ci = false),
+        )
+    }
+}

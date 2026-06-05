@@ -8,6 +8,12 @@ import util.ExperimentConcurrency
 import util.ExperimentOutputContext
 import util.Logger
 import java.text.DecimalFormat
+import java.util.Locale
+
+private const val REALTIME_LOG_SEPARATOR_WIDTH = 80
+private const val REALTIME_SUMMARY_SEPARATOR_WIDTH = 100
+private const val REALTIME_COUNT_COLUMN_WIDTH = 12
+private const val REALTIME_ALGORITHM_COLUMN_WIDTH = 20
 
 /**
  * 实时调度批量任务数实验运行器
@@ -74,15 +80,15 @@ class RealtimeCloudletCountRunner(
      * 运行批量任务数实验
      */
     suspend fun runBatchExperiment() {
-        Logger.info("\n${"=".repeat(80)}")
+        Logger.info("\n${"=".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}")
         Logger.info("开始实时调度批量任务数实验")
-        Logger.info("${"=".repeat(80)}")
+        Logger.info("${"=".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}")
         Logger.info("任务数列表: {}", cloudletCounts.joinToString(", "))
         Logger.info("每个任务数运行次数: {}", runs)
         Logger.info("仿真持续时间: {}s, 到达率: {}/s", simulationDuration, arrivalRate)
         Logger.info("种群大小: {}, 最大迭代: {}", population, maxIter)
         Logger.info("随机数种子: {}", randomSeed)
-        Logger.info("${"=".repeat(80)}\n")
+        Logger.info("${"=".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}\n")
 
         outputContext.saveExperimentInfo(
             mapOf(
@@ -162,18 +168,18 @@ class RealtimeCloudletCountRunner(
         // 导出汇总结果
         exportBatchResults(allResults)
 
-        Logger.info("\n${"=".repeat(80)}")
+        Logger.info("\n${"=".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}")
         Logger.info("实时调度批量任务数实验完成！")
-        Logger.info("${"=".repeat(80)}")
+        Logger.info("${"=".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}")
     }
 
     private suspend fun runCloudletCount(
         index: Int,
         cloudletCount: Int,
     ): Pair<Int, List<RealtimeRunSummary>> {
-        Logger.info("\n${"#".repeat(80)}")
+        Logger.info("\n${"#".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}")
         Logger.info("任务数: {} ({}/{})", cloudletCount, index + 1, cloudletCounts.size)
-        Logger.info("${"#".repeat(80)}")
+        Logger.info("${"#".repeat(REALTIME_LOG_SEPARATOR_WIDTH)}")
 
         val childOutputContext = outputContext.child("cloudlets_$cloudletCount")
         val runner =
@@ -248,9 +254,9 @@ class RealtimeCloudletCountRunner(
      * 打印汇总表格
      */
     private fun printSummaryTable(results: Map<Int, List<RealtimeRunSummary>>) {
-        Logger.info("\n${"=".repeat(100)}")
+        Logger.info("\n${"=".repeat(REALTIME_SUMMARY_SEPARATOR_WIDTH)}")
         Logger.info("实时调度批量任务数实验汇总")
-        Logger.info("${"=".repeat(100)}")
+        Logger.info("${"=".repeat(REALTIME_SUMMARY_SEPARATOR_WIDTH)}")
 
         val sortedCounts = results.keys.sorted()
 
@@ -262,12 +268,12 @@ class RealtimeCloudletCountRunner(
                 .sorted()
 
         // 打印表头
-        Logger.info(String.format("%-12s", "任务数"))
+        Logger.info(countText("任务数"))
         for (alg in allAlgorithms) {
-            Logger.info(String.format("%-20s", alg))
+            Logger.info(algorithmText(alg))
         }
         Logger.info("")
-        Logger.info("-".repeat(100))
+        Logger.info("-".repeat(REALTIME_SUMMARY_SEPARATOR_WIDTH))
 
         // 打印每个指标
         val metrics =
@@ -282,15 +288,15 @@ class RealtimeCloudletCountRunner(
 
         for ((metricName, metricGetter) in metrics) {
             Logger.info("\n{} (平均值):", metricName)
-            Logger.info(String.format("%-12s", "任务数"))
+            Logger.info(countText("任务数"))
             for (alg in allAlgorithms) {
-                Logger.info(String.format("%-20s", alg))
+                Logger.info(algorithmText(alg))
             }
             Logger.info("")
-            Logger.info("-".repeat(100))
+            Logger.info("-".repeat(REALTIME_SUMMARY_SEPARATOR_WIDTH))
 
             for (cloudletCount in sortedCounts) {
-                Logger.info(String.format("%-12d", cloudletCount))
+                Logger.info(countNumber(cloudletCount))
                 val algorithmStats = results[cloudletCount].orEmpty().mapNotNull { it.statistics }
                 val statsMap = algorithmStats.associateBy { it.algorithmName }
 
@@ -298,15 +304,26 @@ class RealtimeCloudletCountRunner(
                     val stat = statsMap[alg]
                     if (stat != null) {
                         val value = metricGetter(stat)
-                        Logger.info(String.format("%-20s", "${dft.format(value.mean)} ± ${dft.format(value.stdDev)}"))
+                        Logger.info(algorithmText("${dft.format(value.mean)} ± ${dft.format(value.stdDev)}"))
                     } else {
-                        Logger.info(String.format("%-20s", "-"))
+                        Logger.info(algorithmText("-"))
                     }
                 }
                 Logger.info("")
             }
         }
 
-        Logger.info("${"=".repeat(100)}")
+        Logger.info("${"=".repeat(REALTIME_SUMMARY_SEPARATOR_WIDTH)}")
     }
+
+    private fun countText(value: String): String = cell("%-${REALTIME_COUNT_COLUMN_WIDTH}s", value)
+
+    private fun countNumber(value: Int): String = cell("%-${REALTIME_COUNT_COLUMN_WIDTH}d", value)
+
+    private fun algorithmText(value: String): String = cell("%-${REALTIME_ALGORITHM_COLUMN_WIDTH}s", value)
+
+    private fun cell(
+        format: String,
+        value: Any,
+    ): String = String.format(Locale.ROOT, format, value)
 }

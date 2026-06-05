@@ -55,9 +55,23 @@ class CloudSimPlusMavenSupportTest {
             )
 
         assertTrue("-Xmx1g" in options)
+        assertTrue("--enable-native-access=ALL-UNNAMED" in options)
+        assertTrue("--sun-misc-unsafe-memory-access=allow" in options)
         assertTrue("-Dhttp.proxyHost=10.53.115.91" in options)
         assertTrue("-Dhttp.proxyPort=7890" in options)
         assertTrue("-Dhttps.proxyHost=10.53.115.91" in options)
         assertTrue("-Dhttps.proxyPort=7890" in options)
+    }
+
+    @Test
+    fun `maven options does not duplicate jdk compatibility flags`() {
+        val options =
+            CloudSimPlusMavenSupport.mavenOptions(
+                proxy = "",
+                existingOptions = "--enable-native-access=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow",
+            )
+
+        assertEquals(1, Regex("--enable-native-access=ALL-UNNAMED").findAll(options).count())
+        assertEquals(1, Regex("--sun-misc-unsafe-memory-access=allow").findAll(options).count())
     }
 }

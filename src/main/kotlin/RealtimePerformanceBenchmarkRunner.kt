@@ -13,9 +13,20 @@ import java.io.File
 import java.time.Instant
 import java.util.Random
 
+private const val SMALL_BENCHMARK_CLOUDLETS = 100
+private const val MEDIUM_BENCHMARK_CLOUDLETS = 1_000
+private const val LARGE_BENCHMARK_CLOUDLETS = 10_000
+private const val NANOS_PER_MILLISECOND = 1_000_000L
+private val DEFAULT_BENCHMARK_CLOUDLET_COUNTS =
+    listOf(
+        SMALL_BENCHMARK_CLOUDLETS,
+        MEDIUM_BENCHMARK_CLOUDLETS,
+        LARGE_BENCHMARK_CLOUDLETS,
+    )
+
 @Serializable
 data class RealtimePerformanceBenchmarkConfig(
-    val cloudletCounts: List<Int> = listOf(100, 1_000, 10_000),
+    val cloudletCounts: List<Int> = DEFAULT_BENCHMARK_CLOUDLET_COUNTS,
     val algorithms: List<RealtimePerformanceBenchmarkAlgorithm> = RealtimePerformanceBenchmarkAlgorithm.entries,
     val measuredRuns: Int = 3,
     val randomSeed: Long = 0L,
@@ -122,7 +133,7 @@ class RealtimePerformanceBenchmarkRunner(
         runIndex: Int,
     ): RealtimePerformanceBenchmarkResult {
         val seed = config.randomSeed + cloudletCount + runIndex
-        Runtime.getRuntime().gc()
+        requestMemoryBaseline()
         val before = usedMemoryBytes()
         val started = System.nanoTime()
         val outcome =
@@ -132,7 +143,7 @@ class RealtimePerformanceBenchmarkRunner(
                     RealtimePerformanceBenchmarkMode.REALTIME -> runRealtimeBenchmark(algorithm, cloudletCount, seed)
                 }
             }
-        val elapsedMs = (System.nanoTime() - started) / 1_000_000
+        val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLISECOND
         val after = usedMemoryBytes()
         val memoryDeltaBytes = (after - before).coerceAtLeast(0L)
 
@@ -223,6 +234,12 @@ class RealtimePerformanceBenchmarkRunner(
         return runtime.totalMemory() - runtime.freeMemory()
     }
 
+    @Suppress("ExplicitGarbageCollectionCall")
+    private fun requestMemoryBaseline() {
+        // This smoke benchmark records memory delta, so it keeps the previous explicit GC behavior.
+        Runtime.getRuntime().gc()
+    }
+
     companion object {
         internal val json =
             Json {
@@ -243,13 +260,15 @@ fun main(args: Array<String>) {
 
 private fun Array<String>.toBenchmarkOptions(): Map<String, String> =
     asList().chunked(2).associate { chunk ->
-        require(chunk.size == 2 && chunk[0].startsWith("--")) { "Invalid benchmark argument list: ${joinToString(" ")}" }
+        require(chunk.size == 2 && chunk[0].startsWith("--")) {
+            "Invalid benchmark argument list: ${joinToString(" ")}"
+        }
         chunk[0].removePrefix("--") to chunk[1]
     }
 
 private fun Map<String, String>.toBenchmarkConfig(): RealtimePerformanceBenchmarkConfig =
     RealtimePerformanceBenchmarkConfig(
-        cloudletCounts = this["sizes"]?.toIntList() ?: listOf(100, 1_000, 10_000),
+        cloudletCounts = this["sizes"]?.toIntList() ?: DEFAULT_BENCHMARK_CLOUDLET_COUNTS,
         algorithms =
             this["algorithms"]?.let(RealtimePerformanceBenchmarkAlgorithm::parseList)
                 ?: RealtimePerformanceBenchmarkAlgorithm.entries,
@@ -263,4 +282,4 @@ private fun Map<String, String>.toBenchmarkConfig(): RealtimePerformanceBenchmar
 private fun String.toIntList(): List<Int> =
     split(",")
         .mapNotNull { it.trim().toIntOrNull()?.takeIf { value -> value > 0 } }
-        .ifEmpty { listOf(100, 1_000, 10_000) }
+        .ifEmpty { DEFAULT_BENCHMARK_CLOUDLET_COUNTS }

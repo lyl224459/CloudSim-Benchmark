@@ -32,13 +32,20 @@ object CsvCellFormatter {
             else -> value.toString()
         }
 
-    private fun Double.formatFloatingPoint(): String = if (isFinite()) String.format(Locale.US, "%.6f", this) else toString()
+    private fun Double.formatFloatingPoint(): String =
+        if (isFinite()) {
+            String.format(Locale.US, "%.6f", this)
+        } else {
+            toString()
+        }
 }
 
 class CsvRowWriter(
     private val delimiter: String = ",",
 ) {
-    fun line(values: Iterable<Any?>): String = values.joinToString(delimiter) { value -> escape(CsvCellFormatter.format(value)) }
+    fun line(values: Iterable<Any?>): String = values.joinToString(delimiter, transform = ::escapedCell)
+
+    private fun escapedCell(value: Any?): String = escape(CsvCellFormatter.format(value))
 
     fun writeHeader(
         writer: BufferedWriter,
@@ -70,7 +77,11 @@ class CsvRowWriter(
     }
 
     private fun escape(value: String): String {
-        val needsQuotes = value.contains(delimiter) || value.contains('"') || value.contains('\n') || value.contains('\r')
+        val needsQuotes =
+            value.contains(delimiter) ||
+                value.contains('"') ||
+                value.contains('\n') ||
+                value.contains('\r')
         if (!needsQuotes) return value
         return "\"" + value.replace("\"", "\"\"") + "\""
     }

@@ -1,5 +1,6 @@
 import buildlogic.BuildCloudSimPlusFromSourceTask
 import buildlogic.CloudSimPlusBuildService
+import buildlogic.ContainerImageSmokeTask
 import buildlogic.PrepareCloudSimPlusSourceTask
 import buildlogic.SanitizeCloudSimPlusJarManifestTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
@@ -965,35 +966,16 @@ val verifyReleasePackage by tasks.registering {
     }
 }
 
-val containerImageSmoke by tasks.registering(Exec::class) {
+val containerImageSmoke by tasks.registering(ContainerImageSmokeTask::class) {
     group = "verification"
     description = "构建容器镜像并运行 --help smoke"
 
-    val imageName = "cloudsim-benchmark:smoke"
     dependsOn("fatJar")
-    if (isWindowsHost) {
-        commandLine(
-            "powershell",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            """
-            ${'$'}ErrorActionPreference = 'Stop'
-            Get-Command docker | Out-Null
-            docker build -t $imageName -f Containerfile .
-            if (${'$'}LASTEXITCODE -ne 0) { exit ${'$'}LASTEXITCODE }
-            docker run --rm $imageName --help
-            if (${'$'}LASTEXITCODE -ne 0) { exit ${'$'}LASTEXITCODE }
-            """.trimIndent(),
-        )
-    } else {
-        commandLine(
-            "bash",
-            "-lc",
-            "docker build -t $imageName -f Containerfile . && docker run --rm $imageName --help",
-        )
-    }
+    imageName.set("cloudsim-benchmark:smoke")
+    dockerExecutable.set("docker")
+    ci.set(isCiBuildProvider)
+    contextDirectory.set(layout.projectDirectory)
+    containerFile.set(layout.projectDirectory.file("Containerfile"))
 }
 
 // 优化 Zip 任务性能 - 根据环境自动选择压缩策略
