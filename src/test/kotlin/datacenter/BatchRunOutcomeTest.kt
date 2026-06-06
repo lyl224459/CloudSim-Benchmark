@@ -14,7 +14,7 @@ class BatchRunOutcomeTest {
 
     @Test
     fun `summary statistics use only successful outcomes`() {
-        val runner = ComparisonRunner(resolvedAlgorithms = emptyList())
+        val runner = ComparisonRunner(BatchExperimentRequest())
         val summary =
             runner.buildAlgorithmSummary(
                 algorithmName = "PSO",
@@ -40,7 +40,7 @@ class BatchRunOutcomeTest {
 
     @Test
     fun `failed summary writes status and blank metric fields`() {
-        val runner = ComparisonRunner(resolvedAlgorithms = emptyList())
+        val runner = ComparisonRunner(BatchExperimentRequest())
         val summary =
             runner.buildAlgorithmSummary(
                 algorithmName = "WOA",
@@ -86,7 +86,7 @@ class BatchRunOutcomeTest {
 
     @Test
     fun `cloudlet count summary row aligns with generated headers`() {
-        val runner = ComparisonRunner(resolvedAlgorithms = emptyList())
+        val runner = ComparisonRunner(BatchExperimentRequest())
         val summary =
             runner.buildAlgorithmSummary(
                 algorithmName = "HHO",

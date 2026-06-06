@@ -8,6 +8,7 @@ import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
@@ -32,6 +33,12 @@ abstract class PrepareCloudSimPlusSourceTask : DefaultTask() {
 
     @get:Input
     abstract val requestedRef: Property<String>
+
+    @get:InputFile
+    abstract val lockFile: RegularFileProperty
+
+    @get:Input
+    abstract val enforceLock: Property<Boolean>
 
     @get:Input
     abstract val networkProxy: Property<String>
@@ -73,6 +80,7 @@ abstract class PrepareCloudSimPlusSourceTask : DefaultTask() {
             offlineMode = offline.get(),
             autoUpdateEnabled = autoUpdate.get(),
             selectedOverride = requestedRef.get().trim(),
+            lockedMetadata = CloudSimPlusLockSupport.read(lockFile.get().asFile).takeIf { enforceLock.get() },
         )
     }
 }

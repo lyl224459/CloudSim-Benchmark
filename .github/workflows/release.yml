@@ -47,17 +47,17 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "tag=v$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Build, package and smoke release assets
-      run: |
-        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
-        .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
+    - name: Audit build warnings
+      shell: pwsh
+      run: ./scripts/run-build-warning-audit.ps1
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
-    - name: Audit build warnings
-      shell: pwsh
-      run: ./scripts/run-build-warning-audit.ps1
+    - name: Build, package and smoke release assets
+      run: |
+        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"

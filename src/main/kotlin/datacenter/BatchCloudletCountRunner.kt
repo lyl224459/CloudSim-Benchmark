@@ -1,11 +1,7 @@
 package datacenter
 
-import config.CloudletGeneratorType
-import scheduler.ResolvedAlgorithm
 import util.CsvRowWriter
 import util.CsvTableSchema
-import util.ExperimentConcurrency
-import util.ExperimentOutputContext
 import util.Logger
 import java.text.DecimalFormat
 import java.util.Locale
@@ -20,44 +16,16 @@ private const val ALGORITHM_COLUMN_WIDTH = 20
  * 支持按照不同的任务数批量执行实验，每个任务数可以运行多次并取平均值
  */
 class BatchCloudletCountRunner(
-    /**
-     * 要测试的任务数列表
-     * 例如: listOf(50, 100, 200, 500, 1000)
-     */
-    private val cloudletCounts: List<Int>,
-    /**
-     * 种群大小
-     */
-    private val population: Int = 30,
-    /**
-     * 最大迭代次数
-     */
-    private val maxIter: Int = 50,
-    /**
-     * 随机数种子
-     */
-    private val randomSeed: Long = 0L,
-    /**
-     * 已解析的算法定义
-     */
-    private val resolvedAlgorithms: List<ResolvedAlgorithm>,
-    /**
-     * 每个任务数的运行次数（用于计算平均值）
-     */
-    private val runs: Int = 1,
-    /**
-     * 任务生成器类型
-     */
-    private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
-    /**
-     * 实验目录
-     */
-    private val experimentDir: java.io.File? = null,
-    private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir),
-    private val useCoroutines: Boolean = true,
-    private val maxConcurrency: Int = 0,
-    private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency),
+    private val request: BatchExperimentRequest,
 ) {
+    private val cloudletCounts = request.batch.cloudletCounts
+    private val population = request.batch.population
+    private val maxIter = request.batch.maxIter
+    private val randomSeed = request.execution.randomSeed
+    private val runs = request.batch.runs
+    private val generatorType = request.batch.generatorType
+    private val outputContext = request.execution.outputContext
+    private val concurrency = request.execution.concurrency
     private val dft = DecimalFormat("###.##")
 
     /**
@@ -110,16 +78,10 @@ class BatchCloudletCountRunner(
         val childOutputContext = outputContext.child("cloudlets_$cloudletCount")
         val runner =
             ComparisonRunner(
-                cloudletCount = cloudletCount,
-                population = population,
-                maxIter = maxIter,
-                randomSeed = randomSeed,
-                resolvedAlgorithms = resolvedAlgorithms,
-                runs = runs,
-                generatorType = generatorType,
-                experimentDir = childOutputContext.experimentDir,
-                outputContext = childOutputContext,
-                concurrency = concurrency,
+                request.copy(
+                    batch = request.batch.copy(cloudletCount = cloudletCount),
+                    execution = request.execution.copy(outputContext = childOutputContext),
+                ),
             )
 
         val summaries = runner.runComparisonSummaries().sortedBy { it.algorithmName }

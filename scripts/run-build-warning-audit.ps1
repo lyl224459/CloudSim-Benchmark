@@ -7,8 +7,18 @@ $logDirectory = Join-Path $root "build/reports/build-warnings/logs"
 $wrapper = if ($IsWindows) { Join-Path $root "gradlew.bat" } else { Join-Path $root "gradlew" }
 $sourceFailures = [System.Collections.Generic.List[string]]::new()
 
+@(
+    (Join-Path $root "build/cloudsimplus-raw-m2"),
+    (Join-Path $root "build/cloudsimplus-m2"),
+    (Join-Path $root "build/cloudsimplus-version.txt"),
+    (Join-Path $root "build/reports/build-warnings")
+) | ForEach-Object {
+    if (Test-Path -LiteralPath $_) {
+        Remove-Item -LiteralPath $_ -Recurse -Force
+    }
+}
+
 New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
-Get-ChildItem -LiteralPath $logDirectory -Filter "*.log" -ErrorAction SilentlyContinue | Remove-Item -Force
 
 function Invoke-AuditedGradleTask {
     param(
@@ -39,7 +49,7 @@ function Invoke-AuditedGradleTask {
 
 Push-Location $root
 try {
-    Invoke-AuditedGradleTask "buildCloudSimPlusFromSource" "buildCloudSimPlusFromSource.log"
+    Invoke-AuditedGradleTask "sanitizeCloudSimPlusJarManifest" "buildCloudSimPlusFromSource.log"
     Invoke-AuditedGradleTask "compileKotlin" "compileKotlin.log" @(
         "-x", "prepareCloudSimPlusSource",
         "-x", "buildCloudSimPlusFromSource",

@@ -1,0 +1,54 @@
+name: CloudSim Plus Latest Compatibility
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+
+jobs:
+  latest-release:
+    name: Latest CloudSim Plus (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: 'gradle'
+
+    - name: Test latest release (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\gradlew.bat clean verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Test latest release (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        ./gradlew clean verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Upload compatibility metadata and reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: cloudsimplus-latest-${{ matrix.os }}
+        path: |
+          build/cloudsimplus-version.txt
+          build/reports/
+        if-no-files-found: warn

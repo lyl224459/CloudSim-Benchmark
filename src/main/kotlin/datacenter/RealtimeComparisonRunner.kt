@@ -3,31 +3,27 @@ package datacenter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import scheduler.ResolvedAlgorithm
-import util.ExperimentConcurrency
-import util.ExperimentOutputContext
 import util.Logger
 import kotlin.system.measureTimeMillis
 
 class RealtimeComparisonRunner(
-    private val cloudletCount: Int = 100,
-    private val simulationDuration: Double = 1000.0,
-    private val arrivalRate: Double = 10.0,
-    private val population: Int = 20,
-    private val maxIter: Int = 20,
-    private val randomSeed: Long = 0L,
-    private val runs: Int = 1,
-    private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
-    private val googleTraceConfig: config.GoogleTraceConfig? = null,
-    private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
-    private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(),
-    private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(),
-    private val resolvedAlgorithms: List<ResolvedAlgorithm>,
-    private val experimentDir: java.io.File? = null,
-    private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir),
-    private val useCoroutines: Boolean = true,
-    private val maxConcurrency: Int = 0,
-    private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency),
+    private val request: RealtimeExperimentRequest,
 ) {
+    private val cloudletCount = request.realtime.cloudletCount
+    private val simulationDuration = request.realtime.simulationDuration
+    private val arrivalRate = request.realtime.arrivalRate
+    private val population = request.optimizer.population
+    private val maxIter = request.optimizer.maxIter
+    private val randomSeed = request.execution.randomSeed
+    private val runs = request.realtime.runs
+    private val generatorType = request.realtime.generatorType
+    private val googleTraceConfig = request.realtime.googleTraceConfig
+    private val objectiveWeights = request.realtime.objectiveWeights
+    private val arrival = request.realtime.arrival
+    private val scheduling = request.realtime.scheduling
+    private val resolvedAlgorithms = request.execution.resolvedAlgorithms
+    private val outputContext = request.execution.outputContext
+    private val concurrency = request.execution.concurrency
     private val metricsCollector = RealtimeMetricsCollector(scheduling, objectiveWeights)
     private val experimentConfig =
         RealtimeExperimentConfigSnapshot(

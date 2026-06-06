@@ -111,22 +111,32 @@ internal class CloudSimPlusSourcePreparer(
         offlineMode: Boolean,
         autoUpdateEnabled: Boolean,
         selectedOverride: String,
+        lockedMetadata: CloudSimPlusMetadata?,
     ) {
-        ensureSourceCheckout(source, offlineMode, selectedOverride)
+        val requestedOrLockedRef = selectedOverride.ifBlank { lockedMetadata?.ref.orEmpty() }
+        ensureSourceCheckout(source, offlineMode, requestedOrLockedRef)
         val selectedRef =
-            selectedOverride.ifBlank {
-                if (!offlineMode && autoUpdateEnabled) {
+            CloudSimPlusRefSelection.select(
+                requestedRef = selectedOverride,
+                autoUpdateEnabled = autoUpdateEnabled,
+                lockedRef = lockedMetadata?.ref,
+            ) {
+                if (!offlineMode) {
                     latestReleaseTagFromRemote() ?: latestReleaseTag(source)
                 } else {
                     latestReleaseTag(source)
                 }
             }
         fetchSelectedRef(source, selectedRef, offlineMode, autoUpdateEnabled, selectedOverride)
-        git.exec(listOf("-C", source.path, "checkout", selectedRef))
+        git.exec(listOf("-C", source.path, "checkout", lockedMetadata?.commit ?: selectedRef))
 
         val commit = git.exec(listOf("-C", source.path, "rev-parse", "HEAD"))
         val cloudSimVersion = CloudSimPlusVersioning.readCloudSimPlusVersion(source)
-        writeVersionFileIfChanged(versionFile, selectedRef, commit, cloudSimVersion)
+        val actualMetadata = CloudSimPlusMetadata(selectedRef, commit, cloudSimVersion)
+        if (lockedMetadata != null && actualMetadata != lockedMetadata) {
+            throw GradleException("CloudSim Plus lock drift: expected=$lockedMetadata actual=$actualMetadata")
+        }
+        CloudSimPlusLockSupport.writeIfChanged(versionFile, actualMetadata)
         logLifecycle("CloudSim Plus source ready: ref=$selectedRef commit=$commit version=$cloudSimVersion")
     }
 
@@ -215,7 +225,7 @@ internal class CloudSimPlusSourcePreparer(
         autoUpdateEnabled: Boolean,
         selectedOverride: String,
     ) {
-        if (offlineMode || !autoUpdateEnabled) {
+        if (offlineMode || (!autoUpdateEnabled && selectedOverride.isBlank())) {
             return
         }
         if (currentExactTag(source) == selectedRef) {
@@ -248,22 +258,4 @@ internal class CloudSimPlusSourcePreparer(
             tags = git.exec(listOf("-C", source.path, "tag", "--list")),
             source = source,
         )
-
-    private fun writeVersionFileIfChanged(
-        versionFile: File,
-        selectedRef: String,
-        commit: String,
-        cloudSimVersion: String,
-    ) {
-        val content =
-            listOf(
-                "ref=$selectedRef",
-                "commit=$commit",
-                "version=$cloudSimVersion",
-            ).joinToString(System.lineSeparator()) + System.lineSeparator()
-        versionFile.parentFile.mkdirs()
-        if (!versionFile.isFile || versionFile.readText() != content) {
-            versionFile.writeText(content)
-        }
-    }
 }

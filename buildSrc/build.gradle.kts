@@ -1,5 +1,8 @@
+import org.gradle.testing.jacoco.tasks.JacocoReport
+
 plugins {
     `kotlin-dsl`
+    jacoco
 }
 
 repositories {
@@ -24,4 +27,13 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    finalizedBy(tasks.named("jacocoTestReport"))
+}
+
+tasks.named<JacocoReport>("jacocoTestReport") {
+    dependsOn(tasks.named("test"))
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
 }

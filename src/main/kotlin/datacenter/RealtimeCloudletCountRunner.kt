@@ -1,11 +1,7 @@
 package datacenter
 
-import config.CloudletGeneratorType
-import scheduler.ResolvedAlgorithm
 import util.CsvRowWriter
 import util.CsvTableSchema
-import util.ExperimentConcurrency
-import util.ExperimentOutputContext
 import util.Logger
 import java.text.DecimalFormat
 import java.util.Locale
@@ -20,60 +16,19 @@ private const val REALTIME_ALGORITHM_COLUMN_WIDTH = 20
  * 支持按照不同的任务数批量执行实时调度实验，每个任务数可以运行多次并取平均值
  */
 class RealtimeCloudletCountRunner(
-    /**
-     * 要测试的任务数列表
-     * 例如: listOf(50, 100, 200, 500, 1000)
-     */
-    private val cloudletCounts: List<Int>,
-    /**
-     * 仿真持续时间（秒）
-     */
-    private val simulationDuration: Double = 500.0,
-    /**
-     * 平均每秒到达的任务数
-     */
-    private val arrivalRate: Double = 5.0,
-    /**
-     * 种群大小
-     */
-    private val population: Int = 20,
-    /**
-     * 最大迭代次数
-     */
-    private val maxIter: Int = 20,
-    /**
-     * 随机数种子
-     */
-    private val randomSeed: Long = 0L,
-    /**
-     * 已解析的算法定义
-     */
-    private val resolvedAlgorithms: List<ResolvedAlgorithm>,
-    /**
-     * 每个任务数的运行次数（用于计算平均值）
-     */
-    private val runs: Int = 1,
-    /**
-     * 任务生成器类型
-     */
-    private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE,
-    /**
-     * 实时到达配置
-     */
-    private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(),
-    /**
-     * 实时调度配置
-     */
-    private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(),
-    /**
-     * 实验目录
-     */
-    private val experimentDir: java.io.File? = null,
-    private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir),
-    private val useCoroutines: Boolean = true,
-    private val maxConcurrency: Int = 0,
-    private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency),
+    private val request: RealtimeExperimentRequest,
 ) {
+    private val cloudletCounts = request.realtime.cloudletCounts
+    private val simulationDuration = request.realtime.simulationDuration
+    private val arrivalRate = request.realtime.arrivalRate
+    private val population = request.optimizer.population
+    private val maxIter = request.optimizer.maxIter
+    private val randomSeed = request.execution.randomSeed
+    private val runs = request.realtime.runs
+    private val generatorType = request.realtime.generatorType
+    private val scheduling = request.realtime.scheduling
+    private val outputContext = request.execution.outputContext
+    private val concurrency = request.execution.concurrency
     private val dft = DecimalFormat("###.##")
 
     /**
@@ -184,20 +139,10 @@ class RealtimeCloudletCountRunner(
         val childOutputContext = outputContext.child("cloudlets_$cloudletCount")
         val runner =
             RealtimeComparisonRunner(
-                cloudletCount = cloudletCount,
-                simulationDuration = simulationDuration,
-                arrivalRate = arrivalRate,
-                population = population,
-                maxIter = maxIter,
-                randomSeed = randomSeed,
-                resolvedAlgorithms = resolvedAlgorithms,
-                runs = runs,
-                generatorType = generatorType,
-                arrival = arrival,
-                scheduling = scheduling,
-                experimentDir = childOutputContext.experimentDir,
-                outputContext = childOutputContext,
-                concurrency = concurrency,
+                request.copy(
+                    realtime = request.realtime.copy(cloudletCount = cloudletCount),
+                    execution = request.execution.copy(outputContext = childOutputContext),
+                ),
             )
 
         val summaries = runner.runComparisonSummaries().sortedBy { it.algorithmName }

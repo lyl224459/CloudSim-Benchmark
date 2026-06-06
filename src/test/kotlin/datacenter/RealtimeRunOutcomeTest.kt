@@ -15,7 +15,7 @@ class RealtimeRunOutcomeTest {
 
     @Test
     fun `summary statistics use only successful outcomes`() {
-        val runner = RealtimeComparisonRunner(resolvedAlgorithms = emptyList())
+        val runner = RealtimeComparisonRunner(RealtimeExperimentRequest())
         val summary =
             runner.buildRealtimeSummary(
                 algorithmName = "PSO-Realtime",
@@ -41,7 +41,7 @@ class RealtimeRunOutcomeTest {
 
     @Test
     fun `failed summary writes status and blank metric fields`() {
-        val runner = RealtimeComparisonRunner(resolvedAlgorithms = emptyList())
+        val runner = RealtimeComparisonRunner(RealtimeExperimentRequest())
         val summary =
             runner.buildRealtimeSummary(
                 algorithmName = "WOA-Realtime",

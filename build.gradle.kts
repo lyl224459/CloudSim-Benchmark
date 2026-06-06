@@ -1,9 +1,14 @@
 import buildlogic.BuildCloudSimPlusFromSourceTask
 import buildlogic.BuildWarningAuditTask
 import buildlogic.CloudSimPlusBuildService
+import buildlogic.CloudSimPlusLockSupport
 import buildlogic.ContainerImageSmokeTask
 import buildlogic.PrepareCloudSimPlusSourceTask
+import buildlogic.ReleaseManifest
+import buildlogic.ReleaseManifestSupport
 import buildlogic.SanitizeCloudSimPlusJarManifestTask
+import buildlogic.UpdateCloudSimPlusLockTask
+import buildlogic.VerifyCloudSimPlusLockTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
@@ -45,11 +50,14 @@ val cloudSimPlusSubmoduleDir = layout.projectDirectory.dir("third_party/cloudsim
 val cloudSimPlusRawMavenRepo = layout.buildDirectory.dir("cloudsimplus-raw-m2")
 val cloudSimPlusLocalMavenRepo = layout.buildDirectory.dir("cloudsimplus-m2")
 val cloudSimPlusVersionFile = layout.buildDirectory.file("cloudsimplus-version.txt")
+val cloudSimPlusLockFile = layout.projectDirectory.file("gradle/cloudsimplus.lock")
+val cloudSimPlusLockedMetadata =
+    providers.fileContents(cloudSimPlusLockFile).asText.map(CloudSimPlusLockSupport::parse)
 val cloudSimPlusAutoUpdate =
     providers
         .gradleProperty("cloudsimplus.autoUpdate")
         .map(String::toBoolean)
-        .orElse(true)
+        .orElse(false)
 val cloudSimPlusOffline =
     providers
         .gradleProperty("cloudsimplus.offline")
@@ -59,6 +67,10 @@ val cloudSimPlusRequestedRef =
     providers
         .gradleProperty("cloudsimplus.ref")
         .orElse("")
+val cloudSimPlusEnforceLock =
+    cloudSimPlusAutoUpdate.zip(cloudSimPlusRequestedRef) { autoUpdate, requestedRef ->
+        !autoUpdate && requestedRef.isBlank()
+    }
 val cloudSimPlusNetworkProxy =
     providers
         .gradleProperty("cloudsimplus.gitProxy")
@@ -72,10 +84,9 @@ val cloudSimPlusGitTimeoutSeconds =
 val buildWarningLogDirectory = layout.buildDirectory.dir("reports/build-warnings/logs")
 val buildWarningAuditReport = layout.buildDirectory.file("reports/build-warnings/audit.md")
 val cloudSimPlusDependencyVersion =
-    providers
-        .gradleProperty("cloudsimplus.version")
-        .orElse("latest.release")
-        .get()
+    cloudSimPlusEnforceLock.zip(cloudSimPlusLockedMetadata) { enforceLock, locked ->
+        if (enforceLock) locked.version else providers.gradleProperty("cloudsimplus.version").orNull ?: "latest.release"
+    }
 
 repositories {
     exclusiveContent {
@@ -182,11 +193,33 @@ val prepareCloudSimPlusSource by tasks.registering(PrepareCloudSimPlusSourceTask
     autoUpdate.set(cloudSimPlusAutoUpdate)
     offline.set(cloudSimPlusOffline)
     requestedRef.set(cloudSimPlusRequestedRef)
+    lockFile.set(cloudSimPlusLockFile)
+    enforceLock.set(cloudSimPlusEnforceLock)
     networkProxy.set(cloudSimPlusNetworkProxy)
     gitTimeoutSeconds.set(cloudSimPlusGitTimeoutSeconds)
     rootDir.set(layout.projectDirectory)
     sourceDir.set(cloudSimPlusSubmoduleDir)
     versionFile.set(cloudSimPlusVersionFile)
+}
+
+val verifyCloudSimPlusLock by tasks.registering(VerifyCloudSimPlusLockTask::class) {
+    group = "verification"
+    description = "验证 CloudSim Plus checkout、实际元数据与 gradle/cloudsimplus.lock 一致"
+    dependsOn(prepareCloudSimPlusSource)
+    lockFile.set(cloudSimPlusLockFile)
+    metadataFile.set(cloudSimPlusVersionFile)
+    rootDir.set(layout.projectDirectory)
+    sourceDir.set(cloudSimPlusSubmoduleDir)
+    enforceLock.set(cloudSimPlusEnforceLock)
+}
+
+val updateCloudSimPlusLock by tasks.registering(UpdateCloudSimPlusLockTask::class) {
+    group = "build setup"
+    description = "将显式 ref 或 latest compatibility build 的实际元数据写入 CloudSim Plus lock"
+    dependsOn(prepareCloudSimPlusSource)
+    updateAllowed.set(cloudSimPlusEnforceLock.map { !it })
+    metadataFile.set(cloudSimPlusVersionFile)
+    lockFile.set(cloudSimPlusLockFile)
 }
 
 tasks.register<BuildWarningAuditTask>("verifyBuildWarnings") {
@@ -206,7 +239,7 @@ val buildCloudSimPlusFromSource by tasks.registering(BuildCloudSimPlusFromSource
     description = "使用 CloudSim Plus submodule 源码构建并 install 到 build/cloudsimplus-raw-m2"
 
     val sourceDir = cloudSimPlusSubmoduleDir.asFile
-    dependsOn(prepareCloudSimPlusSource)
+    dependsOn(verifyCloudSimPlusLock)
     usesService(cloudSimPlusBuildLock)
     sourceFiles.from(
         fileTree(sourceDir) {
@@ -259,7 +292,7 @@ tasks.withType<Jar>().configureEach {
 }
 
 dependencies {
-    implementation("$cloudSimPlusGroup:$cloudSimPlusArtifact:$cloudSimPlusDependencyVersion")
+    implementation("$cloudSimPlusGroup:$cloudSimPlusArtifact:${cloudSimPlusDependencyVersion.get()}")
     implementation("org.apache.commons:commons-math3:3.6.1")
 
     // 日志库：kotlin-logging (Kotlin友好的日志API)
@@ -860,16 +893,22 @@ val generateReleaseManifest by tasks.registering {
             sourcePackageName,
             releaseManifestName,
         )
+    val metadataFile = cloudSimPlusVersionFile
 
-    dependsOn(copyReleaseJar, packageWindowsRelease, packageUnixRelease, packageSourceRelease)
+    dependsOn(copyReleaseJar, packageWindowsRelease, packageUnixRelease, packageSourceRelease, verifyCloudSimPlusLock)
+    inputs.file(metadataFile)
     outputs.file(manifestFile)
 
     doLast {
         val output = manifestFile.get().asFile
         output.parentFile.mkdirs()
-        output.writeText(
-            expectedAssets.joinToString(System.lineSeparator()) + System.lineSeparator(),
-        )
+        val manifest =
+            ReleaseManifest(
+                format = ReleaseManifestSupport.CURRENT_FORMAT,
+                cloudSimPlus = CloudSimPlusLockSupport.read(metadataFile.get().asFile),
+                assets = expectedAssets,
+            )
+        output.writeText(manifest.render())
     }
 }
 
@@ -887,21 +926,21 @@ val verifyReleaseManifest by tasks.registering {
     val artifactsDir = releaseArtifactsDir
     val manifestFile = artifactsDir.map { it.file(releaseManifestName) }
     val expectedAssets = listOf(releaseJarName, windowsPackageName, unixPackageName, sourcePackageName, releaseManifestName)
+    val expectedMetadata = cloudSimPlusLockedMetadata
+    val enforceLock = cloudSimPlusEnforceLock
 
     dependsOn(packageReleaseAssets)
     inputs.file(manifestFile)
+    inputs.property("enforceCloudSimPlusLock", enforceLock)
 
     doLast {
         val dir = artifactsDir.get().asFile
-        val manifest =
-            manifestFile
-                .get()
-                .asFile
-                .readLines()
-                .filter { it.isNotBlank() }
-        check(manifest == expectedAssets) {
-            "Release manifest drift: expected $expectedAssets but found $manifest"
-        }
+        val manifest = ReleaseManifestSupport.parse(manifestFile.get().asFile.readText())
+        ReleaseManifestSupport.validate(
+            manifest = manifest,
+            expectedCloudSimPlus = expectedMetadata.get().takeIf { enforceLock.get() },
+            expectedAssets = expectedAssets,
+        )
         expectedAssets.forEach { asset ->
             check(File(dir, asset).isFile) { "Missing release asset listed in manifest: $asset" }
         }

@@ -72,7 +72,7 @@ git submodule update --init --recursive
 
 Windows 脚本会自动读取系统代理（Internet Settings 中的 `ProxyEnable`/`ProxyServer`）并传递给 Gradle，首次下载 Gradle Wrapper 时无需在仓库中写死代理地址。若 JAR 不存在，`run.cmd` 会自动执行 `gradlew.bat fatJar --no-daemon`。
 
-CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。默认构建会执行 `prepareCloudSimPlusSource`，动态 fetch upstream tags 并 checkout 最新 release tag；Maven 原始产物写入 `build/cloudsimplus-raw-m2`，清理 manifest 后的可解析产物写入 `build/cloudsimplus-m2`。可用 `-Pcloudsimplus.ref=<tag-or-sha>` 固定版本，`-Pcloudsimplus.offline=true` 使用当前 submodule checkout，或在受限网络里用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 为 Git/Maven 源码构建指定代理。PowerShell 下 dotted Gradle 参数需要加引号，例如 `'-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port'`。源码构建任务支持 Gradle configuration cache；如遇网络失败，优先指定代理而不是关闭 configuration cache。Maven 源码构建会自动追加 JDK 25 兼容 JVM 参数，并保留用户已有 `MAVEN_OPTS`。
+CloudSim Plus 通过 `third_party/cloudsimplus` submodule 源码构建。普通本地、PR、release 和 container 构建默认严格使用 `gradle/cloudsimplus.lock` 中的固定 ref、commit 与版本；Maven 原始产物写入 `build/cloudsimplus-raw-m2`，清理 manifest 后的可解析产物写入 `build/cloudsimplus-m2`。兼容性测试可用 `-Pcloudsimplus.ref=<tag-or-sha>` 指定 ref，或用 `-Pcloudsimplus.autoUpdate=true` 测试最新 semver release；确认兼容后通过 `updateCloudSimPlusLock` 更新 lock 并提交对应 submodule gitlink。`-Pcloudsimplus.offline=true` 使用当前 checkout，受限网络可用 `-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port` 指定代理。PowerShell 下 dotted Gradle 参数需要加引号，例如 `'-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port'`。源码构建任务支持 Gradle configuration cache；如遇网络失败，优先指定代理而不是关闭 configuration cache。Maven 源码构建会自动追加 JDK 25 兼容 JVM 参数，并保留用户已有 `MAVEN_OPTS`。
 
 ### 2. 运行实验 (子命令 CLI)
 
@@ -421,6 +421,8 @@ CloudSim-Benchmark/
 发布流程由 `.github/workflows/release.yml` 在 `v*.*.*` 标签或手动触发时执行，复用 Gradle release package tasks 生成可执行 JAR、Windows zip、Unix tar.gz、源码包和清单，并推送容器镜像到 GHCR。发布前验收清单见 `docs/release-readiness.md`。
 
 warning audit 分别捕获 `compileKotlin`、`detekt`、`ktlintCheck` 和 CloudSim Plus Maven 源码构建日志，仅精确允许 detekt `1.23.8` 的 Gradle 10 deprecation 和 ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning；任何新增 warning 都会阻断 CI。审计报告和原始日志保存在 `build/reports/build-warnings/` 并由 CI 始终上传。
+
+每周 CloudSim Plus latest compatibility workflow 会在 Windows、Ubuntu、macOS 上测试最新 release，但不会自动修改 lock。发布清单记录实际 CloudSim Plus ref、commit、version 与全部资产；`buildSrc` JaCoCo 报告位于 `buildSrc/build/reports/jacoco/`，当前仅生成报告、不设失败阈值。
 
 ### 迁移说明
 

@@ -67,6 +67,7 @@ class DocumentationDriftTest {
                 "verifyReleasePackage",
                 "containerImageSmoke",
                 "verifyReleaseManifest",
+                "verifyCloudSimPlusLock",
             )
 
         expectedTasks.forEach { taskName ->
