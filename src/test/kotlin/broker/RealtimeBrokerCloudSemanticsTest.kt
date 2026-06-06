@@ -100,7 +100,12 @@ class RealtimeBrokerCloudSemanticsTest {
                 RealtimeSchedulingConfig(vmQueueCapacity = 1, decisionDelay = 10.0, failureRate = 0.0, retryLimit = 3),
             )
         broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(createCloudlet(0, length = 20_000), createCloudlet(1, length = 20_000)))
+        broker.submitCloudletListRealtime(
+            listOf(
+                createCloudlet(0, length = 20_000),
+                createCloudlet(1, length = 20_000),
+            ),
+        )
 
         simulation.start()
 
@@ -663,27 +668,27 @@ class RealtimeBrokerCloudSemanticsTest {
         assertThat(broker.getHostFailureCount()).isEqualTo(1)
         assertThat(broker.getRuntimeFailureCount()).isGreaterThanOrEqualTo(1)
     }
+}
 
-    private fun createVm(): Vm =
-        VmSimple(1000.0, 1)
-            .setRam(1024)
-            .setBw(1000)
-            .setSize(10000)
+private fun createVm(): Vm =
+    VmSimple(1000.0, 1)
+        .setRam(1024)
+        .setBw(1000)
+        .setSize(10000)
 
-    private fun createCloudlet(
-        id: Int = 0,
-        length: Long = 1000,
-        submissionDelay: Double = 0.1,
-    ): Cloudlet {
-        val utilizationModel = UtilizationModelFull()
-        val cloudlet = CloudletSimple(length, 1)
-        cloudlet.setId(id.toLong())
-        cloudlet.setFileSize(100)
-        cloudlet.setOutputSize(100)
-        cloudlet.setSubmissionDelay(submissionDelay)
-        cloudlet.setUtilizationModelCpu(utilizationModel)
-        cloudlet.setUtilizationModelRam(utilizationModel)
-        cloudlet.setUtilizationModelBw(utilizationModel)
-        return cloudlet
-    }
+private fun createCloudlet(
+    id: Int = 0,
+    length: Long = 1000,
+    submissionDelay: Double = 0.1,
+): Cloudlet {
+    val utilizationModel = UtilizationModelFull()
+    val cloudlet = CloudletSimple(length, 1)
+    cloudlet.setId(id.toLong())
+    cloudlet.setFileSize(100)
+    cloudlet.setOutputSize(100)
+    cloudlet.setSubmissionDelay(submissionDelay)
+    cloudlet.setUtilizationModelCpu(utilizationModel)
+    cloudlet.setUtilizationModelRam(utilizationModel)
+    cloudlet.setUtilizationModelBw(utilizationModel)
+    return cloudlet
 }

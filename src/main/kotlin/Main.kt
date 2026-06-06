@@ -52,7 +52,10 @@ fun main(args: Array<String>) =
 
 internal fun resolveRun(command: CliParser.RunCommand): ResolvedExperimentConfig = resolveRunCommand(command)
 
-internal fun parseBatchAlgorithms(algorithmNames: List<String>): List<BatchAlgorithmType> = registryParseBatchAlgorithms(algorithmNames)
+internal fun parseBatchAlgorithms(algorithmNames: List<String>): List<BatchAlgorithmType> {
+    val algorithms = registryParseBatchAlgorithms(algorithmNames)
+    return algorithms
+}
 
 internal fun parseRealtimeAlgorithms(algorithmNames: List<String>): List<RealtimeAlgorithmType> =
     registryParseRealtimeAlgorithms(algorithmNames)

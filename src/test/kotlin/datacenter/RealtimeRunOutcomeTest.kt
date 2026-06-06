@@ -8,7 +8,8 @@ class RealtimeRunOutcomeTest {
     @Test
     fun `status reflects success partial failure and all failed runs`() {
         assertThat(RealtimeRunStatus.from(successfulRuns = 2, failedRuns = 0)).isEqualTo(RealtimeRunStatus.SUCCESS)
-        assertThat(RealtimeRunStatus.from(successfulRuns = 1, failedRuns = 1)).isEqualTo(RealtimeRunStatus.PARTIAL_FAILURE)
+        val partialFailure = RealtimeRunStatus.from(successfulRuns = 1, failedRuns = 1)
+        assertThat(partialFailure).isEqualTo(RealtimeRunStatus.PARTIAL_FAILURE)
         assertThat(RealtimeRunStatus.from(successfulRuns = 0, failedRuns = 2)).isEqualTo(RealtimeRunStatus.FAILED)
     }
 
@@ -21,7 +22,12 @@ class RealtimeRunOutcomeTest {
                 outcomes =
                     listOf(
                         RealtimeRunOutcome.Success(realtimeResult("PSO-Realtime", makespan = 10.0), run = 1),
-                        RealtimeRunOutcome.Failed("PSO-Realtime", run = 2, errorType = "IllegalStateException", errorMessage = "boom"),
+                        RealtimeRunOutcome.Failed(
+                            "PSO-Realtime",
+                            run = 2,
+                            errorType = "IllegalStateException",
+                            errorMessage = "boom",
+                        ),
                         RealtimeRunOutcome.Success(realtimeResult("PSO-Realtime", makespan = 30.0), run = 3),
                     ),
             )
@@ -41,7 +47,12 @@ class RealtimeRunOutcomeTest {
                 algorithmName = "WOA-Realtime",
                 outcomes =
                     listOf(
-                        RealtimeRunOutcome.Failed("WOA-Realtime", run = 1, errorType = "TimeoutException", errorMessage = "timed out"),
+                        RealtimeRunOutcome.Failed(
+                            "WOA-Realtime",
+                            run = 1,
+                            errorType = "TimeoutException",
+                            errorMessage = "timed out",
+                        ),
                     ),
             )
         val row = summary.toCsvRow()

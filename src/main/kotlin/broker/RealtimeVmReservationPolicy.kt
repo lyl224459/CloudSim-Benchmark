@@ -43,21 +43,29 @@ internal class RealtimeVmReservationPolicy(
         selectedVmId: Int,
         activeCloudlets: List<Cloudlet>,
         vmList: List<Vm>,
-    ): Int {
+    ): Int =
+        desiredFullReservationVmIds(cloudlet, selectedVmId, vmList)
+            .minByOrNull { vmId ->
+                activeCloudlets.count { it.vm?.id?.toInt() == vmId }
+            } ?: selectedVmId
+
+    private fun desiredFullReservationVmIds(
+        cloudlet: Cloudlet,
+        selectedVmId: Int,
+        vmList: List<Vm>,
+    ): List<Int> {
         val groups = vmList.groupBy { it.mips }.toSortedMap()
         val desiredGroup =
             when {
                 cloudlet.length < SHORT_TASK_LENGTH -> groups.keys.firstOrNull()
                 cloudlet.length < MEDIUM_TASK_LENGTH -> groups.keys.elementAtOrNull(1) ?: groups.keys.firstOrNull()
                 else -> groups.keys.lastOrNull()
-            } ?: return selectedVmId
+            } ?: return listOf(selectedVmId)
 
-        val candidateVmIds = groups[desiredGroup].orEmpty().map { it.id.toInt() }
-        if (candidateVmIds.isEmpty()) return selectedVmId
-
-        return candidateVmIds.minByOrNull { vmId ->
-            activeCloudlets.count { it.vm?.id?.toInt() == vmId }
-        } ?: selectedVmId
+        return groups[desiredGroup]
+            .orEmpty()
+            .map { it.id.toInt() }
+            .ifEmpty { listOf(selectedVmId) }
     }
 
     private companion object {

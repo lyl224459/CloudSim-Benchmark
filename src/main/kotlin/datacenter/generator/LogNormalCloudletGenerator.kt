@@ -6,6 +6,8 @@ import org.cloudsimplus.cloudlets.CloudletSimple
 import org.cloudsimplus.utilizationmodels.UtilizationModelFull
 import java.util.Random
 
+private const val MIN_GENERATED_FILE_SIZE = 10L
+
 /**
  * 对数正态分布生成器（默认）
  * 使用对数正态分布生成任务执行时间，正态分布生成文件大小
@@ -28,15 +30,23 @@ class LogNormalCloudletGenerator(
         val utilizationModel = UtilizationModelFull()
         val pesNumber = 1
 
-        for (i in 0 until count) {
+        repeat(count) {
             // 使用对数正态分布生成执行时间（length）
             val length = Math.exp(random.nextGaussian() * varianceExecTime + Math.log(meanExecTime)).toLong()
 
             // 使用正态分布生成输入文件大小
-            val fileSize = Math.max(10, (random.nextGaussian() * varianceFileSize + meanFileSize).toLong())
+            val fileSize =
+                Math.max(
+                    MIN_GENERATED_FILE_SIZE,
+                    (random.nextGaussian() * varianceFileSize + meanFileSize).toLong(),
+                )
 
             // 使用正态分布生成输出文件大小
-            val outputSize = Math.max(10, (random.nextGaussian() * varianceOutputSize + meanOutputSize).toLong())
+            val outputSize =
+                Math.max(
+                    MIN_GENERATED_FILE_SIZE,
+                    (random.nextGaussian() * varianceOutputSize + meanOutputSize).toLong(),
+                )
 
             // 创建云任务
             val cloudlet =

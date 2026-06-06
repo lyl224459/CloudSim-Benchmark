@@ -99,4 +99,7 @@ internal fun RealtimeRunSummary.toCsvRow(): List<Any?> {
 
 internal fun RealtimeRunSummary.toSummaryMap(): Map<String, Any?> = realtimeSummaryCsvHeaders.zip(toCsvRow()).toMap()
 
-internal fun RealtimeRunSummary.toCloudletCountCsvRow(cloudletCount: Int): List<Any?> = listOf(cloudletCount) + toCsvRow()
+internal fun RealtimeRunSummary.toCloudletCountCsvRow(cloudletCount: Int): List<Any?> {
+    val row = listOf(cloudletCount) + toCsvRow()
+    return row
+}

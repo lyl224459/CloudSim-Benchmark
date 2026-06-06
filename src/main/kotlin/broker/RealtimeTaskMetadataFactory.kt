@@ -9,6 +9,10 @@ import scheduler.RegionId
 import scheduler.TenantId
 import kotlin.math.ceil
 
+private const val PRIORITY_SAMPLING_SALT = 41
+private const val HIGH_PRIORITY_INDEX_SALT = 43
+private const val LOW_PRIORITY_INDEX_SALT = 47
+
 internal data class RealtimeTaskMetadataRequest(
     val cloudlet: Cloudlet,
     val arrivalTime: Double,
@@ -59,32 +63,56 @@ internal class RealtimeTaskMetadataFactory(
     private fun priorityFor(
         cloudlet: Cloudlet,
         tracePriority: Int?,
-    ): Int {
-        val levels = schedulingConfig.priorityLevels.coerceAtLeast(1)
-        if (levels == 1) return 0
-        if (tracePriority != null) {
-            return tracePriority.coerceIn(0, levels - 1)
+    ): Int =
+        priorityCandidate(cloudlet, tracePriority)
+            .coerceIn(0, schedulingConfig.priorityLevels.coerceAtLeast(1) - 1)
+
+    private fun priorityCandidate(
+        cloudlet: Cloudlet,
+        tracePriority: Int?,
+    ): Int =
+        when {
+            schedulingConfig.priorityLevels <= 1 -> 0
+            tracePriority != null -> tracePriority.coerceIn(0, schedulingConfig.priorityLevels - 1)
+            else -> sampledPriority(cloudlet, schedulingConfig.priorityLevels)
         }
-        val highPriorityCutoff = ceil(levels * schedulingConfig.highPriorityRatio).toInt().coerceIn(0, levels)
-        if (highPriorityCutoff <= 0) return deterministicIndex(cloudlet.id, salt = 43, modulo = levels)
-        val highPriority = deterministicUnit(CloudletId(cloudlet.id), 0, 41) < schedulingConfig.highPriorityRatio
-        return if (highPriority) {
-            deterministicIndex(cloudlet.id, salt = 43, modulo = highPriorityCutoff)
-        } else {
-            highPriorityCutoff + deterministicIndex(cloudlet.id, salt = 47, modulo = levels - highPriorityCutoff)
-        }.coerceIn(0, levels - 1)
+
+    private fun sampledPriority(
+        cloudlet: Cloudlet,
+        levels: Int,
+    ): Int {
+        val highPriorityCutoff =
+            ceil(levels * schedulingConfig.highPriorityRatio)
+                .toInt()
+                .coerceIn(0, levels)
+        val highPriority =
+            deterministicUnit(CloudletId(cloudlet.id), 0, PRIORITY_SAMPLING_SALT) < schedulingConfig.highPriorityRatio
+        return when {
+            highPriorityCutoff <= 0 ->
+                deterministicIndex(cloudlet.id, salt = HIGH_PRIORITY_INDEX_SALT, modulo = levels)
+            highPriority ->
+                deterministicIndex(cloudlet.id, salt = HIGH_PRIORITY_INDEX_SALT, modulo = highPriorityCutoff)
+            else ->
+                highPriorityCutoff +
+                    deterministicIndex(
+                        cloudlet.id,
+                        salt = LOW_PRIORITY_INDEX_SALT,
+                        modulo = levels - highPriorityCutoff,
+                    )
+        }
     }
 
     private fun deadlineFor(
         cloudlet: Cloudlet,
         arrivalTime: Double,
         fastestVmMips: Double?,
-    ): Double? {
-        if (schedulingConfig.deadlineFactor <= 0.0) return null
-        val fastestMips = fastestVmMips ?: return null
-        val estimatedRuntime = cloudlet.length.toDouble() / fastestMips
-        return arrivalTime + estimatedRuntime * schedulingConfig.deadlineFactor
-    }
+    ): Double? =
+        fastestVmMips
+            ?.takeIf { schedulingConfig.deadlineFactor > 0.0 }
+            ?.let { fastestMips ->
+                val estimatedRuntime = cloudlet.length.toDouble() / fastestMips
+                arrivalTime + estimatedRuntime * schedulingConfig.deadlineFactor
+            }
 
     private fun deterministicIndex(
         cloudletId: Long,

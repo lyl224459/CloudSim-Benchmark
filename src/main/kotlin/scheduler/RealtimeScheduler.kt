@@ -136,6 +136,19 @@ abstract class RealtimeSchedulerBase(
     protected fun acceptingOptimizationCandidates(context: RealtimeSchedulingContext): List<RealtimeNodeState> =
         selectableNodeStates(context).filter { it.acceptingWork }
 
+    protected fun optimizedRealtimeVm(
+        context: RealtimeSchedulingContext,
+        optimize: (List<RealtimeNodeState>, List<Cloudlet>) -> Int,
+    ): Int? {
+        if (context.activeCloudlets.size + 1 < REALTIME_OPTIMIZATION_THRESHOLD) {
+            return null
+        }
+        val candidateStates = acceptingOptimizationCandidates(context)
+        return candidateStates
+            .takeIf { it.isNotEmpty() }
+            ?.let { optimize(it, context.activeCloudlets + context.newCloudlet) }
+    }
+
     protected fun fallbackCandidateVm(context: RealtimeSchedulingContext): Int =
         orderedCandidateStates(context).firstOrNull { it.acceptingWork }?.vmIndex
             ?: acceptingOptimizationCandidates(context).firstOrNull()?.vmIndex
@@ -210,27 +223,25 @@ class RealtimePSOScheduler(
     internal val objectiveWeights: config.ObjectiveWeightsConfig,
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : RealtimeSchedulerBase(vmList) {
-    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-        // 如果有等待任务，使用PSO进行批量调度
-        if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
-            val candidateStates = acceptingOptimizationCandidates(context)
-            if (candidateStates.isEmpty()) {
-                return fallbackCandidateVm(context)
-            }
-            val allCloudlets = context.activeCloudlets + context.newCloudlet
-            val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
-            val pso =
-                PSO(
-                    runtime = OptimizerRuntime(objFunc, population, maxIter, random),
-                    searchSpace = AssignmentSearchSpace(0.0, (candidateVms.size - 1).toDouble(), allCloudlets.size),
-                )
-            val allocation = pso.execute()
-            return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
-        }
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
+        optimizedRealtimeVm(context) { candidateStates, allCloudlets ->
+            optimizeWithPso(context, candidateStates, allCloudlets)
+        } ?: fallbackCandidateVm(context)
 
-        // 如果没有等待任务，使用最小负载策略
-        return fallbackCandidateVm(context)
+    private fun optimizeWithPso(
+        context: RealtimeSchedulingContext,
+        candidateStates: List<RealtimeNodeState>,
+        allCloudlets: List<Cloudlet>,
+    ): Int {
+        val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
+        val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
+        val pso =
+            PSO(
+                runtime = OptimizerRuntime(objFunc, population, maxIter, random),
+                searchSpace = AssignmentSearchSpace(0.0, (candidateVms.size - 1).toDouble(), allCloudlets.size),
+            )
+        val allocation = pso.execute()
+        return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
     }
 }
 
@@ -244,23 +255,24 @@ class RealtimeWOAScheduler(
     internal val objectiveWeights: config.ObjectiveWeightsConfig,
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : RealtimeSchedulerBase(vmList) {
-    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
-        if (context.activeCloudlets.size + 1 >= REALTIME_OPTIMIZATION_THRESHOLD) {
-            val candidateStates = acceptingOptimizationCandidates(context)
-            if (candidateStates.isEmpty()) {
-                return fallbackCandidateVm(context)
-            }
-            val allCloudlets = context.activeCloudlets + context.newCloudlet
-            val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
-            val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
-            val woa =
-                WOA(
-                    runtime = OptimizerRuntime(objFunc, population, maxIter, random),
-                    searchSpace = AssignmentSearchSpace(0.0, (candidateVms.size - 1).toDouble(), allCloudlets.size),
-                )
-            val allocation = woa.execute()
-            return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
-        }
-        return fallbackCandidateVm(context)
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
+        optimizedRealtimeVm(context) { candidateStates, allCloudlets ->
+            optimizeWithWoa(context, candidateStates, allCloudlets)
+        } ?: fallbackCandidateVm(context)
+
+    private fun optimizeWithWoa(
+        context: RealtimeSchedulingContext,
+        candidateStates: List<RealtimeNodeState>,
+        allCloudlets: List<Cloudlet>,
+    ): Int {
+        val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
+        val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
+        val woa =
+            WOA(
+                runtime = OptimizerRuntime(objFunc, population, maxIter, random),
+                searchSpace = AssignmentSearchSpace(0.0, (candidateVms.size - 1).toDouble(), allCloudlets.size),
+            )
+        val allocation = woa.execute()
+        return optimizedCandidateVmIndex(context, candidateStates, allocation[allCloudlets.size - 1])
     }
 }

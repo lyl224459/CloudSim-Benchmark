@@ -21,7 +21,12 @@ class BatchRunOutcomeTest {
                 outcomes =
                     listOf(
                         BatchRunOutcome.Success(batchResult("PSO", makespan = 10.0), run = 1),
-                        BatchRunOutcome.Failed("PSO", run = 2, errorType = "IllegalStateException", errorMessage = "boom"),
+                        BatchRunOutcome.Failed(
+                            "PSO",
+                            run = 2,
+                            errorType = "IllegalStateException",
+                            errorMessage = "boom",
+                        ),
                         BatchRunOutcome.Success(batchResult("PSO", makespan = 30.0), run = 3),
                     ),
             )
@@ -41,7 +46,12 @@ class BatchRunOutcomeTest {
                 algorithmName = "WOA",
                 outcomes =
                     listOf(
-                        BatchRunOutcome.Failed("WOA", run = 1, errorType = "TimeoutException", errorMessage = "timed out"),
+                        BatchRunOutcome.Failed(
+                            "WOA",
+                            run = 1,
+                            errorType = "TimeoutException",
+                            errorMessage = "timed out",
+                        ),
                     ),
             )
         val row = summary.toCsvRow()

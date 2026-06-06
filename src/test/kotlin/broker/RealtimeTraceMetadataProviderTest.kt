@@ -26,7 +26,12 @@ class RealtimeTraceMetadataProviderTest {
                 listOf(
                     RealtimeCloudletSpec(
                         cloudlet = cloudlet,
-                        traceMetadata = RealtimeTraceMetadata(requestedRam = 512.0, requestedBw = 128.0, requestedIo = 64.0),
+                        traceMetadata =
+                            RealtimeTraceMetadata(
+                                requestedRam = 512.0,
+                                requestedBw = 128.0,
+                                requestedIo = 64.0,
+                            ),
                     ),
                 ),
             )

@@ -19,56 +19,86 @@ data class RealtimeTopologyMetrics(
     val failureDomainSpreadScore: Double,
 )
 
+private data class RealtimeTopologySettings(
+    val enabled: Boolean,
+    val regionCount: Int,
+    val racksPerRegion: Int,
+    val hostsPerRack: Int,
+    val localRegion: RegionId,
+    val crossRackLatency: Double,
+    val crossRegionLatency: Double,
+    val crossRegionCost: Double,
+    val hostFailureRate: Double,
+    val rackFailureRate: Double,
+    val regionFailureRate: Double,
+    val physicalTopologyEnabled: Boolean,
+    val dataLocalityEnabled: Boolean,
+    val imageCacheEnabled: Boolean,
+    val hostCpuCapacity: Double,
+    val hostRamCapacity: Double,
+    val hostBwCapacity: Double,
+    val hostIoCapacity: Double,
+    val crossRackBandwidth: Double,
+    val crossRegionBandwidth: Double,
+    val dataLocalityPolicy: DataLocalityPolicy,
+    val imageCacheCapacity: Int,
+)
+
 class RealtimeTopologyModel private constructor(
-    private val enabled: Boolean,
-    private val regionCount: Int,
-    private val racksPerRegion: Int,
-    private val hostsPerRack: Int,
-    private val localRegion: RegionId,
-    private val crossRackLatency: Double,
-    private val crossRegionLatency: Double,
-    private val crossRegionCost: Double,
-    private val hostFailureRate: Double,
-    private val rackFailureRate: Double,
-    private val regionFailureRate: Double,
-    private val physicalTopologyEnabled: Boolean,
-    private val dataLocalityEnabled: Boolean,
-    private val imageCacheEnabled: Boolean,
-    private val hostCpuCapacity: Double,
-    private val hostRamCapacity: Double,
-    private val hostBwCapacity: Double,
-    private val hostIoCapacity: Double,
-    private val crossRackBandwidth: Double,
-    private val crossRegionBandwidth: Double,
-    private val dataLocalityPolicy: DataLocalityPolicy,
-    private val imageCacheCapacity: Int,
+    private val settings: RealtimeTopologySettings,
     initialVmCount: Int,
 ) {
+    private val enabled = settings.enabled
+    private val regionCount = settings.regionCount
+    private val racksPerRegion = settings.racksPerRegion
+    private val hostsPerRack = settings.hostsPerRack
+    private val localRegion = settings.localRegion
+    private val crossRackLatency = settings.crossRackLatency
+    private val crossRegionLatency = settings.crossRegionLatency
+    private val crossRegionCost = settings.crossRegionCost
+    private val hostFailureRate = settings.hostFailureRate
+    private val rackFailureRate = settings.rackFailureRate
+    private val regionFailureRate = settings.regionFailureRate
+    private val physicalTopologyEnabled = settings.physicalTopologyEnabled
+    private val dataLocalityEnabled = settings.dataLocalityEnabled
+    private val imageCacheEnabled = settings.imageCacheEnabled
+    private val hostCpuCapacity = settings.hostCpuCapacity
+    private val hostRamCapacity = settings.hostRamCapacity
+    private val hostBwCapacity = settings.hostBwCapacity
+    private val hostIoCapacity = settings.hostIoCapacity
+    private val crossRackBandwidth = settings.crossRackBandwidth
+    private val crossRegionBandwidth = settings.crossRegionBandwidth
+    private val dataLocalityPolicy = settings.dataLocalityPolicy
+    private val imageCacheCapacity = settings.imageCacheCapacity
+
     companion object {
         val Disabled =
             RealtimeTopologyModel(
-                enabled = false,
-                regionCount = 1,
-                racksPerRegion = 1,
-                hostsPerRack = 1,
-                localRegion = RegionId(0),
-                crossRackLatency = 0.0,
-                crossRegionLatency = 0.0,
-                crossRegionCost = 0.0,
-                hostFailureRate = 0.0,
-                rackFailureRate = 0.0,
-                regionFailureRate = 0.0,
-                physicalTopologyEnabled = false,
-                dataLocalityEnabled = false,
-                imageCacheEnabled = false,
-                hostCpuCapacity = 0.0,
-                hostRamCapacity = 0.0,
-                hostBwCapacity = 0.0,
-                hostIoCapacity = 0.0,
-                crossRackBandwidth = 0.0,
-                crossRegionBandwidth = 0.0,
-                dataLocalityPolicy = DataLocalityPolicy.PREFER_LOCAL,
-                imageCacheCapacity = 0,
+                settings =
+                    RealtimeTopologySettings(
+                        enabled = false,
+                        regionCount = 1,
+                        racksPerRegion = 1,
+                        hostsPerRack = 1,
+                        localRegion = RegionId(0),
+                        crossRackLatency = 0.0,
+                        crossRegionLatency = 0.0,
+                        crossRegionCost = 0.0,
+                        hostFailureRate = 0.0,
+                        rackFailureRate = 0.0,
+                        regionFailureRate = 0.0,
+                        physicalTopologyEnabled = false,
+                        dataLocalityEnabled = false,
+                        imageCacheEnabled = false,
+                        hostCpuCapacity = 0.0,
+                        hostRamCapacity = 0.0,
+                        hostBwCapacity = 0.0,
+                        hostIoCapacity = 0.0,
+                        crossRackBandwidth = 0.0,
+                        crossRegionBandwidth = 0.0,
+                        dataLocalityPolicy = DataLocalityPolicy.PREFER_LOCAL,
+                        imageCacheCapacity = 0,
+                    ),
                 initialVmCount = 0,
             )
 
@@ -77,39 +107,42 @@ class RealtimeTopologyModel private constructor(
             initialVmCount: Int,
         ): RealtimeTopologyModel =
             RealtimeTopologyModel(
-                enabled =
-                    scheduling.topologyEnabled ||
-                        scheduling.physicalTopologyEnabled ||
-                        scheduling.dataLocalityEnabled ||
-                        scheduling.imageCacheEnabled,
-                regionCount = scheduling.regionCount.coerceAtLeast(1),
-                racksPerRegion = scheduling.racksPerRegion.coerceAtLeast(1),
-                hostsPerRack =
-                    if (scheduling.physicalTopologyEnabled) {
-                        scheduling.hostCountPerRack.coerceAtLeast(1)
-                    } else {
-                        scheduling.hostsPerRack.coerceAtLeast(1)
-                    },
-                localRegion = RegionId(scheduling.localRegion.coerceIn(0, scheduling.regionCount.coerceAtLeast(1) - 1)),
-                crossRackLatency = scheduling.crossRackLatency,
-                crossRegionLatency = scheduling.crossRegionLatency,
-                crossRegionCost = scheduling.crossRegionCost,
-                hostFailureRate = scheduling.hostFailureRate,
-                rackFailureRate = scheduling.rackFailureRate,
-                regionFailureRate = scheduling.regionFailureRate,
-                physicalTopologyEnabled = scheduling.physicalTopologyEnabled,
-                dataLocalityEnabled = scheduling.dataLocalityEnabled,
-                imageCacheEnabled = scheduling.imageCacheEnabled,
-                hostCpuCapacity = scheduling.hostCpuCapacity,
-                hostRamCapacity = scheduling.hostRamCapacity,
-                hostBwCapacity = scheduling.hostBwCapacity,
-                hostIoCapacity = scheduling.hostIoCapacity,
-                crossRackBandwidth = scheduling.crossRackBandwidth,
-                crossRegionBandwidth = scheduling.crossRegionBandwidth,
-                dataLocalityPolicy = scheduling.normalizedDataLocalityPolicy(),
-                imageCacheCapacity = scheduling.imageCacheCapacity,
+                settings = scheduling.toTopologySettings(),
                 initialVmCount = initialVmCount,
             )
+
+        private fun RealtimeSchedulingConfig.toTopologySettings(): RealtimeTopologySettings =
+            RealtimeTopologySettings(
+                enabled = topologyEnabled || physicalTopologyEnabled || dataLocalityEnabled || imageCacheEnabled,
+                regionCount = regionCount.coerceAtLeast(1),
+                racksPerRegion = racksPerRegion.coerceAtLeast(1),
+                hostsPerRack = effectiveHostsPerRack(),
+                localRegion = RegionId(localRegion.coerceIn(0, regionCount.coerceAtLeast(1) - 1)),
+                crossRackLatency = crossRackLatency,
+                crossRegionLatency = crossRegionLatency,
+                crossRegionCost = crossRegionCost,
+                hostFailureRate = hostFailureRate,
+                rackFailureRate = rackFailureRate,
+                regionFailureRate = regionFailureRate,
+                physicalTopologyEnabled = physicalTopologyEnabled,
+                dataLocalityEnabled = dataLocalityEnabled,
+                imageCacheEnabled = imageCacheEnabled,
+                hostCpuCapacity = hostCpuCapacity,
+                hostRamCapacity = hostRamCapacity,
+                hostBwCapacity = hostBwCapacity,
+                hostIoCapacity = hostIoCapacity,
+                crossRackBandwidth = crossRackBandwidth,
+                crossRegionBandwidth = crossRegionBandwidth,
+                dataLocalityPolicy = normalizedDataLocalityPolicy(),
+                imageCacheCapacity = imageCacheCapacity,
+            )
+
+        private fun RealtimeSchedulingConfig.effectiveHostsPerRack(): Int =
+            if (physicalTopologyEnabled) {
+                hostCountPerRack.coerceAtLeast(1)
+            } else {
+                hostsPerRack.coerceAtLeast(1)
+            }
     }
 
     private val locationsByVmIndex = linkedMapOf<Int, RealtimeTopologyLocation>()
@@ -121,7 +154,10 @@ class RealtimeTopologyModel private constructor(
         }
     }
 
-    fun locationOf(vmIndex: Int): RealtimeTopologyLocation = locationsByVmIndex.getOrPut(vmIndex) { locationForOrdinal(vmIndex) }
+    fun locationOf(vmIndex: Int): RealtimeTopologyLocation {
+        val location = locationsByVmIndex.getOrPut(vmIndex) { locationForOrdinal(vmIndex) }
+        return location
+    }
 
     fun registerDynamicVm(
         vmIndex: Int,
@@ -211,7 +247,10 @@ class RealtimeTopologyModel private constructor(
         }
     }
 
-    fun costFor(location: RealtimeTopologyLocation): Double = if (enabled && location.regionId != localRegion) crossRegionCost else 0.0
+    fun costFor(location: RealtimeTopologyLocation): Double {
+        val isCrossRegion = enabled && location.regionId != localRegion
+        return if (isCrossRegion) crossRegionCost else 0.0
+    }
 
     fun failurePressure(location: RealtimeTopologyLocation): Double {
         if (!enabled) return 0.0

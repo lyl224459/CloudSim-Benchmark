@@ -70,7 +70,10 @@ data class RealtimeHostState(
             return (usableRatios.maxOrNull() ?: 0.0) - (usableRatios.minOrNull() ?: 0.0)
         }
 
-    private fun Double.ratio(capacity: Double): Double = if (capacity <= 0.0) 0.0 else (this / capacity).coerceAtLeast(0.0)
+    private fun Double.ratio(capacity: Double): Double {
+        val ratio = if (capacity <= 0.0) 0.0 else (this / capacity).coerceAtLeast(0.0)
+        return ratio
+    }
 }
 
 sealed interface RealtimePlacementDecision {

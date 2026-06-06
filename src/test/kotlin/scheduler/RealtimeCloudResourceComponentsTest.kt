@@ -21,8 +21,14 @@ class RealtimeCloudResourceComponentsTest {
         val metadataProvider =
             RealtimeTraceMetadataProvider.fromSpecs(
                 listOf(
-                    RealtimeCloudletSpec(active, RealtimeTraceMetadata(requestedRam = 512.0, requestedBw = 100.0, requestedIo = 50.0)),
-                    RealtimeCloudletSpec(incoming, RealtimeTraceMetadata(requestedRam = 600.0, requestedBw = 100.0, requestedIo = 50.0)),
+                    RealtimeCloudletSpec(
+                        active,
+                        RealtimeTraceMetadata(requestedRam = 512.0, requestedBw = 100.0, requestedIo = 50.0),
+                    ),
+                    RealtimeCloudletSpec(
+                        incoming,
+                        RealtimeTraceMetadata(requestedRam = 600.0, requestedBw = 100.0, requestedIo = 50.0),
+                    ),
                 ),
             )
         val resourceModel =

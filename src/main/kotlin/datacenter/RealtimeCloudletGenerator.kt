@@ -8,6 +8,9 @@ import datacenter.generator.GoogleTraceCloudletGenerator
 import org.cloudsimplus.cloudlets.Cloudlet
 import java.util.Random
 
+private const val MIN_ACTIVE_BURST_RATE = 0.1
+private const val MIN_POISSON_RATE = 0.0001
+
 /**
  * 实时云任务生成器
  * 生成带有到达时间的任务，模拟实时任务调度场景
@@ -125,7 +128,7 @@ class RealtimeCloudletGenerator(
                 if (positionInCycle <= burstWindow) {
                     arrivalRate * arrivalConfig.burstIntensity
                 } else {
-                    (arrivalRate / arrivalConfig.burstIntensity).coerceAtLeast(0.1)
+                    (arrivalRate / arrivalConfig.burstIntensity).coerceAtLeast(MIN_ACTIVE_BURST_RATE)
                 }
 
             currentTime += exponentialInterArrival(activeRate)
@@ -138,7 +141,7 @@ class RealtimeCloudletGenerator(
     }
 
     private fun exponentialInterArrival(rate: Double): Double {
-        val safeRate = rate.coerceAtLeast(0.0001)
+        val safeRate = rate.coerceAtLeast(MIN_POISSON_RATE)
         return -Math.log(1.0 - random.nextDouble()) / safeRate
     }
 }

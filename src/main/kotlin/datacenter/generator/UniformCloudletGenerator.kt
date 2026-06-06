@@ -31,7 +31,7 @@ class UniformCloudletGenerator(
         val fileSizeRange = maxFileSize - minFileSize
         val outputSizeRange = maxOutputSize - minOutputSize
 
-        for (i in 0 until count) {
+        repeat(count) {
             // 使用均匀分布生成执行时间（length）
             val length = (random.nextDouble() * lengthRange).toLong() + minLength
 

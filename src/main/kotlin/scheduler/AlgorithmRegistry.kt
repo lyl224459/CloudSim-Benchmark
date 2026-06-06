@@ -284,8 +284,8 @@ object AlgorithmRegistry {
         if (names.size == 1 && names[0].equals("ALL", ignoreCase = true)) {
             return forMode(mode).filter { it.defaultEnabled }
         }
-        if (names.any { it.equals("ALL", ignoreCase = true) }) {
-            throw IllegalArgumentException("ALL 不能与其他算法名混用")
+        require(names.none { it.equals("ALL", ignoreCase = true) }) {
+            "ALL 不能与其他算法名混用"
         }
 
         return names

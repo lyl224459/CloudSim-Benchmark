@@ -4,6 +4,8 @@ import datacenter.RealtimeTraceMetadataProvider
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 
+private const val DEFAULT_RAM_DEMAND_PER_PE = 256.0
+
 data class RealtimeResourceDemand(
     val cpu: Double = 0.0,
     val ram: Double = 0.0,
@@ -71,7 +73,10 @@ data class RealtimeResourceModel(
     fun ramDemand(cloudlet: Cloudlet): Double =
         if (enabled) {
             traceMetadataProvider.metadataFor(cloudlet)?.requestedRam
-                ?: (cloudlet.pesNumber.toDouble() * 256.0 + cloudlet.fileSize.toDouble() * ramWeight)
+                ?: (
+                    cloudlet.pesNumber.toDouble() * DEFAULT_RAM_DEMAND_PER_PE +
+                        cloudlet.fileSize.toDouble() * ramWeight
+                )
         } else {
             0.0
         }

@@ -85,7 +85,12 @@ class RealtimeBrokerPolicyComponentsTest {
 
         val partial =
             RealtimeVmReservationPolicy(RealtimeSchedulingConfig(resourceReservation = "partial"))
-                .select(selectedVmId = 3, cloudlet = createCloudlet(id = 2), activeCloudlets = emptyList(), vmList = vmList)
+                .select(
+                    selectedVmId = 3,
+                    cloudlet = createCloudlet(id = 2),
+                    activeCloudlets = emptyList(),
+                    vmList = vmList,
+                )
         val full =
             RealtimeVmReservationPolicy(RealtimeSchedulingConfig(resourceReservation = "full"))
                 .select(
