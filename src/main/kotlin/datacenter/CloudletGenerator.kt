@@ -15,7 +15,7 @@ class CloudletGenerator(
     private val generatorType: config.CloudletGeneratorType = CloudletGenConfig.GENERATOR_TYPE,
     private val googleTraceConfig: GoogleTraceConfig? = null,
 ) {
-    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random, googleTraceConfig)
+    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, googleTraceConfig)
 
     /**
      * 创建云任务列表

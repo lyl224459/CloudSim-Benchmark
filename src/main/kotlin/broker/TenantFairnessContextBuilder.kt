@@ -6,5 +6,8 @@ import scheduler.RealtimeTenantFairnessSnapshot
 internal class TenantFairnessContextBuilder(
     private val tenantController: RealtimeTenantController,
 ) {
-    fun snapshots(records: List<RealtimeTaskRecord>): List<RealtimeTenantFairnessSnapshot> = tenantController.snapshots(records)
+    fun snapshots(records: List<RealtimeTaskRecord>): List<RealtimeTenantFairnessSnapshot> {
+        val snapshots = tenantController.snapshots(records)
+        return snapshots
+    }
 }

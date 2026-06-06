@@ -1,6 +1,7 @@
 package util
 
 import mu.KotlinLogging
+import java.util.IllegalFormatException
 
 /**
  * 日志工具类
@@ -10,7 +11,7 @@ object Logger {
     /**
      * 主日志记录器
      */
-    private val logger = KotlinLogging.logger {}
+    private val mainLogger = KotlinLogging.logger {}
 
     /**
      * 结果日志记录器（用于记录实验结果，不包含时间戳等）
@@ -21,7 +22,7 @@ object Logger {
      * 信息日志
      */
     fun info(message: String) {
-        logger.info { message }
+        mainLogger.info { message }
     }
 
     /**
@@ -31,14 +32,14 @@ object Logger {
         message: String,
         vararg args: Any?,
     ) {
-        logger.info { format(message, *args) }
+        mainLogger.info { LogMessageFormatter.format(message, *args) }
     }
 
     /**
      * 调试日志
      */
     fun debug(message: String) {
-        logger.debug { message }
+        mainLogger.debug { message }
     }
 
     /**
@@ -48,14 +49,14 @@ object Logger {
         message: String,
         vararg args: Any?,
     ) {
-        logger.debug { format(message, *args) }
+        mainLogger.debug { LogMessageFormatter.format(message, *args) }
     }
 
     /**
      * 警告日志
      */
     fun warn(message: String) {
-        logger.warn { message }
+        mainLogger.warn { message }
     }
 
     /**
@@ -65,7 +66,7 @@ object Logger {
         message: String,
         vararg args: Any?,
     ) {
-        logger.warn { format(message, *args) }
+        mainLogger.warn { LogMessageFormatter.format(message, *args) }
     }
 
     /**
@@ -76,9 +77,9 @@ object Logger {
         throwable: Throwable? = null,
     ) {
         if (throwable != null) {
-            logger.error(throwable) { message }
+            mainLogger.error(throwable) { message }
         } else {
-            logger.error { message }
+            mainLogger.error { message }
         }
     }
 
@@ -90,11 +91,11 @@ object Logger {
         throwable: Throwable? = null,
         vararg args: Any?,
     ) {
-        val formattedMessage = format(message, *args)
+        val formattedMessage = LogMessageFormatter.format(message, *args)
         if (throwable != null) {
-            logger.error(throwable) { formattedMessage }
+            mainLogger.error(throwable) { formattedMessage }
         } else {
-            logger.error { formattedMessage }
+            mainLogger.error { formattedMessage }
         }
     }
 
@@ -112,13 +113,12 @@ object Logger {
         message: String,
         vararg args: Any?,
     ) {
-        resultLogger.info { format(message, *args) }
+        resultLogger.info { LogMessageFormatter.format(message, *args) }
     }
+}
 
-    /**
-     * 统一的格式化逻辑
-     */
-    private fun format(
+private object LogMessageFormatter {
+    fun format(
         message: String,
         vararg args: Any?,
     ): String =
@@ -128,17 +128,7 @@ object Logger {
             } else {
                 java.lang.String.format(message.replace("%", "%%").replace("{}", "%s"), *args)
             }
-        } catch (e: Exception) {
-            "Log message format failed: ${e.message} | Pattern: $message | Args: ${args.contentToString()}"
+        } catch (exception: IllegalFormatException) {
+            "Log message format failed: ${exception.message} | Pattern: $message | Args: ${args.contentToString()}"
         }
-
-    /**
-     * 获取类日志记录器
-     */
-    fun getLogger(clazz: Class<*>): mu.KLogger = KotlinLogging.logger(clazz.name)
-
-    /**
-     * 获取名称日志记录器
-     */
-    fun getLogger(name: String): mu.KLogger = KotlinLogging.logger(name)
 }

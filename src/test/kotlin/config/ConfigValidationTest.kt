@@ -78,6 +78,26 @@ class ConfigValidationTest {
     }
 
     @Test
+    fun `realtime validation keeps field path and message keyword`() {
+        val invalidConfig =
+            ExperimentConfig.createDefault().copy(
+                realtime =
+                    ExperimentConfig.createDefault().realtime.copy(
+                        scheduling = RealtimeSchedulingConfig(decisionDelay = -1.0),
+                    ),
+            )
+
+        val error =
+            org.junit.jupiter.api.assertThrows<ConfigValidationException> {
+                ExperimentConfig.validate(invalidConfig)
+            }
+        val decisionDelayError = error.errors.single { it.field == "realtime.scheduling.decisionDelay" }
+
+        assertThat(decisionDelayError.message).contains("调度决策延迟")
+        assertThat(decisionDelayError.message).contains("不能为负数")
+    }
+
+    @Test
     fun `should validate realtime cloud semantics config parameters`() {
         val invalidConfig =
             ExperimentConfig.createDefault().copy(

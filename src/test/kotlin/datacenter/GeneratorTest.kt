@@ -21,7 +21,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.LOG_NORMAL,
-                random,
                 null,
             )
 
@@ -35,7 +34,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.UNIFORM,
-                random,
                 null,
             )
 
@@ -58,7 +56,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.GOOGLE_TRACE,
-                random,
                 googleTraceConfig,
             )
 
@@ -72,7 +69,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.LOG_NORMAL,
-                random,
                 null,
             )
 
@@ -95,7 +91,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.UNIFORM,
-                random,
                 null,
             )
 
@@ -118,7 +113,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.LOG_NORMAL,
-                random,
                 null,
             )
 
@@ -139,7 +133,6 @@ class GeneratorTest {
         val generator =
             CloudletGeneratorFactory.createGenerator(
                 CloudletGeneratorType.LOG_NORMAL,
-                random,
                 null,
             )
 

@@ -2,18 +2,16 @@ package datacenter.generator
 
 import config.CloudletGeneratorType
 import config.GoogleTraceConfig
-import java.util.Random
 
 /**
  * 云任务生成器工厂
  */
-object CloudletGeneratorFactory {
+internal object CloudletGeneratorFactory {
     /**
      * 创建生成器实例
      */
     fun createGenerator(
         type: CloudletGeneratorType,
-        random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
         googleTraceConfig: GoogleTraceConfig? = null,
     ): CloudletGeneratorStrategy =
         when (type) {

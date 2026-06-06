@@ -3,6 +3,7 @@ package datacenter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import util.CsvRowWriter
+import util.StatisticalValue
 import java.io.File
 
 class RealtimeMetricSchemaTest {
@@ -13,6 +14,41 @@ class RealtimeMetricSchemaTest {
         assertThat(realtimeTrialCsvHeaders).containsExactlyElementsOf(RealtimeMetricSchema.trialHeaders)
         assertThat(RealtimeMetricSchema.cloudletCountSummaryHeaders)
             .containsExactlyElementsOf(RealtimeMetricSchema.summaryHeaders(prefixHeaders = listOf("CloudletCount")))
+    }
+
+    @Test
+    fun `schema defines every metric key exactly once in enum order`() {
+        val keys = RealtimeMetricSchema.metrics.map { it.key }
+
+        assertThat(keys).containsExactlyElementsOf(RealtimeMetricKey.entries)
+        assertThat(keys).doesNotHaveDuplicates()
+        assertThat(RealtimeMetricSchema.metricHeaders)
+            .containsExactlyElementsOf(RealtimeMetricSchema.metrics.map { it.csvName })
+    }
+
+    @Test
+    fun `metric projections preserve schema order`() {
+        val result =
+            RealtimeAlgorithmResult(
+                algorithmName = "MinLoad",
+                metrics = RealtimeMetricValues(RealtimeMetricKey.entries.associateWith { it.ordinal.toDouble() }),
+            )
+        val statistics =
+            RealtimeAlgorithmStatistics(
+                algorithmName = "MinLoad",
+                metrics =
+                    RealtimeMetricKey.entries.associateWith { key ->
+                        StatisticalValue(key.ordinal.toDouble(), 1.0, 0.0, key.ordinal.toDouble())
+                    },
+            )
+
+        assertThat(RealtimeMetricSchema.trialMetricMap(result).keys)
+            .containsExactlyElementsOf(RealtimeMetricSchema.metricHeaders)
+        assertThat(RealtimeMetricSchema.meanMetricMap(statistics).keys)
+            .containsExactlyElementsOf(RealtimeMetricSchema.metricHeaders)
+        assertThat(RealtimeMetricSchema.stdDevMetricMap(statistics).keys)
+            .containsExactlyElementsOf(RealtimeMetricSchema.metricHeaders)
+        assertThat(RealtimeMetricSchema.blankMetricValues()).hasSize(RealtimeMetricKey.entries.size)
     }
 
     @Test

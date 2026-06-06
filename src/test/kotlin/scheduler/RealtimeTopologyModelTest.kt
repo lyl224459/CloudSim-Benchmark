@@ -12,7 +12,7 @@ class RealtimeTopologyModelTest {
     fun `vm index maps to deterministic topology location`() {
         val model =
             RealtimeTopologyModel.fromConfig(
-                topologyConfig(regionCount = 2, racksPerRegion = 2, hostsPerRack = 2),
+                topologyConfig(shape = TopologyShape(regionCount = 2, racksPerRegion = 2, hostsPerRack = 2)),
                 initialVmCount = 8,
             )
 
@@ -35,11 +35,8 @@ class RealtimeTopologyModelTest {
         val model =
             RealtimeTopologyModel.fromConfig(
                 topologyConfig(
-                    regionCount = 2,
-                    racksPerRegion = 2,
-                    crossRackLatency = 0.2,
-                    crossRegionLatency = 1.5,
-                    crossRegionCost = 0.7,
+                    shape = TopologyShape(regionCount = 2, racksPerRegion = 2),
+                    network = TopologyNetwork(crossRackLatency = 0.2, crossRegionLatency = 1.5, crossRegionCost = 0.7),
                 ),
                 initialVmCount = 3,
             )
@@ -55,7 +52,7 @@ class RealtimeTopologyModelTest {
     fun `dynamic vm chooses least loaded failure domain`() {
         val model =
             RealtimeTopologyModel.fromConfig(
-                topologyConfig(regionCount = 2, racksPerRegion = 1, hostsPerRack = 1),
+                topologyConfig(shape = TopologyShape(regionCount = 2, racksPerRegion = 1, hostsPerRack = 1)),
                 initialVmCount = 2,
             )
 
@@ -69,12 +66,8 @@ class RealtimeTopologyModelTest {
         val model =
             RealtimeTopologyModel.fromConfig(
                 topologyConfig(
-                    regionCount = 2,
-                    racksPerRegion = 2,
-                    hostsPerRack = 1,
-                    crossRackLatency = 0.2,
-                    crossRegionLatency = 1.0,
-                    crossRegionCost = 0.5,
+                    shape = TopologyShape(regionCount = 2, racksPerRegion = 2, hostsPerRack = 1),
+                    network = TopologyNetwork(crossRackLatency = 0.2, crossRegionLatency = 1.0, crossRegionCost = 0.5),
                 ),
                 initialVmCount = 4,
             )
@@ -178,23 +171,31 @@ class RealtimeTopologyModelTest {
     }
 
     private fun topologyConfig(
-        regionCount: Int = 2,
-        racksPerRegion: Int = 2,
-        hostsPerRack: Int = 1,
-        crossRackLatency: Double = 0.1,
-        crossRegionLatency: Double = 1.0,
-        crossRegionCost: Double = 0.0,
+        shape: TopologyShape = TopologyShape(),
+        network: TopologyNetwork = TopologyNetwork(),
     ): RealtimeSchedulingConfig =
         RealtimeSchedulingConfig(
             topologyEnabled = true,
-            regionCount = regionCount,
-            racksPerRegion = racksPerRegion,
-            hostsPerRack = hostsPerRack,
+            regionCount = shape.regionCount,
+            racksPerRegion = shape.racksPerRegion,
+            hostsPerRack = shape.hostsPerRack,
             localRegion = 0,
-            crossRackLatency = crossRackLatency,
-            crossRegionLatency = crossRegionLatency,
-            crossRegionCost = crossRegionCost,
+            crossRackLatency = network.crossRackLatency,
+            crossRegionLatency = network.crossRegionLatency,
+            crossRegionCost = network.crossRegionCost,
         )
+
+    private data class TopologyShape(
+        val regionCount: Int = 2,
+        val racksPerRegion: Int = 2,
+        val hostsPerRack: Int = 1,
+    )
+
+    private data class TopologyNetwork(
+        val crossRackLatency: Double = 0.1,
+        val crossRegionLatency: Double = 1.0,
+        val crossRegionCost: Double = 0.0,
+    )
 
     private fun nodeState(
         vmIndex: Int,

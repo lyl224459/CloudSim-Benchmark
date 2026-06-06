@@ -4,6 +4,7 @@ import cli.ResolvedExperimentConfig
 import config.BatchAlgorithmType
 import config.RealtimeAlgorithmType
 import kotlinx.coroutines.runBlocking
+import mu.KotlinLogging
 import util.Logger
 import kotlin.system.exitProcess
 import cli.parseBatchAlgorithms as registryParseBatchAlgorithms
@@ -13,6 +14,8 @@ import cli.resolveRun as resolveRunCommand
 typealias CommandLineParser = CliParser
 
 typealias ResolvedRun = ResolvedExperimentConfig
+
+private val mainLogger = KotlinLogging.logger("Main")
 
 fun main(args: Array<String>) =
     runBlocking {
@@ -28,19 +31,19 @@ fun main(args: Array<String>) =
             exitProcess(1)
         } catch (e: IllegalArgumentException) {
             Logger.error("参数错误: " + e.message)
-            if (Logger.getLogger("Main").isDebugEnabled) {
+            if (mainLogger.isDebugEnabled) {
                 e.printStackTrace()
             }
             exitProcess(1)
         } catch (e: IllegalStateException) {
             Logger.error("环境错误: " + e.message, e)
-            if (Logger.getLogger("Main").isDebugEnabled) {
+            if (mainLogger.isDebugEnabled) {
                 e.printStackTrace()
             }
             exitProcess(1)
         } catch (e: OutOfMemoryError) {
             Logger.error("内存不足错误，请增加JVM内存参数 (-Xmx)")
-            if (Logger.getLogger("Main").isDebugEnabled) {
+            if (mainLogger.isDebugEnabled) {
                 e.printStackTrace()
             }
             exitProcess(1)

@@ -217,6 +217,43 @@ class MainCliOverrideTest {
     }
 
     @Test
+    fun `resolver rejects invalid mode with valid candidates`() {
+        val error =
+            assertThrows<IllegalArgumentException> {
+                resolveRun(CliParser.RunCommand(mode = "unknown", dryRun = true))
+            }
+
+        assertTrue(error.message?.contains("无效运行模式") == true)
+        assertTrue(error.message?.contains("batch-multi") == true)
+    }
+
+    @Test
+    fun `resolver requires profile selection when config has no default`() {
+        val configFile =
+            Files.createTempFile("cli-missing-profile-", ".toml").toFile().apply {
+                writeText(
+                    """
+                    [profiles.batch_profile]
+                    mode = "batch"
+                    algorithms = ["RANDOM"]
+                    """.trimIndent(),
+                )
+            }
+
+        val error =
+            try {
+                assertThrows<IllegalArgumentException> {
+                    resolveRun(CliParser.RunCommand(configFile = configFile.absolutePath, dryRun = true))
+                }
+            } finally {
+                configFile.delete()
+            }
+
+        assertTrue(error.message?.contains("--profile") == true)
+        assertTrue(error.message?.contains("batch_profile") == true)
+    }
+
+    @Test
     fun `unknown realtime algorithm fails with valid candidates`() {
         val error =
             assertThrows<IllegalArgumentException> {

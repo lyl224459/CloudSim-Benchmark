@@ -2,7 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>DestructuringDeclarationWithTooManyEntries:DatacenterCreator.kt$DatacenterCreator$val (ram, bw, mips, storage, costPerSec) = when (type) { DatacenterType.LOW -&gt; { Tuple5( DatacenterConfig.RAM * DatacenterConfig.L_VM_N, DatacenterConfig.BW * DatacenterConfig.L_VM_N, DatacenterConfig.L_MIPS * DatacenterConfig.L_VM_N, DatacenterConfig.STORAGE * DatacenterConfig.L_VM_N, DatacenterConfig.L_PRICE, ) } DatacenterType.MEDIUM -&gt; { Tuple5( DatacenterConfig.RAM * DatacenterConfig.M_VM_N, DatacenterConfig.BW * DatacenterConfig.M_VM_N, DatacenterConfig.M_MIPS * DatacenterConfig.M_VM_N, DatacenterConfig.STORAGE * DatacenterConfig.M_VM_N, DatacenterConfig.M_PRICE, ) } DatacenterType.HIGH -&gt; { Tuple5( DatacenterConfig.RAM * DatacenterConfig.H_VM_N, DatacenterConfig.BW * DatacenterConfig.H_VM_N, DatacenterConfig.H_MIPS * DatacenterConfig.H_VM_N, DatacenterConfig.STORAGE * DatacenterConfig.H_VM_N, DatacenterConfig.H_PRICE, ) } }</ID>
     <ID>LongMethod:CommandExecutor.kt$CommandExecutor$private suspend fun runResolvedExperiment( resolved: ResolvedExperimentConfig, outputContext: ExperimentOutputContext, )</ID>
     <ID>LongMethod:ConfigValidationTest.kt$ConfigValidationTest$@Test fun `should validate realtime cloud semantics config parameters`()</ID>
     <ID>LongMethod:ConfigurationManagerTest.kt$ConfigurationManagerTest$@Test fun `loadFromSingleFile reads nested profile batch objective and realtime scheduling`()</ID>
@@ -13,25 +12,17 @@
     <ID>LongParameterList:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel$( private val scheduling: RealtimeSchedulingConfig, private val arrivalState: RealtimeArrivalState, private val lifecycleStore: RealtimeTaskLifecycleStore, private val reservationState: RealtimeReservationState, private val metrics: RealtimeBrokerMetrics, private val vmLifecycleManager: RealtimeVmLifecycleManager, private val tenantController: RealtimeTenantController, private val topologyModel: RealtimeTopologyModel, )</ID>
     <ID>LongParameterList:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$( /** * 要测试的任务数列表 * 例如: listOf(50, 100, 200, 500, 1000) */ private val cloudletCounts: List&lt;Int&gt;, /** * 仿真持续时间（秒） */ private val simulationDuration: Double = 500.0, /** * 平均每秒到达的任务数 */ private val arrivalRate: Double = 5.0, /** * 种群大小 */ private val population: Int = 20, /** * 最大迭代次数 */ private val maxIter: Int = 20, /** * 随机数种子 */ private val randomSeed: Long = 0L, /** * 已解析的算法定义 */ private val resolvedAlgorithms: List&lt;ResolvedAlgorithm&gt;, /** * 每个任务数的运行次数（用于计算平均值） */ private val runs: Int = 1, /** * 任务生成器类型 */ private val generatorType: CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE, /** * 实时到达配置 */ private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(), /** * 实时调度配置 */ private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(), /** * 实验目录 */ private val experimentDir: java.io.File? = null, private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir), private val useCoroutines: Boolean = true, private val maxConcurrency: Int = 0, private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency), )</ID>
     <ID>LongParameterList:RealtimeComparisonRunner.kt$RealtimeComparisonRunner$( private val cloudletCount: Int = 100, private val simulationDuration: Double = 1000.0, private val arrivalRate: Double = 10.0, private val population: Int = 20, private val maxIter: Int = 20, private val randomSeed: Long = 0L, private val runs: Int = 1, private val generatorType: config.CloudletGeneratorType = config.CloudletGenConfig.GENERATOR_TYPE, private val googleTraceConfig: config.GoogleTraceConfig? = null, private val objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(), private val arrival: config.RealtimeArrivalConfig = config.RealtimeArrivalConfig(), private val scheduling: config.RealtimeSchedulingConfig = config.RealtimeSchedulingConfig(), private val resolvedAlgorithms: List&lt;ResolvedAlgorithm&gt;, private val experimentDir: java.io.File? = null, private val outputContext: ExperimentOutputContext = ExperimentOutputContext(experimentDir), private val useCoroutines: Boolean = true, private val maxConcurrency: Int = 0, private val concurrency: ExperimentConcurrency = ExperimentConcurrency(useCoroutines, maxConcurrency), )</ID>
-    <ID>LongParameterList:RealtimeTopologyModelTest.kt$RealtimeTopologyModelTest$( regionCount: Int = 2, racksPerRegion: Int = 2, hostsPerRack: Int = 1, crossRackLatency: Double = 0.1, crossRegionLatency: Double = 1.0, crossRegionCost: Double = 0.0, )</ID>
-    <ID>MaxLineLength:TenantFairnessContextBuilder.kt$TenantFairnessContextBuilder$fun snapshots(records: List&lt;RealtimeTaskRecord&gt;): List&lt;RealtimeTenantFairnessSnapshot&gt;</ID>
-    <ID>MemberNameEqualsClassName:Logger.kt$Logger$/** * 主日志记录器 */ private val logger = KotlinLogging.logger {}</ID>
     <ID>NestedBlockDepth:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$private fun printSummaryTable(results: Map&lt;Int, List&lt;BatchRunSummary&gt;&gt;)</ID>
     <ID>NestedBlockDepth:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$private fun printSummaryTable(results: Map&lt;Int, List&lt;RealtimeRunSummary&gt;&gt;)</ID>
     <ID>ThrowsCount:ConfigurationManager.kt$ConfigurationManager.Companion$fun loadFromSingleFile(configPath: String): LoadedConfigs</ID>
-    <ID>TooGenericExceptionCaught:Logger.kt$Logger$e: Exception</ID>
     <ID>TooGenericExceptionCaught:Main.kt$e: Exception</ID>
     <ID>TooManyFunctions:CliParser.kt$CliParser</ID>
     <ID>TooManyFunctions:ComparisonRunner.kt$ComparisonRunner</ID>
-    <ID>TooManyFunctions:Logger.kt$Logger</ID>
     <ID>TooManyFunctions:ObjectiveFunction.kt$SchedulerObjectiveFunction : ObjectiveFunction</ID>
     <ID>TooManyFunctions:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel</ID>
     <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeArrivalState</ID>
     <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeBrokerMetrics</ID>
     <ID>TooManyFunctions:RealtimeTopologyModel.kt$RealtimeTopologyModel</ID>
     <ID>TooManyFunctions:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager</ID>
-    <ID>TooManyFunctions:RunResolver.kt$RunResolver</ID>
-    <ID>UnusedParameter:CloudletGeneratorFactory.kt$CloudletGeneratorFactory$random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)</ID>
-    <ID>UnusedParameter:DatacenterCreator.kt$DatacenterCreator$name: String</ID>
   </CurrentIssues>
 </SmellBaseline>

@@ -22,7 +22,7 @@ class RealtimeCloudletGenerator(
     private val arrivalConfig: RealtimeArrivalConfig = RealtimeArrivalConfig(),
     private val googleTraceConfig: GoogleTraceConfig? = null,
 ) {
-    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, random, googleTraceConfig)
+    private val strategy = CloudletGeneratorFactory.createGenerator(generatorType, googleTraceConfig)
 
     /**
      * 创建实时云任务列表（带到达时间）
