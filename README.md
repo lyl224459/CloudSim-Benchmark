@@ -409,18 +409,18 @@ CloudSim-Benchmark/
 
 ## 🔄 CI/CD
 
-项目配置了 GitHub Actions CI/CD，自动化构建、测试和发布流程。当前主分支门禁以 `fullCheck` 为准，包含示例配置校验、格式检查、静态检查、测试、覆盖率报告和 fatJar 构建：
+项目配置了 GitHub Actions CI/CD，自动化构建、测试和发布流程。当前主分支在 Windows、Ubuntu、macOS 上执行 `fullCheck`、发布包 smoke 和阻断型 build warning audit，包含示例配置校验、格式检查、静态检查、测试、覆盖率报告和 fatJar 构建：
 
 ```yaml
 # .github/workflows/ci.yml
-- Windows + JDK 25 环境
-- .\gradlew.bat clean fullCheck --no-daemon --stacktrace --configuration-cache
-- ktlintCheck / detekt / test / jacocoTestReport / fatJar
+- Windows / Ubuntu / macOS + JDK 25
+- fullCheck / verifyReleasePackage / containerImageSmoke
+- pwsh -File scripts/run-build-warning-audit.ps1
 ```
 
 发布流程由 `.github/workflows/release.yml` 在 `v*.*.*` 标签或手动触发时执行，复用 Gradle release package tasks 生成可执行 JAR、Windows zip、Unix tar.gz、源码包和清单，并推送容器镜像到 GHCR。发布前验收清单见 `docs/release-readiness.md`。
 
-当前保留 detekt `1.23.8` 稳定版；其 Gradle 10 deprecation warning 来自插件内部 API，待 detekt 2.x 稳定后单独升级处理。
+warning audit 分别捕获 `compileKotlin`、`detekt`、`ktlintCheck` 和 CloudSim Plus Maven 源码构建日志，仅精确允许 detekt `1.23.8` 的 Gradle 10 deprecation 和 ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning；任何新增 warning 都会阻断 CI。审计报告和原始日志保存在 `build/reports/build-warnings/` 并由 CI 始终上传。
 
 ### 迁移说明
 

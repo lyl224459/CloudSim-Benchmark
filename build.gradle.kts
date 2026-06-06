@@ -1,4 +1,5 @@
 import buildlogic.BuildCloudSimPlusFromSourceTask
+import buildlogic.BuildWarningAuditTask
 import buildlogic.CloudSimPlusBuildService
 import buildlogic.ContainerImageSmokeTask
 import buildlogic.PrepareCloudSimPlusSourceTask
@@ -67,6 +68,9 @@ val cloudSimPlusGitTimeoutSeconds =
         .gradleProperty("cloudsimplus.gitTimeoutSeconds")
         .map(String::toLong)
         .orElse(60L)
+
+val buildWarningLogDirectory = layout.buildDirectory.dir("reports/build-warnings/logs")
+val buildWarningAuditReport = layout.buildDirectory.file("reports/build-warnings/audit.md")
 val cloudSimPlusDependencyVersion =
     providers
         .gradleProperty("cloudsimplus.version")
@@ -183,6 +187,13 @@ val prepareCloudSimPlusSource by tasks.registering(PrepareCloudSimPlusSourceTask
     rootDir.set(layout.projectDirectory)
     sourceDir.set(cloudSimPlusSubmoduleDir)
     versionFile.set(cloudSimPlusVersionFile)
+}
+
+tasks.register<BuildWarningAuditTask>("verifyBuildWarnings") {
+    group = "verification"
+    description = "验证隔离构建日志只包含已确认的外部工具警告"
+    logDirectory.set(buildWarningLogDirectory)
+    reportFile.set(buildWarningAuditReport)
 }
 
 val cloudSimPlusBuildLock =

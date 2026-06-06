@@ -6,6 +6,7 @@
 
 - `.\gradlew.bat ktlintCheck detekt --no-daemon --stacktrace`
 - `.\gradlew.bat buildSrc:test --no-daemon --stacktrace`
+- `pwsh -File scripts/run-build-warning-audit.ps1`
 - `.\gradlew.bat fullCheck --no-daemon --stacktrace --rerun-tasks`
 - `.\gradlew.bat verifyCloudSimPlusSourceBuild --no-daemon --stacktrace --configuration-cache`
 - `.\gradlew.bat benchmarkPerformanceSmoke --no-daemon --stacktrace --rerun-tasks`
@@ -27,4 +28,6 @@
 - `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 22 项，后续迭代逐步削减。
 - JaCoCo 已设置保守门禁：line >= 64%、branch >= 40%。
 - `benchmarkPerformanceTrend` 只生成性能趋势报告，不设置性能失败阈值。
-- 当前保留 detekt `1.23.8` 稳定版；Gradle 10 deprecation warning 待 detekt 2.x 稳定后单独治理。
+- Windows、Ubuntu、macOS CI 和 release 构建均执行 build warning audit，并始终上传 `build/reports/build-warnings/`。
+- 当前精确允许两个外部工具 warning：detekt `1.23.8` 的 Gradle 10 deprecation，以及 ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning。detekt warning 发生在全局配置阶段，可能出现在每个被审计任务日志中；ktlint Unsafe warning 只允许出现在 `ktlintCheck` 日志中。其余 deprecation、native access、Unsafe、JVM target fallback 和未知 warning 均阻断构建。
+- detekt 白名单在稳定版插件不再调用 `ReportingExtension.file(String)` 后删除；ktlint 白名单在其内嵌 Kotlin compiler 不再调用该 Unsafe API 后删除。
