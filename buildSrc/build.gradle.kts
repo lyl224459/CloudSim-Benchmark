@@ -6,6 +6,15 @@ plugins {
     jacoco
 }
 
+gradlePlugin {
+    plugins {
+        create("buildLogicTestFixture") {
+            id = "cloudsim-benchmark.buildlogic-test-fixture"
+            implementationClass = "buildlogic.BuildLogicTestFixturePlugin"
+        }
+    }
+}
+
 repositories {
     gradlePluginPortal()
     mavenCentral()
@@ -24,6 +33,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
+    testImplementation(gradleTestKit())
 }
 
 tasks.withType<Test>().configureEach {
@@ -46,12 +56,12 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.40".toBigDecimal()
+                minimum = "0.50".toBigDecimal()
             }
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = "0.30".toBigDecimal()
+                minimum = "0.40".toBigDecimal()
             }
         }
     }

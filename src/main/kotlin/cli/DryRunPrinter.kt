@@ -11,23 +11,94 @@ private const val BATCH_SMALL_EXAMPLE =
     "  cloudsim run --config configs/examples/single_config_example.toml " +
         "--profile batch_small --dry-run"
 
+internal interface DryRunOutput {
+    fun info(
+        message: String,
+        vararg args: Any?,
+    )
+
+    fun result(
+        message: String,
+        vararg args: Any?,
+    )
+}
+
+private object LoggerDryRunOutput : DryRunOutput {
+    override fun info(
+        message: String,
+        vararg args: Any?,
+    ) = Logger.info(message, *args)
+
+    override fun result(
+        message: String,
+        vararg args: Any?,
+    ) = Logger.result(message, *args)
+}
+
+internal fun printUsage(output: DryRunOutput) {
+    usageLines.forEach(output::info)
+}
+
+private val usageLines =
+    listOf(
+        "CloudSim-Benchmark CLI",
+        "",
+        "用法:",
+        "  cloudsim run --mode batch|realtime|batch-multi|realtime-multi [options]",
+        "  cloudsim list algorithms --mode batch|realtime",
+        "  cloudsim list profiles --config FILE",
+        "  cloudsim list presets --config FILE",
+        "  cloudsim config validate --config FILE",
+        "  cloudsim config print --config FILE [--profile NAME]",
+        "",
+        "run 选项:",
+        "  --mode MODE                      运行模式（可省略，交给 profile 决定）",
+        "  --algorithms, -a ALGO1,ALGO2     算法列表，或 ALL",
+        "  --preset NAME                    使用配置文件中的预设；与 --algorithms 互斥",
+        "  --profile, -p NAME               选择配置文件中的 profile",
+        "  --seed, -s SEED                  随机数种子",
+        "  --runs, -r COUNT                 运行次数",
+        "  --tasks, -t COUNT1,COUNT2        multi 模式任务数列表",
+        "  --config, -c FILE                配置文件",
+        "  --output, -o DIR                 输出目录",
+        "  --sequential, -S                 顺序执行",
+        "  --concurrency, -C NUM            最大协程并发数",
+        "  --dry-run                        只打印解析后的配置，不创建结果",
+        "",
+        "示例:",
+        BATCH_SMALL_EXAMPLE,
+        "  cloudsim run --mode batch -a RANDOM,PSO -r 3 -s 42 -o runs/demo",
+        "  cloudsim run --mode batch-multi --tasks 50,100,200 -a ALL --concurrency 4",
+        "  cloudsim list profiles --config configs/examples/single_config_example.toml",
+    )
+
 object DryRunPrinter {
-    fun printAlgorithms(mode: String) {
+    fun printAlgorithms(mode: String) = printAlgorithms(mode, LoggerDryRunOutput)
+
+    internal fun printAlgorithms(
+        mode: String,
+        output: DryRunOutput,
+    ) {
         val algorithms =
             when (normalizeMode(mode)) {
                 "batch" -> AlgorithmRegistry.forMode(AlgorithmMode.BATCH).map { it.name }
                 "realtime" -> AlgorithmRegistry.forMode(AlgorithmMode.REALTIME).map { it.name }
                 else -> throw IllegalArgumentException("list algorithms 只接受 batch 或 realtime")
             }
-        Logger.result("可用算法 ({}): {}", mode, algorithms.joinToString(", "))
+        output.result("可用算法 ({}): {}", mode, algorithms.joinToString(", "))
     }
 
-    fun printProfiles(config: ExperimentConfig) {
+    fun printProfiles(config: ExperimentConfig) = printProfiles(config, LoggerDryRunOutput)
+
+    internal fun printProfiles(
+        config: ExperimentConfig,
+        output: DryRunOutput,
+    ) {
         if (config.profiles.isEmpty()) {
-            Logger.result("未定义 profiles")
+            output.result("未定义 profiles")
             return
         }
-        Logger.result("可用 profiles:")
+        output.result("可用 profiles:")
         config.profiles.toSortedMap().forEach { (name, profile) ->
             val selection =
                 when {
@@ -35,30 +106,40 @@ object DryRunPrinter {
                     !profile.preset.isNullOrBlank() -> "preset=${profile.preset}"
                     else -> "(未指定)"
                 }
-            Logger.result("  {} -> mode={}, {}", name, profile.mode, selection)
+            output.result("  {} -> mode={}, {}", name, profile.mode, selection)
         }
-        config.defaultProfile?.let { Logger.result("默认 profile: {}", it) }
+        config.defaultProfile?.let { output.result("默认 profile: {}", it) }
     }
 
-    fun printPresets(presets: Map<String, PresetConfig>) {
+    fun printPresets(presets: Map<String, PresetConfig>) = printPresets(presets, LoggerDryRunOutput)
+
+    internal fun printPresets(
+        presets: Map<String, PresetConfig>,
+        output: DryRunOutput,
+    ) {
         if (presets.isEmpty()) {
-            Logger.result("未定义预设")
+            output.result("未定义预设")
             return
         }
-        Logger.result("可用预设:")
+        output.result("可用预设:")
         presets.toSortedMap().forEach { (name, preset) ->
-            Logger.result("  {} = {}", name, preset.algorithms.joinToString(", "))
+            output.result("  {} = {}", name, preset.algorithms.joinToString(", "))
         }
     }
 
-    fun printDryRun(resolved: ResolvedExperimentConfig) {
-        printDryRunHeader(resolved)
-        printDryRunAlgorithms(resolved)
+    fun printDryRun(resolved: ResolvedExperimentConfig) = printDryRun(resolved, LoggerDryRunOutput)
+
+    internal fun printDryRun(
+        resolved: ResolvedExperimentConfig,
+        output: DryRunOutput,
+    ) {
+        printDryRunHeader(resolved, output)
+        printDryRunAlgorithms(resolved, output)
         if (resolved.mode.startsWith("realtime")) {
-            printRealtimeOverview(resolved)
-            printPhysicalTopology(resolved)
+            printRealtimeOverview(resolved, output)
+            printPhysicalTopology(resolved, output)
         }
-        Logger.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
+        output.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
     }
 
     fun resolvedJson(
@@ -67,35 +148,5 @@ object DryRunPrinter {
         timestamp: String,
     ): String = renderResolvedJson(resolved, experimentDir, timestamp)
 
-    fun printUsage() {
-        Logger.info("CloudSim-Benchmark CLI")
-        Logger.info("")
-        Logger.info("用法:")
-        Logger.info("  cloudsim run --mode batch|realtime|batch-multi|realtime-multi [options]")
-        Logger.info("  cloudsim list algorithms --mode batch|realtime")
-        Logger.info("  cloudsim list profiles --config FILE")
-        Logger.info("  cloudsim list presets --config FILE")
-        Logger.info("  cloudsim config validate --config FILE")
-        Logger.info("  cloudsim config print --config FILE [--profile NAME]")
-        Logger.info("")
-        Logger.info("run 选项:")
-        Logger.info("  --mode MODE                      运行模式（可省略，交给 profile 决定）")
-        Logger.info("  --algorithms, -a ALGO1,ALGO2     算法列表，或 ALL")
-        Logger.info("  --preset NAME                    使用配置文件中的预设；与 --algorithms 互斥")
-        Logger.info("  --profile, -p NAME               选择配置文件中的 profile")
-        Logger.info("  --seed, -s SEED                  随机数种子")
-        Logger.info("  --runs, -r COUNT                 运行次数")
-        Logger.info("  --tasks, -t COUNT1,COUNT2        multi 模式任务数列表")
-        Logger.info("  --config, -c FILE                配置文件")
-        Logger.info("  --output, -o DIR                 输出目录")
-        Logger.info("  --sequential, -S                 顺序执行")
-        Logger.info("  --concurrency, -C NUM            最大协程并发数")
-        Logger.info("  --dry-run                        只打印解析后的配置，不创建结果")
-        Logger.info("")
-        Logger.info("示例:")
-        Logger.info(BATCH_SMALL_EXAMPLE)
-        Logger.info("  cloudsim run --mode batch -a RANDOM,PSO -r 3 -s 42 -o runs/demo")
-        Logger.info("  cloudsim run --mode batch-multi --tasks 50,100,200 -a ALL --concurrency 4")
-        Logger.info("  cloudsim list profiles --config configs/examples/single_config_example.toml")
-    }
+    fun printUsage() = printUsage(LoggerDryRunOutput)
 }

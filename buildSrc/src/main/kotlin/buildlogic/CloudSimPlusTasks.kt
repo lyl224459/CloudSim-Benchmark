@@ -13,6 +13,7 @@ import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
@@ -100,6 +101,10 @@ abstract class BuildCloudSimPlusFromSourceTask
         @get:Input
         abstract val networkProxy: Property<String>
 
+        @get:Input
+        @get:Optional
+        abstract val mavenExecutableOverride: Property<String>
+
         @get:InputFiles
         @get:PathSensitive(PathSensitivity.RELATIVE)
         abstract val sourceFiles: ConfigurableFileCollection
@@ -109,6 +114,11 @@ abstract class BuildCloudSimPlusFromSourceTask
             val source = sourceDir.get().asFile
             val localRepo = rawMavenRepo.get().asFile
             localRepo.mkdirs()
+            val mavenExecutable =
+                mavenExecutableOverride.orNull
+                    ?.trim()
+                    ?.takeIf(String::isNotBlank)
+                    ?: CloudSimPlusMavenSupport.mavenExecutable(source)
             execOperations.exec {
                 workingDir = source
                 CloudSimPlusMavenSupport
@@ -116,7 +126,7 @@ abstract class BuildCloudSimPlusFromSourceTask
                     .takeIf(String::isNotBlank)
                     ?.let { options -> environment("MAVEN_OPTS", options) }
                 commandLine(
-                    CloudSimPlusMavenSupport.mavenExecutable(source),
+                    mavenExecutable,
                     "-Dmaven.repo.local=${localRepo.absolutePath}",
                     "-DskipTests",
                     "-DskipITs",

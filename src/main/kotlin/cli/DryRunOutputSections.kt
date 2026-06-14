@@ -1,7 +1,6 @@
 package cli
 
 import config.RealtimeSchedulingConfig
-import util.Logger
 
 private val bracketedRealtimeKeys = setOf("tenantQuota", "tenantWeights", "tenantCostBudget")
 private val realtimeOverviewFormat =
@@ -79,25 +78,31 @@ private val physicalTopologyFormat =
         "imageCacheCapacity",
     ).joinToString(", ", prefix = "物理拓扑/数据本地性: ") { "$it={}" }
 
-internal fun printDryRunHeader(resolved: ResolvedExperimentConfig) {
-    Logger.result("Dry run: 不会创建实验目录或结果文件")
-    Logger.result("模式: {}", resolved.mode)
-    Logger.result("Profile: {}", resolved.profileName ?: "(无)")
-    Logger.result("输出目录: {}", resolved.output.resultsDir)
-    Logger.result("随机种子: {}", resolved.randomSeed)
-    Logger.result("运行次数: {}", resolved.runs)
+internal fun printDryRunHeader(
+    resolved: ResolvedExperimentConfig,
+    output: DryRunOutput,
+) {
+    output.result("Dry run: 不会创建实验目录或结果文件")
+    output.result("模式: {}", resolved.mode)
+    output.result("Profile: {}", resolved.profileName ?: "(无)")
+    output.result("输出目录: {}", resolved.output.resultsDir)
+    output.result("随机种子: {}", resolved.randomSeed)
+    output.result("运行次数: {}", resolved.runs)
     if (resolved.taskCounts.isNotEmpty()) {
-        Logger.result("任务数列表: {}", resolved.taskCounts.joinToString(", "))
+        output.result("任务数列表: {}", resolved.taskCounts.joinToString(", "))
     } else {
         val count = if (resolved.mode == "batch") resolved.batch.cloudletCount else resolved.realtime.cloudletCount
-        Logger.result("任务数: {}", count)
+        output.result("任务数: {}", count)
     }
 }
 
-internal fun printDryRunAlgorithms(resolved: ResolvedExperimentConfig) {
-    Logger.result("算法:")
+internal fun printDryRunAlgorithms(
+    resolved: ResolvedExperimentConfig,
+    output: DryRunOutput,
+) {
+    output.result("算法:")
     for (algorithm in resolved.algorithms) {
-        Logger.result(
+        output.result(
             "  {} population={} maxIter={}",
             algorithm.displayName,
             algorithm.settings.population,
@@ -107,8 +112,11 @@ internal fun printDryRunAlgorithms(resolved: ResolvedExperimentConfig) {
 }
 
 @Suppress("SpreadOperator")
-internal fun printRealtimeOverview(resolved: ResolvedExperimentConfig) {
-    Logger.result(realtimeOverviewFormat, *realtimeOverviewValues(resolved))
+internal fun printRealtimeOverview(
+    resolved: ResolvedExperimentConfig,
+    output: DryRunOutput,
+) {
+    output.result(realtimeOverviewFormat, *realtimeOverviewValues(resolved))
 }
 
 private fun realtimeOverviewValues(resolved: ResolvedExperimentConfig): Array<Any?> {
@@ -191,9 +199,12 @@ private fun realtimeTopologySchedulingValues(scheduling: RealtimeSchedulingConfi
         scheduling.regionFailureRate,
     )
 
-internal fun printPhysicalTopology(resolved: ResolvedExperimentConfig) {
+internal fun printPhysicalTopology(
+    resolved: ResolvedExperimentConfig,
+    output: DryRunOutput,
+) {
     val scheduling = resolved.realtime.scheduling
-    Logger.result(
+    output.result(
         physicalTopologyFormat,
         scheduling.physicalTopologyEnabled,
         scheduling.dataLocalityEnabled,

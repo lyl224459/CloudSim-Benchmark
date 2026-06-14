@@ -27,7 +27,7 @@
 ## Current quality baseline
 
 - `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 10 项，后续迭代逐步削减。
-- JaCoCo 已设置保守门禁：line >= 65%、branch >= 45%；`buildSrc` 门禁为 line >= 40%、branch >= 30%。
+- JaCoCo 已设置保守门禁：line >= 68%、branch >= 50%；`buildSrc` 门禁为 line >= 50%、branch >= 40%。
 - `benchmarkPerformanceTrend` 只生成性能趋势报告，不设置性能失败阈值。
 - Windows、Ubuntu、macOS CI 和 release 构建均执行 build warning audit，并始终上传 `build/reports/build-warnings/`。
 - 普通构建严格使用 `gradle/cloudsimplus.lock`；每周 latest compatibility workflow 单独测试上游最新 release。发布清单必须记录实际 CloudSim Plus ref、commit 和 version。

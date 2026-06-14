@@ -42,7 +42,7 @@ internal data class CommandExecutionServices(
                         experimentName,
                     )
                 },
-                launcher = ProductionExperimentLauncher,
+                launcher = ProductionExperimentLauncher(),
             )
     }
 }
@@ -72,7 +72,26 @@ internal class CommandExecutionCoordinator(
     }
 }
 
-private object ProductionExperimentLauncher : ResolvedExperimentLauncher {
+internal data class ProductionExperimentLaunchServices(
+    val runBatch: suspend (BatchExperimentRequest) -> Unit,
+    val runBatchMulti: suspend (BatchExperimentRequest) -> Unit,
+    val runRealtime: suspend (RealtimeExperimentRequest) -> Unit,
+    val runRealtimeMulti: suspend (RealtimeExperimentRequest) -> Unit,
+) {
+    companion object {
+        fun production(): ProductionExperimentLaunchServices =
+            ProductionExperimentLaunchServices(
+                runBatch = { ComparisonRunner(it).runComparison() },
+                runBatchMulti = { BatchCloudletCountRunner(it).runExperiment() },
+                runRealtime = { RealtimeComparisonRunner(it).runComparison() },
+                runRealtimeMulti = { RealtimeCloudletCountRunner(it).runBatchExperiment() },
+            )
+    }
+}
+
+internal class ProductionExperimentLauncher(
+    private val services: ProductionExperimentLaunchServices = ProductionExperimentLaunchServices.production(),
+) : ResolvedExperimentLauncher {
     override suspend fun launch(
         resolved: ResolvedExperimentConfig,
         outputContext: ExperimentOutputContext,
@@ -93,7 +112,7 @@ private object ProductionExperimentLauncher : ResolvedExperimentLauncher {
         execution: ExperimentExecutionRequest,
     ) {
         Logger.info("开始批处理调度算法对比实验...")
-        ComparisonRunner(BatchExperimentRequest(resolved.experimentConfig.batch, execution)).runComparison()
+        services.runBatch(BatchExperimentRequest(resolved.experimentConfig.batch, execution))
         Logger.info("批处理实验完成！")
     }
 
@@ -102,12 +121,12 @@ private object ProductionExperimentLauncher : ResolvedExperimentLauncher {
         execution: ExperimentExecutionRequest,
     ) {
         Logger.info("开始批处理模式批量任务数实验...")
-        BatchCloudletCountRunner(
+        services.runBatchMulti(
             BatchExperimentRequest(
                 resolved.experimentConfig.batch.copy(cloudletCounts = resolved.taskCounts),
                 execution,
             ),
-        ).runExperiment()
+        )
     }
 
     private suspend fun runRealtime(
@@ -115,13 +134,13 @@ private object ProductionExperimentLauncher : ResolvedExperimentLauncher {
         execution: ExperimentExecutionRequest,
     ) {
         Logger.info("开始实时调度算法对比实验...")
-        RealtimeComparisonRunner(
+        services.runRealtime(
             RealtimeExperimentRequest(
                 resolved.experimentConfig.realtime,
                 resolved.experimentConfig.optimizer,
                 execution,
             ),
-        ).runComparison()
+        )
         Logger.info("实时调度实验完成！")
     }
 
@@ -130,13 +149,13 @@ private object ProductionExperimentLauncher : ResolvedExperimentLauncher {
         execution: ExperimentExecutionRequest,
     ) {
         Logger.info("开始实时调度模式批量任务数实验...")
-        RealtimeCloudletCountRunner(
+        services.runRealtimeMulti(
             RealtimeExperimentRequest(
                 resolved.experimentConfig.realtime.copy(cloudletCounts = resolved.taskCounts),
                 resolved.experimentConfig.optimizer,
                 execution,
             ),
-        ).runBatchExperiment()
+        )
     }
 
     private fun ResolvedExperimentConfig.executionRequest(outputContext: ExperimentOutputContext) =
