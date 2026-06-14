@@ -36,8 +36,7 @@ function Invoke-AuditedGradleTask {
         "--no-daemon",
         "--stacktrace",
         "--warning-mode=all",
-        "--configuration-cache",
-        "-Pcloudsimplus.offline=true"
+        "--configuration-cache"
     ) + $AdditionalArguments
 
     Write-Host "Auditing Gradle task: $TaskName"
@@ -62,6 +61,12 @@ try {
     $auditExitCode = $LASTEXITCODE
 } finally {
     Pop-Location
+}
+
+$auditReport = Join-Path $root "build/reports/build-warnings/audit.md"
+if (Test-Path -LiteralPath $auditReport) {
+    Write-Host ""
+    Get-Content -LiteralPath $auditReport | Write-Host
 }
 
 if ($sourceFailures.Count -gt 0) {
