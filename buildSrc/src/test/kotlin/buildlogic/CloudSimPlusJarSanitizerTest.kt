@@ -24,6 +24,7 @@ class CloudSimPlusJarSanitizerTest {
         rawJar.parentFile.mkdirs()
         createJar(rawJar, classPath = "bad.jar")
         rawJar.resolveSibling("cloudsimplus-8.5.7-sources.jar").also(::createJar)
+        rawJar.resolveSibling("cloudsimplus-8.5.7.pom").writeText("<project/>")
 
         val runtimeJars =
             CloudSimPlusJarSanitizer.sanitizeRepository(
@@ -31,11 +32,14 @@ class CloudSimPlusJarSanitizerTest {
                 sanitizedMavenRepo = sanitizedRepo,
                 artifactGroup = "org.cloudsimplus",
                 artifactName = "cloudsimplus",
+                artifactVersion = "8.5.7",
             )
 
         assertTrue(runtimeJars.single().path.contains("sanitized"))
         assertJarClassPath(rawJar, "bad.jar")
         assertJarClassPath(runtimeJars.single(), null)
+        assertTrue(runtimeJars.single().resolveSibling("cloudsimplus-8.5.7.pom").isFile)
+        assertFalse(runtimeJars.single().resolveSibling("cloudsimplus-8.5.7-sources.jar").exists())
     }
 
     @Test

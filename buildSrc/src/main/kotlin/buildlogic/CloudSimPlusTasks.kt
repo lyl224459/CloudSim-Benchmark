@@ -95,8 +95,20 @@ abstract class BuildCloudSimPlusFromSourceTask
         @get:Internal
         abstract val sourceDir: DirectoryProperty
 
+        @get:Internal
+        abstract val mavenCacheDir: DirectoryProperty
+
         @get:OutputDirectory
         abstract val rawMavenRepo: DirectoryProperty
+
+        @get:InputFile
+        abstract val metadataFile: RegularFileProperty
+
+        @get:Input
+        abstract val artifactGroup: Property<String>
+
+        @get:Input
+        abstract val artifactName: Property<String>
 
         @get:Input
         abstract val networkProxy: Property<String>
@@ -112,8 +124,8 @@ abstract class BuildCloudSimPlusFromSourceTask
         @TaskAction
         fun build() {
             val source = sourceDir.get().asFile
-            val localRepo = rawMavenRepo.get().asFile
-            localRepo.mkdirs()
+            val dependencyCache = mavenCacheDir.get().asFile
+            dependencyCache.mkdirs()
             val mavenExecutable =
                 mavenExecutableOverride.orNull
                     ?.trim()
@@ -127,9 +139,19 @@ abstract class BuildCloudSimPlusFromSourceTask
                     ?.let { options -> environment("MAVEN_OPTS", options) }
                 commandLine(
                     mavenExecutable,
-                    *CloudSimPlusMavenSupport.installArguments(localRepo).toTypedArray(),
+                    *CloudSimPlusMavenSupport.packageArguments(dependencyCache).toTypedArray(),
                 )
             }
+            val metadata = CloudSimPlusLockSupport.read(metadataFile.get().asFile)
+            val stagedArtifacts =
+                CloudSimPlusArtifactStager.stage(
+                    sourceDir = source,
+                    rawMavenRepo = rawMavenRepo.get().asFile,
+                    artifactGroup = artifactGroup.get(),
+                    artifactName = artifactName.get(),
+                    artifactVersion = metadata.version,
+                )
+            logger.lifecycle("Staged CloudSim Plus artifacts: ${stagedArtifacts.joinToString { it.name }}")
         }
     }
 
@@ -148,6 +170,9 @@ abstract class SanitizeCloudSimPlusJarManifestTask : DefaultTask() {
     @get:Input
     abstract val artifactName: Property<String>
 
+    @get:Input
+    abstract val artifactVersion: Property<String>
+
     @TaskAction
     fun sanitize() {
         val runtimeJars =
@@ -156,6 +181,7 @@ abstract class SanitizeCloudSimPlusJarManifestTask : DefaultTask() {
                 sanitizedMavenRepo = sanitizedMavenRepo.get().asFile,
                 artifactGroup = artifactGroup.get(),
                 artifactName = artifactName.get(),
+                artifactVersion = artifactVersion.get(),
             )
         runtimeJars.forEach { jar ->
             logger.lifecycle("Sanitized CloudSim Plus jar manifest: ${jar.path}")

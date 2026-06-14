@@ -27,6 +27,34 @@ class ContainerImageSmokeSupportTest {
     }
 
     @Test
+    fun `buildx command enables github actions cache`() {
+        val containerFile = File("Containerfile")
+
+        assertEquals(
+            listOf(
+                "docker",
+                "buildx",
+                "build",
+                "--load",
+                "--cache-from=type=gha,scope=container-smoke",
+                "--cache-to=type=gha,mode=max,scope=container-smoke",
+                "-t",
+                "cloudsim-benchmark:smoke",
+                "-f",
+                containerFile.absolutePath,
+                ".",
+            ),
+            ContainerImageSmokeSupport.buildCommand(
+                dockerExecutable = "docker",
+                imageName = "cloudsim-benchmark:smoke",
+                containerFile = containerFile,
+                useBuildx = true,
+                useGitHubActionsCache = true,
+            ),
+        )
+    }
+
+    @Test
     fun `missing docker message distinguishes ci from local runs`() {
         assertEquals(
             "Docker executable 'docker' is required for containerImageSmoke in CI.",

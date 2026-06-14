@@ -27,6 +27,12 @@ abstract class ContainerImageSmokeTask
         @get:Input
         abstract val ci: Property<Boolean>
 
+        @get:Input
+        abstract val useBuildx: Property<Boolean>
+
+        @get:Input
+        abstract val useGitHubActionsCache: Property<Boolean>
+
         @get:Internal
         abstract val contextDirectory: DirectoryProperty
 
@@ -57,6 +63,8 @@ abstract class ContainerImageSmokeTask
                         dockerExecutable = docker,
                         imageName = imageName.get(),
                         containerFile = containerFile.get().asFile,
+                        useBuildx = useBuildx.get(),
+                        useGitHubActionsCache = useGitHubActionsCache.get(),
                     ),
                 )
             }

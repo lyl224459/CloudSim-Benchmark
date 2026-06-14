@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # --- 阶段 1: 编译阶段 ---
 FROM eclipse-temurin:25-jdk AS builder
 
@@ -22,13 +24,22 @@ COPY third_party third_party
 # 修复权限问题：确保 gradlew 可执行
 RUN chmod +x gradlew
 
-# 预构建 CloudSim Plus 源码依赖并预下载依赖 (利用镜像缓存)
-RUN ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
-RUN ./gradlew dependencies --no-daemon --configuration-cache
+# 预构建 CloudSim Plus 源码依赖并预下载依赖
+RUN --mount=type=cache,target=/root/.m2/repository \
+    --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/wrapper \
+    ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
+RUN --mount=type=cache,target=/root/.m2/repository \
+    --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/wrapper \
+    ./gradlew dependencies --no-daemon --configuration-cache
 
 # 复制源码并构建 fatJar
 COPY src src
-RUN ./gradlew fatJar --no-daemon --configuration-cache -Pcompress=true
+RUN --mount=type=cache,target=/root/.m2/repository \
+    --mount=type=cache,target=/root/.gradle/caches \
+    --mount=type=cache,target=/root/.gradle/wrapper \
+    ./gradlew fatJar --no-daemon --configuration-cache -Pcompress=true
 
 # --- 阶段 2: 运行阶段 ---
 FROM eclipse-temurin:25-jre

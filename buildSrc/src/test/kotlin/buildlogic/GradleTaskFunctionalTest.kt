@@ -31,6 +31,8 @@ class GradleTaskFunctionalTest {
                 imageName.set('fixture-image')
                 dockerExecutable.set('definitely-missing-docker')
                 ci.set(false)
+                useBuildx.set(false)
+                useGitHubActionsCache.set(false)
                 contextDirectory.set(layout.projectDirectory)
                 containerFile.set(layout.projectDirectory.file('Containerfile'))
             }
@@ -57,6 +59,8 @@ class GradleTaskFunctionalTest {
                 imageName.set('fixture-image')
                 dockerExecutable.set('definitely-missing-docker')
                 ci.set(true)
+                useBuildx.set(true)
+                useGitHubActionsCache.set(true)
                 contextDirectory.set(layout.projectDirectory)
                 containerFile.set(layout.projectDirectory.file('Containerfile'))
             }
@@ -74,6 +78,7 @@ class GradleTaskFunctionalTest {
         val rawRepo = project.resolve("raw")
         val inputJar = rawRepo.resolve("org/cloudsimplus/cloudsimplus/8.5.7/cloudsimplus-8.5.7.jar")
         createJarWithClassPath(inputJar)
+        inputJar.resolveSibling("cloudsimplus-8.5.7.pom").writeText("<project/>")
         project.writeBuild(
             """
             import buildlogic.SanitizeCloudSimPlusJarManifestTask
@@ -83,6 +88,7 @@ class GradleTaskFunctionalTest {
                 sanitizedMavenRepo.set(layout.projectDirectory.dir('sanitized'))
                 artifactGroup.set('org.cloudsimplus')
                 artifactName.set('cloudsimplus')
+                artifactVersion.set('8.5.7')
             }
             """,
         )
@@ -170,7 +176,11 @@ class GradleTaskFunctionalTest {
 
             tasks.register('buildSource', BuildCloudSimPlusFromSourceTask) {
                 sourceDir.set(layout.projectDirectory.dir('source'))
+                mavenCacheDir.set(layout.buildDirectory.dir('maven-cache'))
                 rawMavenRepo.set(layout.buildDirectory.dir('raw-m2'))
+                metadataFile.set(layout.projectDirectory.file('metadata.txt'))
+                artifactGroup.set('org.cloudsimplus')
+                artifactName.set('cloudsimplus')
                 networkProxy.set('')
                 mavenExecutableOverride.set('definitely-missing-maven')
                 sourceFiles.from(layout.projectDirectory.file('source/pom.xml'))
@@ -178,6 +188,7 @@ class GradleTaskFunctionalTest {
             """,
         )
         project.resolve("source/pom.xml").writeText("<project/>")
+        project.resolve("metadata.txt").writeText(metadata("a".repeat(40)))
 
         val result = project.runAndFail("buildSource")
 

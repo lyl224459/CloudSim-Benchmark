@@ -34,6 +34,14 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
+    - name: Cache CloudSim Plus Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-cloudsimplus-
+
     - name: Prepare Release Version
       id: ver
       shell: bash
@@ -123,6 +131,9 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -140,3 +151,5 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha,scope=release-image
+        cache-to: type=gha,mode=max,scope=release-image
