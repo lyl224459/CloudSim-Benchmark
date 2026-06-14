@@ -5,6 +5,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
 
@@ -15,6 +17,7 @@ class ExperimentConcurrency(
     @OptIn(ExperimentalCoroutinesApi::class)
     private val dispatcher: CoroutineContext =
         if (maxConcurrency > 0) Dispatchers.Default.limitedParallelism(maxConcurrency) else Dispatchers.Default
+    private val semaphore: Semaphore? = maxConcurrency.takeIf { it > 0 }?.let(::Semaphore)
 
     val description: String
         get() =
@@ -36,7 +39,9 @@ class ExperimentConcurrency(
         return coroutineScope {
             itemList
                 .map { item ->
-                    async(dispatcher) { block(item) }
+                    async(dispatcher) {
+                        semaphore?.withPermit { block(item) } ?: block(item)
+                    }
                 }.awaitAll()
         }
     }

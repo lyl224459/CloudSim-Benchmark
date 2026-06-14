@@ -15,7 +15,7 @@ class CommandExecutionCoordinatorTest {
     lateinit var tempDir: File
 
     @Test
-    fun `coordinator maps resolved run to launcher and output context`() =
+    fun `coordinator maps resolved run to launcher and output context`(): Unit =
         runBlocking {
             val events = mutableListOf<String>()
             val resolved = resolved("batch")
@@ -33,7 +33,7 @@ class CommandExecutionCoordinatorTest {
         }
 
     @Test
-    fun `dry run validates and resolves without creating output or launching`() =
+    fun `dry run validates and resolves without creating output or launching`(): Unit =
         runBlocking {
             val events = mutableListOf<String>()
             val coordinator =

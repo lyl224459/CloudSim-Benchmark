@@ -20,6 +20,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
 
     - name: Set up JDK 25
       uses: actions/setup-java@v4
@@ -111,6 +112,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
 
     - name: Set up JDK 25
       uses: actions/setup-java@v4
@@ -119,10 +121,24 @@ jobs:
         distribution: 'temurin'
         cache: 'gradle'
 
+    - name: Load hosted-runner performance baseline
+      shell: bash
+      run: |
+        mkdir -p build/reports/performance
+        git fetch origin performance-history:refs/remotes/origin/performance-history || true
+        git show origin/performance-history:jmh-results.json \
+          > build/reports/performance/previous-jmh-results.json 2>/dev/null || \
+          rm -f build/reports/performance/previous-jmh-results.json
+
     - name: Generate JMH trend report
+      shell: bash
       run: |
         ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
-        ./gradlew benchmarkPerformanceTrend --no-daemon --stacktrace --configuration-cache
+        args=(benchmarkPerformanceTrend --no-daemon --stacktrace --configuration-cache)
+        if test -s build/reports/performance/previous-jmh-results.json; then
+          args+=("-PperformanceBaseline=build/reports/performance/previous-jmh-results.json")
+        fi
+        ./gradlew "${args[@]}"
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
@@ -135,4 +151,5 @@ jobs:
         path: |
           build/reports/performance/jmh-results.json
           build/reports/performance/performance-trend.md
+          build/reports/performance/previous-jmh-results.json
         if-no-files-found: warn

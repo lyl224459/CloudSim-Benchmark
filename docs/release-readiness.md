@@ -26,11 +26,12 @@
 
 ## Current quality baseline
 
-- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 10 项，后续迭代逐步削减。
-- JaCoCo 已设置保守门禁：line >= 68%、branch >= 50%；`buildSrc` 门禁为 line >= 50%、branch >= 40%。
-- `benchmarkPerformanceTrend` 只生成性能趋势报告，不设置性能失败阈值。
+- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 2 项，后续迭代逐步削减。
+- JaCoCo 已设置保守门禁：line >= 68%、branch >= 50%、`datacenter` branch >= 45%；`buildSrc` 门禁为 line >= 50%、branch >= 40%。
+- `benchmarkPerformanceTrend` 不设置性能失败阈值；`Weekly Performance History` 每周将 hosted runner 的 JMH JSON 和 delta
+  报告写入 `performance-history` 分支，仅用于趋势观察。
 - Windows、Ubuntu、macOS CI 和 release 构建均执行 build warning audit，并始终上传 `build/reports/build-warnings/`。
 - 普通构建严格使用 `gradle/cloudsimplus.lock`；每周 latest compatibility workflow 单独测试上游最新 release。发布清单必须记录实际 CloudSim Plus ref、commit 和 version。
 - `buildSrc` JaCoCo 生成 XML/HTML 报告并执行保守覆盖率门禁。
-- 当前精确允许两个外部工具 warning：detekt `1.23.8` 的 Gradle 10 deprecation，以及 ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning。detekt warning 发生在全局配置阶段，可能出现在每个被审计任务日志中；ktlint Unsafe warning 只允许出现在 `ktlintCheck` 日志中。其余 deprecation、native access、Unsafe、JVM target fallback 和未知 warning 均阻断构建。
+- 当前精确允许三个外部工具 warning 签名：detekt `1.23.8` 的 Gradle 10 deprecation、ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning，以及锁定 CloudSim Plus 源码可能产生的 javac legacy diagnostics。detekt warning 发生在全局配置阶段，可能出现在每个被审计任务日志中；ktlint Unsafe warning 只允许出现在 `ktlintCheck` 日志中。其余 deprecation、native access、Unsafe、JVM target fallback 和未知 warning 均阻断构建。
 - detekt 白名单在稳定版插件不再调用 `ReportingExtension.file(String)` 后删除；ktlint 白名单在其内嵌 Kotlin compiler 不再调用该 Unsafe API 后删除。

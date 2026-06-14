@@ -127,13 +127,7 @@ abstract class BuildCloudSimPlusFromSourceTask
                     ?.let { options -> environment("MAVEN_OPTS", options) }
                 commandLine(
                     mavenExecutable,
-                    "-Dmaven.repo.local=${localRepo.absolutePath}",
-                    "-DskipTests",
-                    "-DskipITs",
-                    "-Dgpg.skip=true",
-                    "-Dlicense.skip=true",
-                    "-Dmaven.javadoc.skip=true",
-                    "install",
+                    *CloudSimPlusMavenSupport.installArguments(localRepo).toTypedArray(),
                 )
             }
         }

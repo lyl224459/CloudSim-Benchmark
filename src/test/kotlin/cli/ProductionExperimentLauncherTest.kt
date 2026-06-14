@@ -19,7 +19,7 @@ class ProductionExperimentLauncherTest {
     lateinit var tempDir: File
 
     @Test
-    fun `launcher maps all production modes to matching requests`() =
+    fun `launcher maps all production modes to matching requests`(): Unit =
         runBlocking {
             val batch = mutableListOf<BatchExperimentRequest>()
             val batchMulti = mutableListOf<BatchExperimentRequest>()

@@ -13,6 +13,16 @@ class CloudSimPlusMavenSupportTest {
     lateinit var tempDir: File
 
     @Test
+    fun `install arguments disable upstream artifact attachment profile`() {
+        val arguments = CloudSimPlusMavenSupport.installArguments(tempDir)
+
+        assertTrue("-Dmaven.repo.local=${tempDir.absolutePath}" in arguments)
+        assertTrue("-P!default" in arguments)
+        assertTrue("-Dmaven.javadoc.skip=true" in arguments)
+        assertEquals("install", arguments.last())
+    }
+
+    @Test
     fun `maven executable falls back when wrapper script is missing`() {
         assertEquals("mvn.cmd", CloudSimPlusMavenSupport.mavenExecutable(tempDir, osName = "Windows 11"))
         assertEquals("mvn", CloudSimPlusMavenSupport.mavenExecutable(tempDir, osName = "Linux"))

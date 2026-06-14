@@ -10,7 +10,7 @@ import java.nio.file.Files
 
 class ExperimentOutputContextConfigTest {
     @Test
-    fun `csv disabled suppresses trial file output`() =
+    fun `csv disabled suppresses trial file output`(): Unit =
         runBlocking {
             val tempDir = Files.createTempDirectory("output-context-disabled").toFile()
             try {
@@ -39,7 +39,7 @@ class ExperimentOutputContextConfigTest {
         }
 
     @Test
-    fun `csv delimiter is applied when enabled`() =
+    fun `csv delimiter is applied when enabled`(): Unit =
         runBlocking {
             val tempDir = Files.createTempDirectory("output-context-delimiter").toFile()
             try {

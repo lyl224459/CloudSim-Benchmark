@@ -10,7 +10,7 @@ import java.nio.file.Files
 
 class ExperimentOutputContextTest {
     @Test
-    fun `concurrent trial writes keep a single header and complete rows`() =
+    fun `concurrent trial writes keep a single header and complete rows`(): Unit =
         runBlocking {
             val tempDir = Files.createTempDirectory("experiment-output-concurrent").toFile()
             try {
@@ -40,7 +40,7 @@ class ExperimentOutputContextTest {
         }
 
     @Test
-    fun `child output context inherits csv settings and writes into child directory`() =
+    fun `child output context inherits csv settings and writes into child directory`(): Unit =
         runBlocking {
             val tempDir = Files.createTempDirectory("experiment-output-child").toFile()
             try {

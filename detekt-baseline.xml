@@ -4,13 +4,5 @@
   <CurrentIssues>
     <ID>LongMethod:ConfigValidationTest.kt$ConfigValidationTest$@Test fun `should validate realtime cloud semantics config parameters`()</ID>
     <ID>LongMethod:ConfigurationManagerTest.kt$ConfigurationManagerTest$@Test fun `loadFromSingleFile reads nested profile batch objective and realtime scheduling`()</ID>
-    <ID>ThrowsCount:ConfigurationManager.kt$ConfigurationManager.Companion$fun loadFromSingleFile(configPath: String): LoadedConfigs</ID>
-    <ID>TooManyFunctions:CliParser.kt$CliParser</ID>
-    <ID>TooManyFunctions:ObjectiveFunction.kt$SchedulerObjectiveFunction : ObjectiveFunction</ID>
-    <ID>TooManyFunctions:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel</ID>
-    <ID>TooManyFunctions:RealtimeArrivalState.kt$RealtimeArrivalState</ID>
-    <ID>TooManyFunctions:RealtimeBrokerMetrics.kt$RealtimeBrokerMetrics</ID>
-    <ID>TooManyFunctions:RealtimeTopologyModel.kt$RealtimeTopologyModel</ID>
-    <ID>TooManyFunctions:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager</ID>
   </CurrentIssues>
 </SmellBaseline>

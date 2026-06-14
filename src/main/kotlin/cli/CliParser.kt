@@ -26,6 +26,7 @@ private inline fun ensureCli(
     }
 }
 
+@Suppress("TooManyFunctions") // Compatibility facade keeps all public CLI command parsing entry points together.
 class CliParser(
     private val args: Array<String>,
 ) {

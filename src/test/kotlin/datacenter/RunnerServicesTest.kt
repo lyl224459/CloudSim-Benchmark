@@ -18,7 +18,7 @@ class RunnerServicesTest {
     lateinit var tempDir: File
 
     @Test
-    fun `batch runner increments seeds saves trials and keeps partial failures`() =
+    fun `batch runner increments seeds saves trials and keeps partial failures`(): Unit =
         runBlocking {
             val exporter = RecordingBatchExporter()
             val seeds = mutableListOf<Long>()
@@ -42,7 +42,7 @@ class RunnerServicesTest {
         }
 
     @Test
-    fun `realtime runner increments seeds and exports failed trial`() =
+    fun `realtime runner increments seeds and exports failed trial`(): Unit =
         runBlocking {
             val exporter = RecordingRealtimeExporter()
             val seeds = mutableListOf<Long>()
@@ -66,7 +66,7 @@ class RunnerServicesTest {
         }
 
     @Test
-    fun `cloudlet count runners create sorted child requests and child output directories`() =
+    fun `cloudlet count runners create sorted child requests and child output directories`(): Unit =
         runBlocking {
             val batchChildren = mutableListOf<BatchExperimentRequest>()
             val realtimeChildren = mutableListOf<RealtimeExperimentRequest>()

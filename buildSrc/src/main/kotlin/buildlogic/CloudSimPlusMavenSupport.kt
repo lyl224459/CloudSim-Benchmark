@@ -5,6 +5,18 @@ import java.net.URI
 import java.util.jar.JarFile
 
 internal object CloudSimPlusMavenSupport {
+    fun installArguments(localRepo: File): List<String> =
+        listOf(
+            "-Dmaven.repo.local=${localRepo.absolutePath}",
+            "-DskipTests",
+            "-DskipITs",
+            "-Dgpg.skip=true",
+            "-Dlicense.skip=true",
+            "-Dmaven.javadoc.skip=true",
+            "-P!default",
+            "install",
+        )
+
     fun mavenExecutable(
         source: File,
         osName: String = System.getProperty("os.name"),

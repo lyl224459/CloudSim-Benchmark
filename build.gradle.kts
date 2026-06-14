@@ -1,5 +1,6 @@
 import buildlogic.BuildCloudSimPlusFromSourceTask
 import buildlogic.BuildWarningAuditTask
+import buildlogic.CliEndToEndSmokeTask
 import buildlogic.CloudSimPlusBuildService
 import buildlogic.CloudSimPlusLockSupport
 import buildlogic.ContainerImageSmokeTask
@@ -10,6 +11,7 @@ import buildlogic.SanitizeCloudSimPlusJarManifestTask
 import buildlogic.UpdateCloudSimPlusLockTask
 import buildlogic.VerifyCloudSimPlusLockTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
+import buildlogic.VerifyJUnitTestSignaturesTask
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
 import org.gradle.api.provider.ProviderFactory
@@ -376,7 +378,25 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
                 minimum = "0.50".toBigDecimal()
             }
         }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("datacenter")
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.45".toBigDecimal()
+            }
+        }
     }
+}
+
+val verifyJUnitTestSignatures by tasks.registering(VerifyJUnitTestSignaturesTask::class) {
+    group = "verification"
+    description = "验证所有 JUnit @Test 方法返回 void/Unit，防止测试被静默忽略"
+
+    dependsOn(tasks.named("testClasses"))
+    testClassesDirs.from(sourceSets["test"].output.classesDirs)
+    testRuntimeClasspath.from(sourceSets["test"].runtimeClasspath)
 }
 
 detekt {
@@ -439,6 +459,7 @@ tasks.named("check") {
         "detekt",
         "jacocoTestReport",
         "jacocoTestCoverageVerification",
+        verifyJUnitTestSignatures,
         verifyCloudSimPlusSourceBuild,
     )
 }
@@ -611,7 +632,7 @@ val fullCheck by tasks.registering {
     group = "verification"
     description = "执行完整校验：check、test、fatJar 和示例配置校验"
 
-    dependsOn("check", "test", "fatJar", validateExampleConfigs, "verifyReleaseAssets", "fatJarHelpSmoke")
+    dependsOn("check", "test", "fatJar", validateExampleConfigs, "verifyReleaseAssets", "fatJarHelpSmoke", "cliEndToEndSmoke")
 }
 
 // 创建测试覆盖率任务
@@ -1026,6 +1047,20 @@ val containerImageSmoke by tasks.registering(ContainerImageSmokeTask::class) {
     ci.set(isCiBuildProvider)
     contextDirectory.set(layout.projectDirectory)
     containerFile.set(layout.projectDirectory.file("Containerfile"))
+}
+
+val cliEndToEndSmoke by tasks.registering(CliEndToEndSmokeTask::class) {
+    group = "verification"
+    description = "通过 fatJar 验证 help/list/config validate 和 batch/realtime dry-run 生产入口"
+
+    val fatJarTask = tasks.named<Jar>("fatJar")
+    dependsOn(fatJarTask)
+    executableJar.set(fatJarTask.flatMap { it.archiveFile })
+    exampleConfig.set(layout.projectDirectory.file("configs/examples/single_config_example.toml"))
+    javaExecutable.set("java")
+    jvmArguments.set(cloudSimJvmArgs)
+    dryRunRoot.set(layout.buildDirectory.dir("tmp/cli-end-to-end-smoke/dry-run-output"))
+    reportFile.set(layout.buildDirectory.file("reports/cli-end-to-end-smoke/report.txt"))
 }
 
 // 优化 Zip 任务性能 - 根据环境自动选择压缩策略

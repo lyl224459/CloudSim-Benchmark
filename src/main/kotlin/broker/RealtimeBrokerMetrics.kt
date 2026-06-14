@@ -28,6 +28,7 @@ data class RealtimeBrokerMetricsSnapshot(
     val maxQueueDepth: Int,
 )
 
+@Suppress("TooManyFunctions") // Metrics facade keeps stable scalar and snapshot accessors in one type.
 class RealtimeBrokerMetrics {
     var rejectedCount: Int = 0
         private set

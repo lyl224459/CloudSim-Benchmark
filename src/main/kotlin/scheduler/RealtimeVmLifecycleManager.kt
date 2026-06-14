@@ -25,6 +25,7 @@ data class RealtimeVmLifecycleSnapshot(
     val acceptingWork: Boolean get() = lifecycle == RealtimeVmLifecycle.ACTIVE
 }
 
+@Suppress("TooManyFunctions") // Lifecycle facade preserves the broker-facing transition and query API.
 class RealtimeVmLifecycleManager(
     initialVms: List<Vm>,
     private val scheduling: RealtimeSchedulingConfig,

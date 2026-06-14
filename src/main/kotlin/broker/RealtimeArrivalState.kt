@@ -13,6 +13,7 @@ data class RealtimeArrivalSnapshot(
     val attempts: Map<CloudletId, Int>,
 )
 
+@Suppress("TooManyFunctions") // State facade owns the complete arrival lifecycle transition API.
 class RealtimeArrivalState {
     private val waitingCloudlets = mutableListOf<Cloudlet>()
     private val pendingCloudlets = mutableListOf<Cloudlet>()

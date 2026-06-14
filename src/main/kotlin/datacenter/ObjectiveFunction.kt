@@ -20,6 +20,7 @@ interface ObjectiveFunction {
  * 调度器目标函数实现
  * 包含成本、总时间、负载均衡等指标的计算
  */
+@Suppress("TooManyFunctions") // ObjectiveFunction facade exposes the established metric estimation API.
 class SchedulerObjectiveFunction(
     private val cloudletList: List<Cloudlet>,
     private val vmList: List<Vm>,

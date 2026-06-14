@@ -18,6 +18,7 @@ data class RealtimeTopologyMetrics(
     val failureDomainSpreadScore: Double,
 )
 
+@Suppress("TooManyFunctions") // Topology facade preserves the scheduler-facing location and metrics API.
 class RealtimeTopologyModel private constructor(
     private val settings: RealtimeTopologySettings,
     initialVmCount: Int,

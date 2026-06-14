@@ -19,6 +19,7 @@ internal data class RealtimeBrokerReadDependencies(
     val topologyModel: RealtimeTopologyModel,
 )
 
+@Suppress("TooManyFunctions") // Read facade intentionally mirrors the broker's stable metrics/query API.
 internal class RealtimeBrokerReadModel(
     dependencies: RealtimeBrokerReadDependencies,
 ) {

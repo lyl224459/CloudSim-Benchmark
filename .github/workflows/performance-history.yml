@@ -1,0 +1,89 @@
+name: Weekly Performance History
+
+on:
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  performance-history:
+    name: Record hosted-runner JMH trend
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: "25"
+        distribution: temurin
+        cache: gradle
+
+    - name: Load previous hosted-runner baseline
+      shell: bash
+      run: |
+        mkdir -p build/reports/performance
+        git fetch origin performance-history:refs/remotes/origin/performance-history || true
+        if git show origin/performance-history:jmh-results.json > build/reports/performance/previous-jmh-results.json 2>/dev/null; then
+          echo "Loaded previous performance baseline"
+        else
+          rm -f build/reports/performance/previous-jmh-results.json
+          echo "No previous performance baseline; recording first observation"
+        fi
+
+    - name: Generate performance trend
+      shell: bash
+      run: |
+        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        args=(benchmarkPerformanceTrend --no-daemon --stacktrace --configuration-cache)
+        if test -s build/reports/performance/previous-jmh-results.json; then
+          args+=("-PperformanceBaseline=build/reports/performance/previous-jmh-results.json")
+        fi
+        ./gradlew "${args[@]}"
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Publish performance history branch
+      if: success()
+      shell: bash
+      run: |
+        history_dir="${RUNNER_TEMP}/performance-history"
+        if git show-ref --verify --quiet refs/remotes/origin/performance-history; then
+          git worktree add "${history_dir}" origin/performance-history
+        else
+          git worktree add --detach "${history_dir}"
+          git -C "${history_dir}" switch --orphan performance-history
+          git -C "${history_dir}" rm -rf .
+        fi
+        cp build/reports/performance/jmh-results.json "${history_dir}/jmh-results.json"
+        cp build/reports/performance/performance-trend.md "${history_dir}/performance-trend.md"
+        printf 'Hosted GitHub runner observations only. Do not use as a blocking performance gate.\n' \
+          > "${history_dir}/README.md"
+        git -C "${history_dir}" config user.name "github-actions[bot]"
+        git -C "${history_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git -C "${history_dir}" add README.md jmh-results.json performance-trend.md
+        if ! git -C "${history_dir}" diff --cached --quiet; then
+          git -C "${history_dir}" commit -m "chore: update hosted-runner performance history"
+          git -C "${history_dir}" push origin HEAD:performance-history
+        fi
+
+    - name: Upload performance history artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: weekly-performance-history
+        path: |
+          build/reports/performance/jmh-results.json
+          build/reports/performance/performance-trend.md
+          build/reports/performance/previous-jmh-results.json
+        if-no-files-found: warn

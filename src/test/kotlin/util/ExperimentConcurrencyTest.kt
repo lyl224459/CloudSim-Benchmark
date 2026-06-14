@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 class ExperimentConcurrencyTest {
     @Test
-    fun `max concurrency one serializes mapped work`() =
+    fun `max concurrency one serializes mapped work`(): Unit =
         runBlocking {
             val concurrency = ExperimentConcurrency(useCoroutines = true, maxConcurrency = 1)
             val active = AtomicInteger(0)
@@ -25,7 +25,7 @@ class ExperimentConcurrencyTest {
         }
 
     @Test
-    fun `sequential mode does not dispatch mapped work concurrently`() =
+    fun `sequential mode does not dispatch mapped work concurrently`(): Unit =
         runBlocking {
             val concurrency = ExperimentConcurrency(useCoroutines = false, maxConcurrency = 8)
             val order = mutableListOf<Int>()

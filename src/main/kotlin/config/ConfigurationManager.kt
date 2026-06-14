@@ -33,22 +33,8 @@ class ConfigurationManager {
          * @throws IllegalArgumentException 当配置文件不存在或格式无效时抛出
          */
         fun loadFromSingleFile(configPath: String): LoadedConfigs {
-            // 输入验证
-            require(configPath.isNotBlank()) { "配置文件路径不能为空" }
-
-            val file = File(configPath)
-            require(file.exists()) { "配置文件不存在: $configPath" }
-            require(file.canRead()) { "配置文件无法读取: $configPath" }
-            require(file.length() != 0L) { "配置文件为空: $configPath" }
-
-            val content =
-                try {
-                    file.readText()
-                } catch (e: IOException) {
-                    throw IllegalArgumentException("无法读取配置文件内容: ${e.message}", e)
-                } catch (e: SecurityException) {
-                    throw IllegalArgumentException("无法读取配置文件内容: ${e.message}", e)
-                }
+            val file = validatedConfigFile(configPath)
+            val content = readConfigFile(file)
 
             val rootConfig = parseRootConfig(content, configPath)
             ExperimentConfig.validateDynamicTomlSections(content, rootConfig.toExperimentTomlConfig())
@@ -57,6 +43,30 @@ class ConfigurationManager {
 
             return LoadedConfigs(systemConfig, experimentConfig)
         }
+
+        private fun validatedConfigFile(configPath: String): File {
+            require(configPath.isNotBlank()) { "配置文件路径不能为空" }
+            return File(configPath).also { file ->
+                require(file.exists()) { "配置文件不存在: $configPath" }
+                require(file.canRead()) { "配置文件无法读取: $configPath" }
+                require(file.length() != 0L) { "配置文件为空: $configPath" }
+            }
+        }
+
+        private fun readConfigFile(file: File): String =
+            try {
+                file.readText()
+            } catch (e: IOException) {
+                throw configReadError(e)
+            } catch (e: SecurityException) {
+                throw configReadError(e)
+            }
+
+        private fun configReadError(cause: Exception): IllegalArgumentException =
+            IllegalArgumentException(
+                "无法读取配置文件内容: ${cause.message}",
+                cause,
+            )
 
         private fun parseRootConfig(
             content: String,

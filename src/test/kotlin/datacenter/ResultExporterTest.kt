@@ -13,7 +13,7 @@ class ResultExporterTest {
     lateinit var tempDir: File
 
     @Test
-    fun `batch exporter writes trial comparison and summary csv`() =
+    fun `batch exporter writes trial comparison and summary csv`(): Unit =
         runBlocking {
             val exporter = BatchResultExporter(ExperimentOutputContext(tempDir), runs = 2)
             val summary = partialBatchSummary()
@@ -30,7 +30,7 @@ class ResultExporterTest {
         }
 
     @Test
-    fun `realtime exporter writes failed trial and empty summary values`() =
+    fun `realtime exporter writes failed trial and empty summary values`(): Unit =
         runBlocking {
             val exporter = RealtimeResultExporter(ExperimentOutputContext(tempDir))
             val summary = failedRealtimeSummary()
@@ -46,7 +46,7 @@ class ResultExporterTest {
         }
 
     @Test
-    fun `csv disabled exporters do not create files`() =
+    fun `csv disabled exporters do not create files`(): Unit =
         runBlocking {
             val disabled = ExperimentOutputContext(tempDir, csvEnabled = false)
 
