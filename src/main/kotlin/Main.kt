@@ -17,6 +17,7 @@ typealias ResolvedRun = ResolvedExperimentConfig
 
 private val mainLogger = KotlinLogging.logger("Main")
 
+@Suppress("TooGenericExceptionCaught") // CLI boundary keeps a stable exit code for unexpected failures.
 fun main(args: Array<String>) =
     runBlocking {
         try {

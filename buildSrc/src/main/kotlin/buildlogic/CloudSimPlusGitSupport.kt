@@ -4,17 +4,25 @@ import org.gradle.api.GradleException
 import java.io.File
 import java.util.concurrent.TimeUnit
 
+internal fun interface CloudSimPlusGitOperations {
+    fun exec(
+        args: List<String>,
+        workDir: File,
+        ignoreExit: Boolean,
+    ): String
+}
+
 internal class CloudSimPlusGitClient(
     private val rootDir: File,
     private val networkProxy: String,
     private val timeoutSeconds: Long,
     private val temporaryDir: File,
     private val logInfo: (String) -> Unit,
-) {
-    fun exec(
+) : CloudSimPlusGitOperations {
+    override fun exec(
         args: List<String>,
-        workDir: File = rootDir,
-        ignoreExit: Boolean = false,
+        workDir: File,
+        ignoreExit: Boolean,
     ): String {
         var lastCommand = listOf("git") + args
         var lastOutput = ""
@@ -34,6 +42,11 @@ internal class CloudSimPlusGitClient(
         }
         throw GradleException("Git command failed: ${lastCommand.joinToString(" ")}\n$lastOutput")
     }
+
+    fun exec(
+        args: List<String>,
+        ignoreExit: Boolean = false,
+    ): String = exec(args, rootDir, ignoreExit)
 
     private fun runGitProcess(
         args: List<String>,
@@ -102,7 +115,7 @@ internal class CloudSimPlusGitClient(
 internal class CloudSimPlusSourcePreparer(
     private val repositoryUrl: String,
     private val rootDir: File,
-    private val git: CloudSimPlusGitClient,
+    private val git: CloudSimPlusGitOperations,
     private val logLifecycle: (String) -> Unit,
 ) {
     fun prepare(
@@ -128,9 +141,9 @@ internal class CloudSimPlusSourcePreparer(
                 }
             }
         fetchSelectedRef(source, selectedRef, offlineMode, autoUpdateEnabled, selectedOverride)
-        git.exec(listOf("-C", source.path, "checkout", lockedMetadata?.commit ?: selectedRef))
+        git.exec(listOf("-C", source.path, "checkout", lockedMetadata?.commit ?: selectedRef), rootDir, ignoreExit = false)
 
-        val commit = git.exec(listOf("-C", source.path, "rev-parse", "HEAD"))
+        val commit = git.exec(listOf("-C", source.path, "rev-parse", "HEAD"), rootDir, ignoreExit = false)
         val cloudSimVersion = CloudSimPlusVersioning.readCloudSimPlusVersion(source)
         val actualMetadata = CloudSimPlusMetadata(selectedRef, commit, cloudSimVersion)
         if (lockedMetadata != null && actualMetadata != lockedMetadata) {
@@ -156,6 +169,7 @@ internal class CloudSimPlusSourcePreparer(
         val submoduleResult =
             git.exec(
                 listOf("submodule", "update", "--init", "--recursive", "--", "third_party/cloudsimplus"),
+                rootDir,
                 ignoreExit = true,
             )
         if (gitMarker.exists() && isUsableGitCheckout(source)) {
@@ -183,6 +197,7 @@ internal class CloudSimPlusSourcePreparer(
         }
         return git.exec(
             listOf("-C", source.path, "rev-parse", "--is-inside-work-tree"),
+            rootDir,
             ignoreExit = true,
         ).trim() == "true"
     }
@@ -215,7 +230,7 @@ internal class CloudSimPlusSourcePreparer(
                     source.path,
                 )
             }
-        git.exec(cloneArgs, rootDir)
+        git.exec(cloneArgs, rootDir, ignoreExit = false)
     }
 
     private fun fetchSelectedRef(
@@ -238,24 +253,26 @@ internal class CloudSimPlusSourcePreparer(
             } else {
                 listOf("-C", source.path, "fetch", "--depth", "1", "origin", selectedRef)
             }
-        git.exec(fetchArgs, ignoreExit = true)
+        git.exec(fetchArgs, rootDir, ignoreExit = true)
     }
 
     private fun currentExactTag(source: File): String? =
         git.exec(
             listOf("-C", source.path, "describe", "--tags", "--exact-match"),
+            rootDir,
             ignoreExit = true,
         ).trim().takeIf(String::isNotBlank)
 
     private fun latestReleaseTagFromRemote(): String? =
         git.exec(
             listOf("ls-remote", "--tags", repositoryUrl),
+            rootDir,
             ignoreExit = true,
         ).let(CloudSimPlusVersioning::parseLatestReleaseTag)
 
     private fun latestReleaseTag(source: File): String =
         CloudSimPlusVersioning.latestReleaseTagFromLocalTags(
-            tags = git.exec(listOf("-C", source.path, "tag", "--list")),
+            tags = git.exec(listOf("-C", source.path, "tag", "--list"), rootDir, ignoreExit = false),
             source = source,
         )
 }

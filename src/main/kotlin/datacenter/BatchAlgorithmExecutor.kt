@@ -14,10 +14,10 @@ import java.util.Random
 
 internal class BatchAlgorithmExecutor(
     private val config: BatchConfig,
-) {
+) : BatchExecutionService {
     private val decimalFormat = DecimalFormat("###.##")
 
-    fun run(
+    override fun run(
         algorithmName: String,
         runSeed: Long,
         schedulerFactory: (List<Cloudlet>, List<Vm>) -> Scheduler,

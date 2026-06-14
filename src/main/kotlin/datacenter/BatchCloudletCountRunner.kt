@@ -1,22 +1,18 @@
 package datacenter
 
-import util.CsvRowWriter
-import util.CsvTableSchema
 import util.Logger
 import java.text.DecimalFormat
-import java.util.Locale
 
 private const val LOG_SEPARATOR_WIDTH = 80
-private const val SUMMARY_SEPARATOR_WIDTH = 100
-private const val COUNT_COLUMN_WIDTH = 12
-private const val ALGORITHM_COLUMN_WIDTH = 20
 
 /**
  * 批量任务数实验运行器
  * 支持按照不同的任务数批量执行实验，每个任务数可以运行多次并取平均值
  */
-class BatchCloudletCountRunner(
+class BatchCloudletCountRunner internal constructor(
     private val request: BatchExperimentRequest,
+    private val summaryRunner: BatchSummaryRunnerFactory,
+    private val exporter: BatchCloudletCountExportService,
 ) {
     private val cloudletCounts = request.batch.cloudletCounts
     private val population = request.batch.population
@@ -27,6 +23,12 @@ class BatchCloudletCountRunner(
     private val outputContext = request.execution.outputContext
     private val concurrency = request.execution.concurrency
     private val dft = DecimalFormat("###.##")
+
+    constructor(request: BatchExperimentRequest) : this(
+        request,
+        BatchSummaryRunnerFactory { child -> ComparisonRunner(child).runComparisonSummaries() },
+        BatchCloudletCountResultExporter(request.execution.outputContext),
+    )
 
     /**
      * 运行批量任务数实验（批处理模式）
@@ -60,7 +62,7 @@ class BatchCloudletCountRunner(
                 }.toMap()
 
         // 导出汇总结果
-        exportBatchResults(allResults)
+        exporter.export(allResults)
 
         Logger.info("\n${"=".repeat(LOG_SEPARATOR_WIDTH)}")
         Logger.info("批量任务数实验完成！")
@@ -76,15 +78,12 @@ class BatchCloudletCountRunner(
         Logger.info("${"#".repeat(LOG_SEPARATOR_WIDTH)}")
 
         val childOutputContext = outputContext.child("cloudlets_$cloudletCount")
-        val runner =
-            ComparisonRunner(
-                request.copy(
-                    batch = request.batch.copy(cloudletCount = cloudletCount),
-                    execution = request.execution.copy(outputContext = childOutputContext),
-                ),
+        val childRequest =
+            request.copy(
+                batch = request.batch.copy(cloudletCount = cloudletCount),
+                execution = request.execution.copy(outputContext = childOutputContext),
             )
-
-        val summaries = runner.runComparisonSummaries().sortedBy { it.algorithmName }
+        val summaries = summaryRunner.run(childRequest).sortedBy { it.algorithmName }
         val statistics = summaries.mapNotNull { it.statistics }
 
         Logger.info("\n任务数 {} 的统计结果:", cloudletCount)
@@ -102,103 +101,4 @@ class BatchCloudletCountRunner(
         Logger.info("\n任务数 {} 的实验完成", cloudletCount)
         return cloudletCount to summaries
     }
-
-    /**
-     * 导出批量实验结果到 CSV
-     */
-    private fun exportBatchResults(results: Map<Int, List<BatchRunSummary>>) {
-        if (!outputContext.csvEnabled) {
-            Logger.info("CSV 输出已禁用，跳过批处理批量任务数结果导出")
-            printSummaryTable(results)
-            return
-        }
-        val csvFile = outputContext.generateResultFileName("batch_cloudlet_count_summary")
-
-        val rows =
-            results.toSortedMap().flatMap { (cloudletCount, summaries) ->
-                summaries.map { summary -> summary.toCloudletCountCsvRow(cloudletCount) }
-            }
-        CsvRowWriter(outputContext.csvDelimiter).writeTable(
-            csvFile,
-            CsvTableSchema(batchCloudletCountSummaryCsvHeaders),
-            rows,
-        )
-
-        Logger.info("\n批量实验结果已导出到: {}", csvFile.absolutePath)
-
-        outputContext.saveSummaryRows(rows, batchCloudletCountSummaryCsvHeaders)
-
-        // 打印汇总表格
-        printSummaryTable(results)
-    }
-
-    /**
-     * 打印汇总表格
-     */
-    private fun printSummaryTable(results: Map<Int, List<BatchRunSummary>>) {
-        Logger.info("\n${"=".repeat(SUMMARY_SEPARATOR_WIDTH)}")
-        Logger.info("批量任务数实验汇总")
-        Logger.info("${"=".repeat(SUMMARY_SEPARATOR_WIDTH)}")
-
-        val sortedCounts = results.keys.sorted()
-
-        // 获取所有算法名称
-        val allAlgorithms =
-            results.values
-                .flatMap { it.map { summary -> summary.algorithmName } }
-                .distinct()
-                .sorted()
-
-        // 打印表头
-        Logger.info(countText("任务数"))
-        for (alg in allAlgorithms) {
-            Logger.info(algorithmText(alg))
-        }
-        Logger.info("")
-        Logger.info("-".repeat(SUMMARY_SEPARATOR_WIDTH))
-
-        // 打印每个指标
-        val metrics =
-            listOf(
-                "Makespan" to { stat: AlgorithmStatistics -> stat.makespan },
-                "LoadBalance" to { stat: AlgorithmStatistics -> stat.loadBalance },
-                "Cost" to { stat: AlgorithmStatistics -> stat.cost },
-                "Fitness" to { stat: AlgorithmStatistics -> stat.fitness },
-            )
-
-        for ((metricName, metricGetter) in metrics) {
-            Logger.info("\n{} (平均值):", metricName)
-            Logger.info(countText("任务数"))
-            for (alg in allAlgorithms) {
-                Logger.info(algorithmText(alg))
-            }
-            Logger.info("")
-            Logger.info("-".repeat(SUMMARY_SEPARATOR_WIDTH))
-
-            for (cloudletCount in sortedCounts) {
-                Logger.info(countNumber(cloudletCount))
-                val algorithmStats = results[cloudletCount].orEmpty().mapNotNull { it.statistics }
-                val statsMap = algorithmStats.associateBy { it.algorithmName }
-
-                for (alg in allAlgorithms) {
-                    val stat = statsMap[alg]
-                    if (stat != null) {
-                        val value = metricGetter(stat)
-                        Logger.info(algorithmText("${dft.format(value.mean)} ± ${dft.format(value.stdDev)}"))
-                    } else {
-                        Logger.info(algorithmText("-"))
-                    }
-                }
-                Logger.info("")
-            }
-        }
-
-        Logger.info("${"=".repeat(SUMMARY_SEPARATOR_WIDTH)}")
-    }
-
-    private fun countText(value: String): String = String.format(Locale.ROOT, "%-${COUNT_COLUMN_WIDTH}s", value)
-
-    private fun countNumber(value: Int): String = String.format(Locale.ROOT, "%-${COUNT_COLUMN_WIDTH}d", value)
-
-    private fun algorithmText(value: String): String = String.format(Locale.ROOT, "%-${ALGORITHM_COLUMN_WIDTH}s", value)
 }

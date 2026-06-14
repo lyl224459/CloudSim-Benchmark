@@ -25,13 +25,22 @@ data class AlgorithmStatistics(
     val fitness: StatisticalValue,
 )
 
-class ComparisonRunner(
+class ComparisonRunner private constructor(
     private val request: BatchExperimentRequest,
+    services: BatchRunnerServices,
 ) {
     private val batch = request.batch
     private val execution = request.execution
-    private val algorithmExecutor = BatchAlgorithmExecutor(batch)
-    private val resultExporter = BatchResultExporter(execution.outputContext, batch.runs)
+    private val algorithmExecutor = services.executor
+    private val resultExporter = services.exporter
+
+    constructor(request: BatchExperimentRequest) : this(request, BatchRunnerServices.production(request))
+
+    internal constructor(
+        request: BatchExperimentRequest,
+        executor: BatchExecutionService,
+        exporter: BatchExportService,
+    ) : this(request, BatchRunnerServices(executor, exporter))
 
     suspend fun runComparison(): List<AlgorithmResult> =
         coroutineScope {

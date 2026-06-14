@@ -54,6 +54,12 @@ jobs:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
+    - name: Verify buildSrc
+      run: .\gradlew.bat buildSrc:check --no-daemon --stacktrace --configuration-cache
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
     - name: Build, package and smoke release assets
       run: |
         .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache

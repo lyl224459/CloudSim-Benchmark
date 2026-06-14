@@ -61,9 +61,9 @@ jobs:
         path: build/reports/build-warnings/
         if-no-files-found: error
 
-    - name: Generate buildSrc JaCoCo report
+    - name: Verify buildSrc and generate JaCoCo report
       if: runner.os == 'Linux'
-      run: ./gradlew buildSrc:test buildSrc:jacocoTestReport --no-daemon --stacktrace --configuration-cache
+      run: ./gradlew buildSrc:check buildSrc:jacocoTestReport --no-daemon --stacktrace --configuration-cache
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"

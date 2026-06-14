@@ -40,8 +40,8 @@ internal class RealtimeExperimentRunner(
     private val config: RealtimeExperimentConfigSnapshot,
     private val metricsCollector: RealtimeMetricsCollector,
     private val dft: DecimalFormat = DecimalFormat("###.##"),
-) {
-    fun run(request: RealtimeExperimentRunRequest): RealtimeAlgorithmResult {
+) : RealtimeExperimentService {
+    override fun run(request: RealtimeExperimentRunRequest): RealtimeAlgorithmResult {
         Logger.info("\n${"=".repeat(REALTIME_EXPERIMENT_SEPARATOR_WIDTH)}")
         Logger.info("运行实时调度算法: {}", request.algorithmName)
         Logger.info("${"=".repeat(REALTIME_EXPERIMENT_SEPARATOR_WIDTH)}")

@@ -10,10 +10,10 @@ import java.util.Locale
 internal class BatchResultExporter(
     private val outputContext: ExperimentOutputContext,
     private val runs: Int,
-) {
+) : BatchExportService {
     private val decimalFormat = DecimalFormat("###.##")
 
-    fun printComparisonResults(summaries: List<BatchRunSummary>) {
+    override fun printComparisonResults(summaries: List<BatchRunSummary>) {
         printHeader()
         summaries.forEach(::printRow)
         Logger.result("-".repeat(RESULT_SEPARATOR_WIDTH))
@@ -21,7 +21,7 @@ internal class BatchResultExporter(
         Logger.result("${"=".repeat(RESULT_SEPARATOR_WIDTH)}\n")
     }
 
-    fun exportToCsv(summaries: List<BatchRunSummary>) {
+    override fun exportToCsv(summaries: List<BatchRunSummary>) {
         if (!outputContext.csvEnabled) {
             Logger.info("CSV 输出已禁用，跳过批处理结果导出")
             return
@@ -36,11 +36,11 @@ internal class BatchResultExporter(
         if (runs > 1) Logger.info("注: 导出值为 {} 次运行的平均值与标准差", runs)
     }
 
-    fun saveSummary(summaries: List<BatchRunSummary>) {
+    override fun saveSummary(summaries: List<BatchRunSummary>) {
         outputContext.saveSummaryRows(summaries.map { it.toCsvRow() }, batchSummaryCsvHeaders)
     }
 
-    suspend fun saveTrial(outcome: BatchRunOutcome) {
+    override suspend fun saveTrial(outcome: BatchRunOutcome) {
         outputContext.saveAlgorithmTrialRow(outcome.algorithmName, batchTrialCsvHeaders, outcome.toTrialCsvRow())
     }
 

@@ -30,43 +30,24 @@ class RealtimeVmLifecycleManager(
     private val scheduling: RealtimeSchedulingConfig,
     private val topologyModel: RealtimeTopologyModel = RealtimeTopologyModel.Disabled,
 ) {
-    private val mutableVms = initialVms.toMutableList()
-    private val lifecycleByIndex = linkedMapOf<Int, RealtimeVmLifecycleSnapshot>()
-    private var scaleOutCount = 0
-    private var scaleInCount = 0
-    private var activeVmPeak = initialVms.size
-    private var autoscalingCost = 0.0
-    private var coldStartDelayTotal = 0.0
+    private val state = RealtimeVmLifecycleState(initialVms, scheduling)
+    private val queries = RealtimeVmLifecycleQueries { state.snapshots().values }
 
-    init {
-        initialVms.indices.forEach { index ->
-            lifecycleByIndex[index] =
-                RealtimeVmLifecycleSnapshot(
-                    vmIndex = index,
-                    lifecycle = RealtimeVmLifecycle.ACTIVE,
-                    dynamic = false,
-                    createdAt = 0.0,
-                    activeAt = 0.0,
-                    lastBusyAt = 0.0,
-                )
-        }
-    }
+    val vmList: List<Vm> get() = state.vmList
 
-    val vmList: List<Vm> get() = mutableVms
+    fun snapshots(): Map<Int, RealtimeVmLifecycleSnapshot> = state.snapshots()
 
-    fun snapshots(): Map<Int, RealtimeVmLifecycleSnapshot> = lifecycleByIndex.toMap()
+    fun getScaleOutCount(): Int = state.accounting.scaleOutCount
 
-    fun getScaleOutCount(): Int = scaleOutCount
+    fun getScaleInCount(): Int = state.accounting.scaleInCount
 
-    fun getScaleInCount(): Int = scaleInCount
+    fun getActiveVmPeak(): Int = state.accounting.activeVmPeak
 
-    fun getActiveVmPeak(): Int = activeVmPeak
+    fun getAutoscalingCost(): Double = state.accounting.autoscalingCost
 
-    fun getAutoscalingCost(): Double = autoscalingCost
+    fun getColdStartDelayTotal(): Double = state.accounting.coldStartDelayTotal
 
-    fun getColdStartDelayTotal(): Double = coldStartDelayTotal
-
-    fun hasLiveDynamicVms(): Boolean = lifecycleByIndex.values.any { it.isLiveDynamic }
+    fun hasLiveDynamicVms(): Boolean = queries.hasLiveDynamicVms()
 
     fun maybeScaleOut(
         queueDepth: Int,
@@ -76,28 +57,8 @@ class RealtimeVmLifecycleManager(
         if (!canScaleOut(queueDepth)) return emptyList()
 
         val vm = createDynamicVm()
-        val index = mutableVms.size
-        mutableVms.add(vm)
+        val index = state.addDynamicVm(vm, currentTime)
         topologyModel.registerDynamicVm(index, activeVmIndexes)
-        val lifecycle =
-            if (scheduling.vmColdStartDelay > 0.0) {
-                RealtimeVmLifecycle.WARMING
-            } else {
-                RealtimeVmLifecycle.ACTIVE
-            }
-        lifecycleByIndex[index] =
-            RealtimeVmLifecycleSnapshot(
-                vmIndex = index,
-                lifecycle = lifecycle,
-                dynamic = true,
-                createdAt = currentTime,
-                activeAt = currentTime + scheduling.vmColdStartDelay,
-                lastBusyAt = currentTime,
-            )
-        scaleOutCount++
-        autoscalingCost += scheduling.scaleOutCost
-        coldStartDelayTotal += scheduling.vmColdStartDelay
-        updatePeak()
         return listOf(vm)
     }
 
@@ -105,24 +66,7 @@ class RealtimeVmLifecycleManager(
         currentTime: Double,
         activeVmIndexes: Set<Int>,
     ) {
-        for ((index, snapshot) in lifecycleByIndex.toMap()) {
-            val warmed =
-                if (snapshot.lifecycle == RealtimeVmLifecycle.WARMING && currentTime >= snapshot.activeAt) {
-                    snapshot.copy(lifecycle = RealtimeVmLifecycle.ACTIVE)
-                } else {
-                    snapshot
-                }
-
-            val busyAware =
-                if (index in activeVmIndexes) {
-                    warmed.copy(lastBusyAt = currentTime)
-                } else {
-                    warmed
-                }
-
-            lifecycleByIndex[index] = busyAware
-        }
-        updatePeak()
+        state.refresh(currentTime, activeVmIndexes)
     }
 
     fun maybeScaleIn(
@@ -132,22 +76,14 @@ class RealtimeVmLifecycleManager(
         if (!scheduling.autoscalingEnabled) return
         if (scheduling.scaleInIdleTime <= 0.0) return
 
-        lifecycleByIndex
-            .toMap()
-            .filter { (index, snapshot) -> shouldScaleIn(index, snapshot, currentTime, activeVmIndexes) }
-            .forEach { (index, snapshot) ->
-                lifecycleByIndex[index] = snapshot.copy(lifecycle = RealtimeVmLifecycle.TERMINATED)
-                scaleInCount++
-            }
-        updatePeak()
+        state.scaleInIdle(currentTime, activeVmIndexes)
     }
 
     fun markBusy(
         vmIndex: Int,
         currentTime: Double,
     ) {
-        val snapshot = lifecycleByIndex[vmIndex] ?: return
-        lifecycleByIndex[vmIndex] = snapshot.copy(lastBusyAt = currentTime)
+        state.markBusy(vmIndex, currentTime)
     }
 
     private fun createDynamicVm(): Vm =
@@ -159,39 +95,7 @@ class RealtimeVmLifecycleManager(
 
     private fun canScaleOut(queueDepth: Int): Boolean =
         scheduling.autoscalingEnabled &&
-            scheduling.maxDynamicVms > dynamicVmCount() &&
+            scheduling.maxDynamicVms > queries.dynamicVmCount() &&
             queueDepth >= scheduling.scaleOutQueueThreshold.coerceAtLeast(1) &&
-            !hasProvisioningVm()
-
-    private fun shouldScaleIn(
-        index: Int,
-        snapshot: RealtimeVmLifecycleSnapshot,
-        currentTime: Double,
-        activeVmIndexes: Set<Int>,
-    ): Boolean =
-        snapshot.dynamic &&
-            snapshot.lifecycle == RealtimeVmLifecycle.ACTIVE &&
-            index !in activeVmIndexes &&
-            currentTime - snapshot.createdAt >= scheduling.scaleInProtectionTime &&
-            currentTime - snapshot.lastBusyAt >= scheduling.scaleInIdleTime
-
-    private fun dynamicVmCount(): Int = lifecycleByIndex.values.count { it.isLiveDynamic }
-
-    private fun hasProvisioningVm(): Boolean = lifecycleByIndex.values.any { it.isStarting }
-
-    private fun updatePeak() {
-        val active =
-            lifecycleByIndex.values.count {
-                it.lifecycle == RealtimeVmLifecycle.ACTIVE ||
-                    it.lifecycle == RealtimeVmLifecycle.WARMING ||
-                    it.lifecycle == RealtimeVmLifecycle.PROVISIONING
-            }
-        if (active > activeVmPeak) activeVmPeak = active
-    }
-
-    private val RealtimeVmLifecycleSnapshot.isLiveDynamic: Boolean
-        get() = dynamic && lifecycle != RealtimeVmLifecycle.TERMINATED
-
-    private val RealtimeVmLifecycleSnapshot.isStarting: Boolean
-        get() = lifecycle == RealtimeVmLifecycle.PROVISIONING || lifecycle == RealtimeVmLifecycle.WARMING
+            !queries.hasProvisioningVm()
 }

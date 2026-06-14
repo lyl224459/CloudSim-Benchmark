@@ -166,14 +166,16 @@ class RealtimeBroker(
         )
     private val readModel =
         RealtimeBrokerReadModel(
-            schedulingConfig,
-            arrivalState,
-            lifecycleStore,
-            reservationState,
-            brokerMetrics,
-            environment.vmLifecycleManager,
-            tenantController,
-            environment.topologyModel,
+            RealtimeBrokerReadDependencies(
+                schedulingConfig,
+                arrivalState,
+                lifecycleStore,
+                reservationState,
+                brokerMetrics,
+                environment.vmLifecycleManager,
+                tenantController,
+                environment.topologyModel,
+            ),
         )
     private val arrivalWorkflow =
         RealtimeArrivalWorkflow(

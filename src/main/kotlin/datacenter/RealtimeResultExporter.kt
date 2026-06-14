@@ -14,8 +14,8 @@ private const val RESULT_ROW_FORMAT = "%-15s %-16s %-8d %-8d %-12s %-12s %-12s %
 internal class RealtimeResultExporter(
     private val outputContext: ExperimentOutputContext,
     private val dft: DecimalFormat = DecimalFormat("###.##"),
-) {
-    suspend fun saveTrialOutcome(outcome: RealtimeRunOutcome) {
+) : RealtimeExportService {
+    override suspend fun saveTrialOutcome(outcome: RealtimeRunOutcome) {
         outputContext.saveAlgorithmTrialRow(
             algorithmName = outcome.algorithmName,
             headers = realtimeTrialCsvHeaders,
@@ -23,7 +23,7 @@ internal class RealtimeResultExporter(
         )
     }
 
-    fun printComparisonResults(summaries: List<RealtimeRunSummary>) {
+    override fun printComparisonResults(summaries: List<RealtimeRunSummary>) {
         Logger.result("\n${"=".repeat(RESULT_TABLE_WIDTH)}")
         Logger.result("实时调度算法对比结果汇总")
         Logger.result("${"=".repeat(RESULT_TABLE_WIDTH)}")
@@ -36,7 +36,7 @@ internal class RealtimeResultExporter(
         Logger.result("${"=".repeat(RESULT_TABLE_WIDTH)}")
     }
 
-    fun exportRealtimeToCSV(summaries: List<RealtimeRunSummary>) {
+    override fun exportRealtimeToCSV(summaries: List<RealtimeRunSummary>) {
         if (!outputContext.csvEnabled) {
             Logger.info("CSV 输出已禁用，跳过实时结果导出")
             return
@@ -51,7 +51,7 @@ internal class RealtimeResultExporter(
         Logger.info("实时调度结果已导出到: {}", csvFile.absolutePath)
     }
 
-    fun saveSummaryResults(summaries: List<RealtimeRunSummary>) {
+    override fun saveSummaryResults(summaries: List<RealtimeRunSummary>) {
         outputContext.saveSummaryRows(
             rows = summaries.map { it.toCsvRow() },
             headers = realtimeSummaryCsvHeaders,

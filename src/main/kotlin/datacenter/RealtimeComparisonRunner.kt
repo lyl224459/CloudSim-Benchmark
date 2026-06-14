@@ -6,8 +6,9 @@ import scheduler.ResolvedAlgorithm
 import util.Logger
 import kotlin.system.measureTimeMillis
 
-class RealtimeComparisonRunner(
+class RealtimeComparisonRunner private constructor(
     private val request: RealtimeExperimentRequest,
+    services: RealtimeRunnerServices,
 ) {
     private val cloudletCount = request.realtime.cloudletCount
     private val simulationDuration = request.realtime.simulationDuration
@@ -24,7 +25,6 @@ class RealtimeComparisonRunner(
     private val resolvedAlgorithms = request.execution.resolvedAlgorithms
     private val outputContext = request.execution.outputContext
     private val concurrency = request.execution.concurrency
-    private val metricsCollector = RealtimeMetricsCollector(scheduling, objectiveWeights)
     private val experimentConfig =
         RealtimeExperimentConfigSnapshot(
             cloudletCount = cloudletCount,
@@ -35,13 +35,17 @@ class RealtimeComparisonRunner(
             arrival = arrival,
             scheduling = scheduling,
         )
-    private val experimentRunner =
-        RealtimeExperimentRunner(
-            config = experimentConfig,
-            metricsCollector = metricsCollector,
-        )
-    private val resultExporter = RealtimeResultExporter(outputContext)
+    private val experimentRunner = services.experimentRunner
+    private val resultExporter = services.exporter
     private val algorithmSelection = RealtimeAlgorithmSelection(resolvedAlgorithms)
+
+    constructor(request: RealtimeExperimentRequest) : this(request, RealtimeRunnerServices.production(request))
+
+    internal constructor(
+        request: RealtimeExperimentRequest,
+        experimentRunner: RealtimeExperimentService,
+        exporter: RealtimeExportService,
+    ) : this(request, RealtimeRunnerServices(experimentRunner, exporter))
 
     suspend fun runComparison(): List<RealtimeAlgorithmResult> =
         coroutineScope {

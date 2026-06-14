@@ -2,21 +2,14 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>LongMethod:CommandExecutor.kt$CommandExecutor$private suspend fun runResolvedExperiment( resolved: ResolvedExperimentConfig, outputContext: ExperimentOutputContext, )</ID>
     <ID>LongMethod:ConfigValidationTest.kt$ConfigValidationTest$@Test fun `should validate realtime cloud semantics config parameters`()</ID>
     <ID>LongMethod:ConfigurationManagerTest.kt$ConfigurationManagerTest$@Test fun `loadFromSingleFile reads nested profile batch objective and realtime scheduling`()</ID>
-    <ID>LongMethod:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$suspend fun runBatchExperiment()</ID>
-    <ID>LongMethod:RealtimeTaskLifecycleStore.kt$RealtimeTaskLifecycleStore$private fun validateTransition( from: RealtimeTaskLifecycle, to: RealtimeTaskLifecycle, )</ID>
-    <ID>LongParameterList:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel$( private val scheduling: RealtimeSchedulingConfig, private val arrivalState: RealtimeArrivalState, private val lifecycleStore: RealtimeTaskLifecycleStore, private val reservationState: RealtimeReservationState, private val metrics: RealtimeBrokerMetrics, private val vmLifecycleManager: RealtimeVmLifecycleManager, private val tenantController: RealtimeTenantController, private val topologyModel: RealtimeTopologyModel, )</ID>
-    <ID>NestedBlockDepth:BatchCloudletCountRunner.kt$BatchCloudletCountRunner$private fun printSummaryTable(results: Map&lt;Int, List&lt;BatchRunSummary&gt;&gt;)</ID>
-    <ID>NestedBlockDepth:RealtimeCloudletCountRunner.kt$RealtimeCloudletCountRunner$private fun printSummaryTable(results: Map&lt;Int, List&lt;RealtimeRunSummary&gt;&gt;)</ID>
     <ID>ThrowsCount:ConfigurationManager.kt$ConfigurationManager.Companion$fun loadFromSingleFile(configPath: String): LoadedConfigs</ID>
-    <ID>TooGenericExceptionCaught:Main.kt$e: Exception</ID>
     <ID>TooManyFunctions:CliParser.kt$CliParser</ID>
     <ID>TooManyFunctions:ObjectiveFunction.kt$SchedulerObjectiveFunction : ObjectiveFunction</ID>
     <ID>TooManyFunctions:RealtimeBrokerReadModel.kt$RealtimeBrokerReadModel</ID>
-    <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeArrivalState</ID>
-    <ID>TooManyFunctions:RealtimeBrokerState.kt$RealtimeBrokerMetrics</ID>
+    <ID>TooManyFunctions:RealtimeArrivalState.kt$RealtimeArrivalState</ID>
+    <ID>TooManyFunctions:RealtimeBrokerMetrics.kt$RealtimeBrokerMetrics</ID>
     <ID>TooManyFunctions:RealtimeTopologyModel.kt$RealtimeTopologyModel</ID>
     <ID>TooManyFunctions:RealtimeVmLifecycleManager.kt$RealtimeVmLifecycleManager</ID>
   </CurrentIssues>

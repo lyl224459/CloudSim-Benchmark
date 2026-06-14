@@ -8,149 +8,114 @@ import scheduler.RealtimeTopologyMetrics
 import scheduler.RealtimeTopologyModel
 import scheduler.RealtimeVmLifecycleManager
 
+internal data class RealtimeBrokerReadDependencies(
+    val scheduling: RealtimeSchedulingConfig,
+    val arrivalState: RealtimeArrivalState,
+    val lifecycleStore: RealtimeTaskLifecycleStore,
+    val reservationState: RealtimeReservationState,
+    val metrics: RealtimeBrokerMetrics,
+    val vmLifecycleManager: RealtimeVmLifecycleManager,
+    val tenantController: RealtimeTenantController,
+    val topologyModel: RealtimeTopologyModel,
+)
+
 internal class RealtimeBrokerReadModel(
-    private val scheduling: RealtimeSchedulingConfig,
-    private val arrivalState: RealtimeArrivalState,
-    private val lifecycleStore: RealtimeTaskLifecycleStore,
-    private val reservationState: RealtimeReservationState,
-    private val metrics: RealtimeBrokerMetrics,
-    private val vmLifecycleManager: RealtimeVmLifecycleManager,
-    private val tenantController: RealtimeTenantController,
-    private val topologyModel: RealtimeTopologyModel,
+    dependencies: RealtimeBrokerReadDependencies,
 ) {
-    fun waitingCloudlets(): List<Cloudlet> = arrivalState.waitingCloudletsSnapshot()
+    private val tasks = RealtimeBrokerTaskReadView(dependencies)
+    private val scalarMetrics = RealtimeBrokerScalarMetricsView(dependencies.metrics, dependencies.vmLifecycleManager)
+    private val tenantTopology = RealtimeBrokerTenantTopologyView(dependencies)
 
-    fun activeCloudlets(): List<Cloudlet> {
-        pruneCompletedReservations()
-        return (arrivalState.pendingCloudletsSnapshot() + waitingCloudlets())
-            .distinctBy { it.id }
-            .filter { it.status != Cloudlet.Status.FAILED }
-    }
+    fun waitingCloudlets(): List<Cloudlet> = tasks.waitingCloudlets()
 
-    fun rejectedCount(): Int = metrics.rejectedCount
+    fun activeCloudlets(): List<Cloudlet> = tasks.activeCloudlets()
 
-    fun capacityRejectedCount(): Int = metrics.capacityRejectedCount
+    fun rejectedCount(): Int = scalarMetrics.rejectedCount()
 
-    fun resourceRejectedCount(): Int = metrics.resourceRejectedCount
+    fun capacityRejectedCount(): Int = scalarMetrics.capacityRejectedCount()
 
-    fun tenantQuotaRejectedCount(): Int = metrics.tenantQuotaRejectedCount
+    fun resourceRejectedCount(): Int = scalarMetrics.resourceRejectedCount()
 
-    fun tenantBudgetRejectedCount(): Int = metrics.tenantBudgetRejectedCount
+    fun tenantQuotaRejectedCount(): Int = scalarMetrics.tenantQuotaRejectedCount()
 
-    fun submittedCount(): Int = metrics.submittedCount
+    fun tenantBudgetRejectedCount(): Int = scalarMetrics.tenantBudgetRejectedCount()
 
-    fun retryCount(): Int = metrics.retryCount
+    fun submittedCount(): Int = scalarMetrics.submittedCount()
 
-    fun retrySuccessCount(): Int = metrics.retrySuccessCount
+    fun retryCount(): Int = scalarMetrics.retryCount()
 
-    fun permanentFailedCount(): Int = metrics.permanentFailedCount
+    fun retrySuccessCount(): Int = scalarMetrics.retrySuccessCount()
 
-    fun runtimeFailureCount(): Int = metrics.runtimeFailureCount
+    fun permanentFailedCount(): Int = scalarMetrics.permanentFailedCount()
 
-    fun timeoutCancelledCount(): Int = metrics.timeoutCancelledCount
+    fun runtimeFailureCount(): Int = scalarMetrics.runtimeFailureCount()
 
-    fun migrationCount(): Int = metrics.migrationCount
+    fun timeoutCancelledCount(): Int = scalarMetrics.timeoutCancelledCount()
 
-    fun checkpointRecoveryCount(): Int = metrics.checkpointRecoveryCount
+    fun migrationCount(): Int = scalarMetrics.migrationCount()
 
-    fun scaleOutCount(): Int = vmLifecycleManager.getScaleOutCount()
+    fun checkpointRecoveryCount(): Int = scalarMetrics.checkpointRecoveryCount()
 
-    fun scaleInCount(): Int = vmLifecycleManager.getScaleInCount()
+    fun scaleOutCount(): Int = scalarMetrics.scaleOutCount()
 
-    fun activeVmPeak(): Int = vmLifecycleManager.getActiveVmPeak()
+    fun scaleInCount(): Int = scalarMetrics.scaleInCount()
 
-    fun autoscalingCost(): Double = vmLifecycleManager.getAutoscalingCost()
+    fun activeVmPeak(): Int = scalarMetrics.activeVmPeak()
 
-    fun coldStartDelayTotal(): Double = vmLifecycleManager.getColdStartDelayTotal()
+    fun autoscalingCost(): Double = scalarMetrics.autoscalingCost()
 
-    fun averageDecisionDelay(): Double = metrics.averageDecisionDelay
+    fun coldStartDelayTotal(): Double = scalarMetrics.coldStartDelayTotal()
 
-    fun averageQueueDepth(): Double = metrics.averageQueueDepth
+    fun averageDecisionDelay(): Double = scalarMetrics.averageDecisionDelay()
 
-    fun maxQueueDepth(): Int = metrics.maxQueueDepth
+    fun averageQueueDepth(): Double = scalarMetrics.averageQueueDepth()
 
-    fun taskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = lifecycleStore.get(cloudlet.id)
+    fun maxQueueDepth(): Int = scalarMetrics.maxQueueDepth()
 
-    fun retrySuccessRate(): Double = metrics.retrySuccessRate
+    fun taskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = tasks.taskMetadata(cloudlet)
 
-    fun preemptedCount(): Int = metrics.preemptedCount
+    fun retrySuccessRate(): Double = scalarMetrics.retrySuccessRate()
 
-    fun preemptionSuccessCount(): Int = metrics.preemptionSuccessCount
+    fun preemptedCount(): Int = scalarMetrics.preemptedCount()
 
-    fun preemptionFailedCount(): Int = metrics.preemptionFailedCount
+    fun preemptionSuccessCount(): Int = scalarMetrics.preemptionSuccessCount()
 
-    fun averagePreemptionDelay(): Double = metrics.averagePreemptionDelay
+    fun preemptionFailedCount(): Int = scalarMetrics.preemptionFailedCount()
 
-    fun preemptionPenalty(): Double = metrics.preemptionPenalty
+    fun averagePreemptionDelay(): Double = scalarMetrics.averagePreemptionDelay()
 
-    fun checkpointLossTotal(): Long = metrics.checkpointLoss
+    fun preemptionPenalty(): Double = scalarMetrics.preemptionPenalty()
 
-    fun hostFailureCount(): Int = metrics.hostFailureCount
+    fun checkpointLossTotal(): Long = scalarMetrics.checkpointLossTotal()
 
-    fun rackFailureCount(): Int = metrics.rackFailureCount
+    fun hostFailureCount(): Int = scalarMetrics.hostFailureCount()
 
-    fun regionFailureCount(): Int = metrics.regionFailureCount
+    fun rackFailureCount(): Int = scalarMetrics.rackFailureCount()
 
-    fun arrivalTime(cloudlet: Cloudlet): Double = arrivalState.arrivalTimeOf(cloudlet)
+    fun regionFailureCount(): Int = scalarMetrics.regionFailureCount()
 
-    fun slaViolationCount(cloudlets: List<Cloudlet>): Int {
-        if (scheduling.deadlineFactor <= 0.0) return 0
-        return cloudlets.count { cloudlet ->
-            cloudlet.status == Cloudlet.Status.SUCCESS &&
-                lifecycleStore.get(cloudlet.id)?.deadline?.let { deadline -> cloudlet.finishTime > deadline } == true
-        }
-    }
+    fun arrivalTime(cloudlet: Cloudlet): Double = tasks.arrivalTime(cloudlet)
 
-    fun tenantFairnessIndex(cloudlets: List<Cloudlet>): Double {
-        val records = lifecycleStore.snapshot()
-        return tenantController.fairnessIndex(cloudlets, records)
-    }
+    fun slaViolationCount(cloudlets: List<Cloudlet>): Int = tasks.slaViolationCount(cloudlets)
 
-    fun dominantResourceFairnessIndex(): Double {
-        val records = lifecycleStore.snapshot()
-        return tenantController.dominantResourceFairnessIndex(records)
-    }
+    fun tenantFairnessIndex(cloudlets: List<Cloudlet>): Double = tenantTopology.tenantFairnessIndex(cloudlets)
 
-    fun fairnessViolationCount(): Int = tenantController.fairnessViolationCount(lifecycleStore.snapshot())
+    fun dominantResourceFairnessIndex(): Double = tenantTopology.dominantResourceFairnessIndex()
 
-    fun tenantSlaPenalty(cloudlets: List<Cloudlet>): Double {
-        val records = lifecycleStore.snapshot()
-        return tenantController.tenantSlaPenalty(cloudlets, records)
-    }
+    fun fairnessViolationCount(): Int = tenantTopology.fairnessViolationCount()
+
+    fun tenantSlaPenalty(cloudlets: List<Cloudlet>): Double = tenantTopology.tenantSlaPenalty(cloudlets)
 
     fun costSlaTradeoffScore(
         cost: Double,
         tenantSlaPenalty: Double,
-    ): Double = tenantController.costSlaTradeoffScore(cost, tenantSlaPenalty)
+    ): Double = tenantTopology.costSlaTradeoffScore(cost, tenantSlaPenalty)
 
-    fun retrySuccessByTenant(cloudlets: List<Cloudlet>): Double =
-        tenantController.retrySuccessByTenant(cloudlets, lifecycleStore.snapshot())
+    fun retrySuccessByTenant(cloudlets: List<Cloudlet>): Double = tenantTopology.retrySuccessByTenant(cloudlets)
 
-    fun topologyMetrics(cloudlets: List<Cloudlet>): RealtimeTopologyMetrics =
-        topologyModel.metricsFor(
-            cloudlets.mapNotNull { cloudlet ->
-                lifecycleStore.get(cloudlet.id)?.assignedVmIndex
-                    ?: reservationState.assignedVmIndexOf(cloudlet)
-                    ?: cloudlet.vm?.id?.toInt()
-            },
-        )
+    fun topologyMetrics(cloudlets: List<Cloudlet>): RealtimeTopologyMetrics = tenantTopology.topologyMetrics(cloudlets)
 
-    fun timeoutCount(timeoutSeconds: Double): Int {
-        if (timeoutSeconds <= 0.0) return 0
-        return waitingCloudlets().count { cloudlet ->
-            val elapsed =
-                if (cloudlet.status == Cloudlet.Status.SUCCESS) {
-                    cloudlet.finishTime - arrivalTime(cloudlet)
-                } else {
-                    Double.POSITIVE_INFINITY
-                }
-            elapsed > timeoutSeconds
-        }
-    }
-
-    private fun pruneCompletedReservations() {
-        reservationState.prune { cloudletId -> lifecycleStore.get(cloudletId)?.lifecycle }
-    }
+    fun timeoutCount(timeoutSeconds: Double): Int = tasks.timeoutCount(timeoutSeconds)
 }
 
 internal fun RealtimeTaskLifecycle.isActiveForRealtimeBroker(): Boolean =

@@ -65,76 +65,8 @@ class RealtimeTaskLifecycleStore {
         from: RealtimeTaskLifecycle,
         to: RealtimeTaskLifecycle,
     ) {
-        if (from == to) return
-        val allowed =
-            when (from) {
-                RealtimeTaskLifecycle.ARRIVED ->
-                    setOf(
-                        RealtimeTaskLifecycle.PENDING_DECISION,
-                        RealtimeTaskLifecycle.RETRYING,
-                        RealtimeTaskLifecycle.REJECTED,
-                        RealtimeTaskLifecycle.FAILED,
-                    )
-                RealtimeTaskLifecycle.PENDING_DECISION ->
-                    setOf(
-                        RealtimeTaskLifecycle.SUBMITTED,
-                        RealtimeTaskLifecycle.RUNNING,
-                        RealtimeTaskLifecycle.PREEMPTED,
-                        RealtimeTaskLifecycle.MIGRATING,
-                        RealtimeTaskLifecycle.ARRIVED,
-                        RealtimeTaskLifecycle.RETRYING,
-                        RealtimeTaskLifecycle.REJECTED,
-                        RealtimeTaskLifecycle.FAILED,
-                    )
-                RealtimeTaskLifecycle.SUBMITTED ->
-                    setOf(
-                        RealtimeTaskLifecycle.RUNNING,
-                        RealtimeTaskLifecycle.PREEMPTED,
-                        RealtimeTaskLifecycle.MIGRATING,
-                        RealtimeTaskLifecycle.RETRYING,
-                        RealtimeTaskLifecycle.COMPLETED,
-                        RealtimeTaskLifecycle.FAILED,
-                        RealtimeTaskLifecycle.CANCELLED,
-                        RealtimeTaskLifecycle.TIMED_OUT,
-                    )
-                RealtimeTaskLifecycle.RUNNING ->
-                    setOf(
-                        RealtimeTaskLifecycle.PENDING_DECISION,
-                        RealtimeTaskLifecycle.ARRIVED,
-                        RealtimeTaskLifecycle.PREEMPTED,
-                        RealtimeTaskLifecycle.MIGRATING,
-                        RealtimeTaskLifecycle.RETRYING,
-                        RealtimeTaskLifecycle.COMPLETED,
-                        RealtimeTaskLifecycle.FAILED,
-                        RealtimeTaskLifecycle.CANCELLED,
-                        RealtimeTaskLifecycle.TIMED_OUT,
-                    )
-                RealtimeTaskLifecycle.PREEMPTED ->
-                    setOf(
-                        RealtimeTaskLifecycle.MIGRATING,
-                        RealtimeTaskLifecycle.RETRYING,
-                        RealtimeTaskLifecycle.FAILED,
-                    )
-                RealtimeTaskLifecycle.MIGRATING ->
-                    setOf(
-                        RealtimeTaskLifecycle.RETRYING,
-                        RealtimeTaskLifecycle.ARRIVED,
-                        RealtimeTaskLifecycle.FAILED,
-                    )
-                RealtimeTaskLifecycle.RETRYING ->
-                    setOf(
-                        RealtimeTaskLifecycle.ARRIVED,
-                        RealtimeTaskLifecycle.PENDING_DECISION,
-                        RealtimeTaskLifecycle.REJECTED,
-                        RealtimeTaskLifecycle.FAILED,
-                    )
-                RealtimeTaskLifecycle.COMPLETED,
-                RealtimeTaskLifecycle.REJECTED,
-                RealtimeTaskLifecycle.FAILED,
-                RealtimeTaskLifecycle.CANCELLED,
-                RealtimeTaskLifecycle.TIMED_OUT,
-                -> emptySet()
-            }
-        require(to in allowed) { "Invalid realtime task transition: $from -> $to" }
+        require(RealtimeTaskTransitionPolicy.allows(from, to)) {
+            "Invalid realtime task transition: $from -> $to"
+        }
     }
 }
