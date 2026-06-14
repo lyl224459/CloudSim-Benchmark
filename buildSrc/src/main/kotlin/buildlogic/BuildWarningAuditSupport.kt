@@ -55,6 +55,18 @@ internal object BuildWarningAuditSupport {
             Regex("""^WARNING: sun\.misc\.Unsafe::objectFieldOffset will be removed in a future release$"""),
         )
 
+    private val allowedCloudSimPlusCompilerDiagnostics =
+        listOf(
+            Regex(
+                """^\[INFO] .*/ContinuousDistributionNull\.java: .*ContinuousDistributionNull\.java """ +
+                    """uses or overrides a deprecated API\.$""",
+            ),
+            Regex("""^\[INFO] .*/Resource\.java: Some input files use unchecked or unsafe operations\.$"""),
+            Regex(
+                """^\[INFO] .*/CloudletTest\.java: .*CloudletTest\.java uses unchecked or unsafe operations\.$""",
+            ),
+        )
+
     fun audit(logDirectory: File): BuildWarningAuditResult {
         val violations = mutableListOf<String>()
         val sourceCounts = linkedMapOf<BuildWarningSource, Int>()
@@ -96,6 +108,10 @@ internal object BuildWarningAuditSupport {
             appendLine(
                 "- `ktlint-kotlin-compiler-unsafe`: JDK 25 warning from ktlint's embedded Kotlin compiler. " +
                     "Remove after ktlint no longer invokes this Unsafe API.",
+            )
+            appendLine(
+                "- `cloudsimplus-javac-legacy-diagnostics`: javac diagnostics from the locked CloudSim Plus source. " +
+                    "Remove after upstream no longer emits deprecated or unchecked-operation diagnostics.",
             )
             appendLine()
             if (result.allowedCounts.isEmpty()) {
@@ -147,6 +163,10 @@ internal object BuildWarningAuditSupport {
             allowedCounts.increment("ktlint-kotlin-compiler-unsafe")
             return
         }
+        if (source == BuildWarningSource.CLOUDSIM_PLUS_MAVEN && isAllowedCloudSimPlusCompilerDiagnostic(normalizedLine)) {
+            allowedCounts.increment("cloudsimplus-javac-legacy-diagnostics")
+            return
+        }
         if (warningMarkers.any { marker -> normalizedLine.contains(marker, ignoreCase = true) }) {
             violations += "`${source.name}` line $lineNumber: `${normalizedLine.trim().replace("`", "'")}`"
         }
@@ -154,6 +174,9 @@ internal object BuildWarningAuditSupport {
 
     private fun isAllowedKtlintUnsafeLine(line: String): Boolean =
         allowedKtlintUnsafePatterns.any { pattern -> pattern.matches(line) }
+
+    private fun isAllowedCloudSimPlusCompilerDiagnostic(line: String): Boolean =
+        allowedCloudSimPlusCompilerDiagnostics.any { pattern -> pattern.matches(line) }
 
     private fun MutableMap<String, Int>.increment(key: String) {
         this[key] = getOrDefault(key, 0) + 1

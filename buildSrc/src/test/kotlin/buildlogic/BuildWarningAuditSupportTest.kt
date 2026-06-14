@@ -16,12 +16,14 @@ class BuildWarningAuditSupportTest {
         writeCleanLogs()
         tempDir.resolve(BuildWarningSource.DETEKT.logFileName).writeText(DETEKT_WARNING)
         tempDir.resolve(BuildWarningSource.KTLINT.logFileName).writeText(KTLINT_UNSAFE_WARNING)
+        tempDir.resolve(BuildWarningSource.CLOUDSIM_PLUS_MAVEN.logFileName).writeText(CLOUDSIM_PLUS_COMPILER_DIAGNOSTICS)
 
         val result = BuildWarningAuditSupport.audit(tempDir)
 
         assertTrue(result.violations.isEmpty())
         assertEquals(1, result.allowedCounts["detekt-plugin-configuration"])
         assertEquals(4, result.allowedCounts["ktlint-kotlin-compiler-unsafe"])
+        assertEquals(3, result.allowedCounts["cloudsimplus-javac-legacy-diagnostics"])
     }
 
     @Test
@@ -58,10 +60,13 @@ class BuildWarningAuditSupportTest {
         tempDir.resolve(BuildWarningSource.KTLINT.logFileName).writeText(
             "WARNING: A terminally deprecated method in sun.misc.Unsafe has been called unexpectedly",
         )
+        tempDir.resolve(BuildWarningSource.CLOUDSIM_PLUS_MAVEN.logFileName).writeText(
+            "$CLOUDSIM_PLUS_COMPILER_DIAGNOSTICS unexpected suffix",
+        )
 
         val result = BuildWarningAuditSupport.audit(tempDir)
 
-        assertEquals(2, result.violations.size)
+        assertEquals(3, result.violations.size)
     }
 
     @Test
@@ -109,6 +114,13 @@ class BuildWarningAuditSupportTest {
             WARNING: sun.misc.Unsafe::objectFieldOffset has been called by org.jetbrains.kotlin.com.intellij.util.containers.Unsafe (file:/home/runner/.gradle/caches/modules-2/files-2.1/org.jetbrains.kotlin/kotlin-compiler-embeddable/2.1.0/hash/kotlin-compiler-embeddable-2.1.0.jar)
             WARNING: Please consider reporting this to the maintainers of class org.jetbrains.kotlin.com.intellij.util.containers.Unsafe
             WARNING: sun.misc.Unsafe::objectFieldOffset will be removed in a future release
+            """.trimIndent()
+
+        val CLOUDSIM_PLUS_COMPILER_DIAGNOSTICS =
+            """
+            [INFO] /work/cloudsimplus/src/main/java/org/cloudsimplus/distributions/ContinuousDistributionNull.java: /work/cloudsimplus/src/main/java/org/cloudsimplus/distributions/ContinuousDistributionNull.java uses or overrides a deprecated API.
+            [INFO] /work/cloudsimplus/src/main/java/org/cloudsimplus/resources/Resource.java: Some input files use unchecked or unsafe operations.
+            [INFO] /work/cloudsimplus/src/test/java/org/cloudsimplus/cloudlets/CloudletTest.java: /work/cloudsimplus/src/test/java/org/cloudsimplus/cloudlets/CloudletTest.java uses unchecked or unsafe operations.
             """.trimIndent()
     }
 }
