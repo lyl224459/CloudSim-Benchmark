@@ -1,0 +1,9 @@
+Dry run: 不会创建实验目录或结果文件
+模式: batch
+Profile: profile-a
+输出目录: SNAPSHOT_OUTPUT
+随机种子: 0
+运行次数: 1
+任务数列表: 50, 100
+算法:
+CSV 输出: enabled=true, delimiter=','

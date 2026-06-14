@@ -89,6 +89,28 @@ class DryRunPrinterTest {
         assertThat(json.indexOf("\"profile\"")).isLessThan(json.indexOf("\"algorithms\""))
     }
 
+    @Test
+    fun `batch and realtime dry run text match committed snapshots`() {
+        assertDryRunSnapshot("batch", "dry-run-batch.txt")
+        assertDryRunSnapshot("realtime", "dry-run-realtime.txt")
+    }
+
+    private fun assertDryRunSnapshot(
+        mode: String,
+        snapshotName: String,
+    ) {
+        val output = RecordingDryRunOutput()
+        DryRunPrinter.printDryRun(resolved(mode), output)
+        val snapshot = File("src/test/resources/snapshots/$snapshotName").readText().replace("\r\n", "\n")
+
+        val rendered =
+            output.results
+                .joinToString(separator = "\n", postfix = "\n")
+                .replace(tempDir.absolutePath, "SNAPSHOT_OUTPUT")
+
+        assertThat(rendered).isEqualTo(snapshot)
+    }
+
     private fun resolved(mode: String) =
         ResolvedExperimentConfig(
             command = CliParser.RunCommand(mode = mode),

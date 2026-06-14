@@ -5,6 +5,7 @@ import config.RealtimeConfig
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import scheduler.AlgorithmRegistry
 import scheduler.ResolvedAlgorithm
@@ -112,6 +113,45 @@ class RunnerServicesTest {
             assertThat(realtimeExports.single().keys).containsExactlyInAnyOrder(50, 100)
         }
 
+    @Test
+    fun `cloudlet count runners sort nonempty summaries before exporting`(): Unit =
+        runBlocking {
+            val batchExports = mutableListOf<Map<Int, List<BatchRunSummary>>>()
+            val realtimeExports = mutableListOf<Map<Int, List<RealtimeRunSummary>>>()
+
+            BatchCloudletCountRunner(
+                request = batchRequest().copy(batch = BatchConfig(cloudletCounts = listOf(50))),
+                summaryRunner = BatchSummaryRunnerFactory { listOf(batchSummary("ZETA"), batchSummary("ALPHA")) },
+                exporter = BatchCloudletCountExportService(batchExports::add),
+            ).runExperiment()
+            RealtimeCloudletCountRunner(
+                request = realtimeRequest().copy(realtime = RealtimeConfig(cloudletCounts = listOf(50))),
+                summaryRunner =
+                    RealtimeSummaryRunnerFactory {
+                        listOf(realtimeSummary("ZETA"), realtimeSummary("ALPHA"))
+                    },
+                exporter = RealtimeCloudletCountExportService(realtimeExports::add),
+            ).runBatchExperiment()
+
+            assertThat(batchExports.single().getValue(50).map { it.algorithmName }).containsExactly("ALPHA", "ZETA")
+            assertThat(realtimeExports.single().getValue(50).map { it.algorithmName }).containsExactly("ALPHA", "ZETA")
+        }
+
+    @Test
+    fun `cloudlet count runner propagates exporter failures`() {
+        val failure = IllegalStateException("export failed")
+        val runner =
+            BatchCloudletCountRunner(
+                request = batchRequest().copy(batch = BatchConfig(cloudletCounts = listOf(50))),
+                summaryRunner = BatchSummaryRunnerFactory { emptyList() },
+                exporter = BatchCloudletCountExportService { throw failure },
+            )
+
+        val thrown = assertThrows<IllegalStateException> { runBlocking { runner.runExperiment() } }
+
+        assertThat(thrown).isSameAs(failure)
+    }
+
     private fun batchRequest(runs: Int = 1): BatchExperimentRequest =
         BatchExperimentRequest(
             batch = BatchConfig(runs = runs),
@@ -159,6 +199,18 @@ class RunnerServicesTest {
             RealtimeMetricKey.FITNESS to value,
         ),
     )
+
+    private fun batchSummary(algorithmName: String): BatchRunSummary =
+        BatchRunAggregator.buildSummary(
+            algorithmName,
+            listOf(BatchRunOutcome.Success(batchResult(algorithmName, 1.0), run = 1)),
+        )
+
+    private fun realtimeSummary(algorithmName: String): RealtimeRunSummary =
+        RealtimeRunAggregator.buildSummary(
+            algorithmName,
+            listOf(RealtimeRunOutcome.Success(realtimeResult(algorithmName, 1.0), run = 1)),
+        )
 }
 
 private class RecordingBatchExporter : BatchExportService {

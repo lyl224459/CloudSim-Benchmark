@@ -344,9 +344,18 @@ dependencies {
 
 tasks.named<Test>("test") {
     useJUnitPlatform()
+    systemProperty("net.bytebuddy.experimental", "true")
 
     // 测试JVM参数优化
-    jvmArgs(listOf("-Xmx2g", "-XX:MaxGCPauseMillis=50") + cloudSimJvmArgs)
+    jvmArgs(
+        listOf(
+            "-Xmx2g",
+            "-XX:MaxGCPauseMillis=50",
+            "-XX:+EnableDynamicAgentLoading",
+            "--sun-misc-unsafe-memory-access=allow",
+            "-Xshare:off",
+        ) + cloudSimJvmArgs,
+    )
 
     // 测试报告配置
     reports {
@@ -399,7 +408,25 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = "0.45".toBigDecimal()
+                minimum = "0.50".toBigDecimal()
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("cli")
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.50".toBigDecimal()
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("broker")
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.65".toBigDecimal()
             }
         }
     }
