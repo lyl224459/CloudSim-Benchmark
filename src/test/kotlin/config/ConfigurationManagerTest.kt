@@ -64,203 +64,13 @@ class ConfigurationManagerTest {
 
     @Test
     fun `loadFromSingleFile reads nested profile batch objective and realtime scheduling`() {
-        val configFile =
-            createTempTomlFile(
-                """
-                defaultProfile = "realtime_nested"
+        val configFile = File("src/test/resources/config/nested-profile-config.toml")
+        val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
 
-                [profiles.batch_nested]
-                mode = "batch"
-                algorithms = ["PSO"]
-
-                [profiles.batch_nested.batch]
-                cloudletCount = 64
-
-                [profiles.batch_nested.batch.objective]
-                cost = 0.2
-                totalTime = 0.3
-                loadBalance = 0.4
-                makespan = 0.1
-
-                [profiles.realtime_nested]
-                mode = "realtime"
-                algorithms = ["MIN_LOAD"]
-
-                [profiles.realtime_nested.realtime]
-                cloudletCount = 80
-                simulationDuration = 200.0
-                arrivalRate = 2.0
-
-                [profiles.realtime_nested.realtime.arrival]
-                distribution = "burst"
-                burstIntensity = 3.5
-                burstDuration = 25.0
-
-                [profiles.realtime_nested.realtime.scheduling]
-                strategy = "static"
-                maxQueueSize = 10
-                taskTimeout = 15.0
-                resourceReservation = "partial"
-                decisionDelay = 0.5
-                decisionJitter = 0.2
-                failureRate = 0.1
-                retryLimit = 2
-                retryDelay = 1.5
-                retryBackoffMultiplier = 2.0
-                queuePolicy = "priority"
-                priorityLevels = 4
-                highPriorityRatio = 0.25
-                deadlineFactor = 1.5
-                vmQueueCapacity = 3
-                overloadFailureMultiplier = 0.2
-                autoscalingEnabled = true
-                scaleOutQueueThreshold = 2
-                scaleInIdleTime = 10.0
-                maxDynamicVms = 3
-                vmColdStartDelay = 4.0
-                scaleOutCost = 0.25
-                scaleInProtectionTime = 8.0
-                resourceModelEnabled = true
-                networkLatency = 0.05
-                imagePullDelay = 0.5
-                ioWeight = 1.0
-                ramWeight = 0.5
-                bwWeight = 0.25
-                runtimeFailureRate = 0.03
-                nodeFailureRate = 0.02
-                checkpointInterval = 5.0
-                migrationDelay = 1.5
-                timeoutAction = "retry"
-                preemptionEnabled = true
-                preemptionPolicy = "deadline_then_priority"
-                preemptionMinPriorityGap = 2
-                preemptionMaxPerTask = 3
-                preemptionDelay = 0.4
-                preemptionPenalty = 0.7
-                multiTenantEnabled = true
-                tenantCount = 3
-                tenantQuota = [2, 1, 1]
-                tenantWeights = [1.0, 2.0, 1.0]
-                tenantFairnessPolicy = "weighted_fair"
-                tenantSchedulingPolicy = "dominant_resource_fairness"
-                tenantBurstAllowance = 2
-                tenantSlaPenaltyWeight = 1.5
-                tenantCostBudget = [10.0, 20.0, 15.0]
-                topologyEnabled = true
-                topologyPolicy = "spread_fault_domains"
-                regionCount = 4
-                racksPerRegion = 3
-                hostsPerRack = 2
-                localRegion = 1
-                crossRackLatency = 0.15
-                crossRegionLatency = 2.5
-                crossRegionCost = 0.8
-                hostFailureRate = 0.01
-                rackFailureRate = 0.02
-                regionFailureRate = 0.03
-                physicalTopologyEnabled = true
-                dataLocalityEnabled = true
-                imageCacheEnabled = true
-                hostCountPerRack = 4
-                hostCpuCapacity = 8.0
-                hostRamCapacity = 32768.0
-                hostBwCapacity = 10000.0
-                hostIoCapacity = 5000.0
-                crossRackBandwidth = 20.0
-                crossRegionBandwidth = 5.0
-                dataLocalityPolicy = "balanced"
-                imageCacheCapacity = 3
-                """.trimIndent(),
-            )
-
-        try {
-            val configs = ConfigurationManager.loadFromSingleFile(configFile.absolutePath)
-            val batch = configs.experimentConfig.profiles["batch_nested"]?.batch
-            val realtime = configs.experimentConfig.profiles["realtime_nested"]?.realtime
-
-            assertEquals(0.2, batch?.objective?.cost)
-            assertEquals(0.3, batch?.objective?.totalTime)
-            assertEquals(0.4, batch?.objective?.loadBalance)
-            assertEquals(0.1, batch?.objective?.makespan)
-            assertEquals("burst", realtime?.arrival?.distribution)
-            assertEquals(3.5, realtime?.arrival?.burstIntensity)
-            assertEquals(25.0, realtime?.arrival?.burstDuration)
-            assertEquals("static", realtime?.scheduling?.strategy)
-            assertEquals(10, realtime?.scheduling?.maxQueueSize)
-            assertEquals(15.0, realtime?.scheduling?.taskTimeout)
-            assertEquals("partial", realtime?.scheduling?.resourceReservation)
-            assertEquals(0.5, realtime?.scheduling?.decisionDelay)
-            assertEquals(0.2, realtime?.scheduling?.decisionJitter)
-            assertEquals(0.1, realtime?.scheduling?.failureRate)
-            assertEquals(2, realtime?.scheduling?.retryLimit)
-            assertEquals(1.5, realtime?.scheduling?.retryDelay)
-            assertEquals(2.0, realtime?.scheduling?.retryBackoffMultiplier)
-            assertEquals("priority", realtime?.scheduling?.queuePolicy)
-            assertEquals(4, realtime?.scheduling?.priorityLevels)
-            assertEquals(0.25, realtime?.scheduling?.highPriorityRatio)
-            assertEquals(1.5, realtime?.scheduling?.deadlineFactor)
-            assertEquals(3, realtime?.scheduling?.vmQueueCapacity)
-            assertEquals(0.2, realtime?.scheduling?.overloadFailureMultiplier)
-            assertEquals(true, realtime?.scheduling?.autoscalingEnabled)
-            assertEquals(2, realtime?.scheduling?.scaleOutQueueThreshold)
-            assertEquals(10.0, realtime?.scheduling?.scaleInIdleTime)
-            assertEquals(3, realtime?.scheduling?.maxDynamicVms)
-            assertEquals(4.0, realtime?.scheduling?.vmColdStartDelay)
-            assertEquals(0.25, realtime?.scheduling?.scaleOutCost)
-            assertEquals(8.0, realtime?.scheduling?.scaleInProtectionTime)
-            assertEquals(true, realtime?.scheduling?.resourceModelEnabled)
-            assertEquals(0.05, realtime?.scheduling?.networkLatency)
-            assertEquals(0.5, realtime?.scheduling?.imagePullDelay)
-            assertEquals(1.0, realtime?.scheduling?.ioWeight)
-            assertEquals(0.5, realtime?.scheduling?.ramWeight)
-            assertEquals(0.25, realtime?.scheduling?.bwWeight)
-            assertEquals(0.03, realtime?.scheduling?.runtimeFailureRate)
-            assertEquals(0.02, realtime?.scheduling?.nodeFailureRate)
-            assertEquals(5.0, realtime?.scheduling?.checkpointInterval)
-            assertEquals(1.5, realtime?.scheduling?.migrationDelay)
-            assertEquals("retry", realtime?.scheduling?.timeoutAction)
-            assertEquals(true, realtime?.scheduling?.preemptionEnabled)
-            assertEquals("deadline_then_priority", realtime?.scheduling?.preemptionPolicy)
-            assertEquals(2, realtime?.scheduling?.preemptionMinPriorityGap)
-            assertEquals(3, realtime?.scheduling?.preemptionMaxPerTask)
-            assertEquals(0.4, realtime?.scheduling?.preemptionDelay)
-            assertEquals(0.7, realtime?.scheduling?.preemptionPenalty)
-            assertEquals(true, realtime?.scheduling?.multiTenantEnabled)
-            assertEquals(3, realtime?.scheduling?.tenantCount)
-            assertEquals(listOf(2, 1, 1), realtime?.scheduling?.tenantQuota)
-            assertEquals(listOf(1.0, 2.0, 1.0), realtime?.scheduling?.tenantWeights)
-            assertEquals("weighted_fair", realtime?.scheduling?.tenantFairnessPolicy)
-            assertEquals("dominant_resource_fairness", realtime?.scheduling?.tenantSchedulingPolicy)
-            assertEquals(2, realtime?.scheduling?.tenantBurstAllowance)
-            assertEquals(1.5, realtime?.scheduling?.tenantSlaPenaltyWeight)
-            assertEquals(listOf(10.0, 20.0, 15.0), realtime?.scheduling?.tenantCostBudget)
-            assertEquals(true, realtime?.scheduling?.topologyEnabled)
-            assertEquals("spread_fault_domains", realtime?.scheduling?.topologyPolicy)
-            assertEquals(4, realtime?.scheduling?.regionCount)
-            assertEquals(3, realtime?.scheduling?.racksPerRegion)
-            assertEquals(2, realtime?.scheduling?.hostsPerRack)
-            assertEquals(1, realtime?.scheduling?.localRegion)
-            assertEquals(0.15, realtime?.scheduling?.crossRackLatency)
-            assertEquals(2.5, realtime?.scheduling?.crossRegionLatency)
-            assertEquals(0.8, realtime?.scheduling?.crossRegionCost)
-            assertEquals(0.01, realtime?.scheduling?.hostFailureRate)
-            assertEquals(0.02, realtime?.scheduling?.rackFailureRate)
-            assertEquals(0.03, realtime?.scheduling?.regionFailureRate)
-            assertEquals(true, realtime?.scheduling?.physicalTopologyEnabled)
-            assertEquals(true, realtime?.scheduling?.dataLocalityEnabled)
-            assertEquals(true, realtime?.scheduling?.imageCacheEnabled)
-            assertEquals(4, realtime?.scheduling?.hostCountPerRack)
-            assertEquals(8.0, realtime?.scheduling?.hostCpuCapacity)
-            assertEquals(32768.0, realtime?.scheduling?.hostRamCapacity)
-            assertEquals(10000.0, realtime?.scheduling?.hostBwCapacity)
-            assertEquals(5000.0, realtime?.scheduling?.hostIoCapacity)
-            assertEquals(20.0, realtime?.scheduling?.crossRackBandwidth)
-            assertEquals(5.0, realtime?.scheduling?.crossRegionBandwidth)
-            assertEquals("balanced", realtime?.scheduling?.dataLocalityPolicy)
-            assertEquals(3, realtime?.scheduling?.imageCacheCapacity)
-        } finally {
-            configFile.delete()
-        }
+        assertNestedBatchObjective(configs)
+        assertNestedRealtimeCoreAndResource(configs)
+        assertNestedRealtimeReliabilityAndTenant(configs)
+        assertNestedRealtimeTopology(configs)
     }
 
     @Test
@@ -456,6 +266,107 @@ class ConfigurationManagerTest {
         } finally {
             configFile.delete()
         }
+    }
+
+    private fun assertNestedBatchObjective(configs: ConfigurationManager.LoadedConfigs) {
+        val batch = requireNotNull(configs.experimentConfig.profiles["batch_nested"]?.batch)
+
+        assertEquals(0.2, batch.objective.cost)
+        assertEquals(0.3, batch.objective.totalTime)
+        assertEquals(0.4, batch.objective.loadBalance)
+        assertEquals(0.1, batch.objective.makespan)
+    }
+
+    private fun assertNestedRealtimeCoreAndResource(configs: ConfigurationManager.LoadedConfigs) {
+        val realtime = requireNotNull(configs.experimentConfig.profiles["realtime_nested"]?.realtime)
+        val scheduling = realtime.scheduling
+
+        assertEquals("burst", realtime.arrival.distribution)
+        assertEquals(3.5, realtime.arrival.burstIntensity)
+        assertEquals(25.0, realtime.arrival.burstDuration)
+        assertEquals("static", scheduling.strategy)
+        assertEquals(10, scheduling.maxQueueSize)
+        assertEquals(15.0, scheduling.taskTimeout)
+        assertEquals("partial", scheduling.resourceReservation)
+        assertEquals(0.5, scheduling.decisionDelay)
+        assertEquals(0.2, scheduling.decisionJitter)
+        assertEquals(0.1, scheduling.failureRate)
+        assertEquals(2, scheduling.retryLimit)
+        assertEquals(1.5, scheduling.retryDelay)
+        assertEquals(2.0, scheduling.retryBackoffMultiplier)
+        assertEquals("priority", scheduling.queuePolicy)
+        assertEquals(4, scheduling.priorityLevels)
+        assertEquals(0.25, scheduling.highPriorityRatio)
+        assertEquals(1.5, scheduling.deadlineFactor)
+        assertEquals(3, scheduling.vmQueueCapacity)
+        assertEquals(0.2, scheduling.overloadFailureMultiplier)
+        assertTrue(scheduling.autoscalingEnabled)
+        assertEquals(2, scheduling.scaleOutQueueThreshold)
+        assertEquals(10.0, scheduling.scaleInIdleTime)
+        assertEquals(3, scheduling.maxDynamicVms)
+        assertEquals(4.0, scheduling.vmColdStartDelay)
+        assertEquals(0.25, scheduling.scaleOutCost)
+        assertEquals(8.0, scheduling.scaleInProtectionTime)
+        assertTrue(scheduling.resourceModelEnabled)
+        assertEquals(0.05, scheduling.networkLatency)
+        assertEquals(0.5, scheduling.imagePullDelay)
+        assertEquals(1.0, scheduling.ioWeight)
+        assertEquals(0.5, scheduling.ramWeight)
+        assertEquals(0.25, scheduling.bwWeight)
+    }
+
+    private fun assertNestedRealtimeReliabilityAndTenant(configs: ConfigurationManager.LoadedConfigs) {
+        val scheduling = requireNotNull(configs.experimentConfig.profiles["realtime_nested"]?.realtime).scheduling
+
+        assertEquals(0.03, scheduling.runtimeFailureRate)
+        assertEquals(0.02, scheduling.nodeFailureRate)
+        assertEquals(5.0, scheduling.checkpointInterval)
+        assertEquals(1.5, scheduling.migrationDelay)
+        assertEquals("retry", scheduling.timeoutAction)
+        assertTrue(scheduling.preemptionEnabled)
+        assertEquals("deadline_then_priority", scheduling.preemptionPolicy)
+        assertEquals(2, scheduling.preemptionMinPriorityGap)
+        assertEquals(3, scheduling.preemptionMaxPerTask)
+        assertEquals(0.4, scheduling.preemptionDelay)
+        assertEquals(0.7, scheduling.preemptionPenalty)
+        assertTrue(scheduling.multiTenantEnabled)
+        assertEquals(3, scheduling.tenantCount)
+        assertEquals(listOf(2, 1, 1), scheduling.tenantQuota)
+        assertEquals(listOf(1.0, 2.0, 1.0), scheduling.tenantWeights)
+        assertEquals("weighted_fair", scheduling.tenantFairnessPolicy)
+        assertEquals("dominant_resource_fairness", scheduling.tenantSchedulingPolicy)
+        assertEquals(2, scheduling.tenantBurstAllowance)
+        assertEquals(1.5, scheduling.tenantSlaPenaltyWeight)
+        assertEquals(listOf(10.0, 20.0, 15.0), scheduling.tenantCostBudget)
+    }
+
+    private fun assertNestedRealtimeTopology(configs: ConfigurationManager.LoadedConfigs) {
+        val scheduling = requireNotNull(configs.experimentConfig.profiles["realtime_nested"]?.realtime).scheduling
+
+        assertTrue(scheduling.topologyEnabled)
+        assertEquals("spread_fault_domains", scheduling.topologyPolicy)
+        assertEquals(4, scheduling.regionCount)
+        assertEquals(3, scheduling.racksPerRegion)
+        assertEquals(2, scheduling.hostsPerRack)
+        assertEquals(1, scheduling.localRegion)
+        assertEquals(0.15, scheduling.crossRackLatency)
+        assertEquals(2.5, scheduling.crossRegionLatency)
+        assertEquals(0.8, scheduling.crossRegionCost)
+        assertEquals(0.01, scheduling.hostFailureRate)
+        assertEquals(0.02, scheduling.rackFailureRate)
+        assertEquals(0.03, scheduling.regionFailureRate)
+        assertTrue(scheduling.physicalTopologyEnabled)
+        assertTrue(scheduling.dataLocalityEnabled)
+        assertTrue(scheduling.imageCacheEnabled)
+        assertEquals(4, scheduling.hostCountPerRack)
+        assertEquals(8.0, scheduling.hostCpuCapacity)
+        assertEquals(32768.0, scheduling.hostRamCapacity)
+        assertEquals(10000.0, scheduling.hostBwCapacity)
+        assertEquals(5000.0, scheduling.hostIoCapacity)
+        assertEquals(20.0, scheduling.crossRackBandwidth)
+        assertEquals(5.0, scheduling.crossRegionBandwidth)
+        assertEquals("balanced", scheduling.dataLocalityPolicy)
+        assertEquals(3, scheduling.imageCacheCapacity)
     }
 
     private fun createTempTomlFile(content: String): File {

@@ -26,7 +26,7 @@
 
 ## Current quality baseline
 
-- `detekt-baseline.xml` 是首次接入 detekt 的过渡基线，当前 2 项，后续迭代逐步削减。
+- Detekt baseline 已清零并删除；`verifyNoDetektBaseline` 禁止重新引入 baseline 文件或配置。
 - JaCoCo 已设置保守门禁：line >= 68%、branch >= 50%、`datacenter` branch >= 45%；`buildSrc` 门禁为 line >= 50%、branch >= 40%。
 - `benchmarkPerformanceTrend` 不设置性能失败阈值；`Weekly Performance History` 每周将 hosted runner 的 JMH JSON 和 delta
   报告写入 `performance-history` 分支，仅用于趋势观察。

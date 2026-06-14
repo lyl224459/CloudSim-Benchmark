@@ -1,0 +1,4 @@
+realtime.scheduling.decisionDelay|调度决策延迟不能为负数
+realtime.scheduling.runtimeFailureRate|运行中失败率必须在 [0,1] 范围内
+realtime.scheduling.tenantCount|租户数量必须大于等于 1
+realtime.scheduling.topologyPolicy|拓扑策略 必须是以下值之一: latency_aware, spread_fault_domains
