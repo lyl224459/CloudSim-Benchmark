@@ -1,25 +1,27 @@
-# 性能测试实验配置
-# 用于评估算法性能，运行时间中等
-
-[random]
-seed = 98765
-
-[batch]
-cloudletCount = 200
-population = 50
-maxIter = 200
-runs = 10
-
-[realtime]
-cloudletCount = 500
-simulationDuration = 1000.0
-arrivalRate = 10.0
-population = 30
-maxIter = 50
-runs = 5
+defaultProfile = "perf_batch"
 
 [output]
 resultsDir = "runs/performance_test"
 
 [experiment]
 nameFormat = "perf_{mode}_{timestamp}_{algorithms}"
+
+[profiles.perf_batch]
+mode = "batch"
+algorithms = ["RANDOM", "PSO", "WOA", "GWO", "HHO"]
+runs = 10
+
+[profiles.perf_batch.batch]
+cloudletCount = 200
+population = 50
+maxIter = 200
+
+[profiles.perf_realtime]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+runs = 5
+
+[profiles.perf_realtime.realtime]
+cloudletCount = 500
+simulationDuration = 1000.0
+arrivalRate = 10.0

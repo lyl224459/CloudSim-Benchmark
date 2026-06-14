@@ -1,19 +1,19 @@
 package util
 
-import org.nd4j.linalg.api.ndarray.INDArray
-import org.nd4j.linalg.factory.Nd4j
+import java.util.Locale
 import kotlin.math.sqrt
+
+private const val STATISTICAL_VALUE_RANGE_FORMAT = "%.2f ± %.2f [%.2f, %.2f]"
 
 /**
  * 统计值（平均值和标准差）
  * 提供统计计算功能和数据验证
- * 使用高性能计算库优化数值计算
  */
 data class StatisticalValue(
     val mean: Double,
     val stdDev: Double,
     val min: Double,
-    val max: Double
+    val max: Double,
 ) {
     init {
         // 数据验证
@@ -25,13 +25,9 @@ data class StatisticalValue(
         require(min <= mean && mean <= max) { "平均值必须在最小值和最大值之间" }
     }
 
-    override fun toString(): String {
-        return String.format("%.2f ± %.2f", mean, stdDev)
-    }
+    override fun toString(): String = String.format(Locale.ROOT, "%.2f ± %.2f", mean, stdDev)
 
-    fun toStringWithRange(): String {
-        return String.format("%.2f ± %.2f [%.2f, %.2f]", mean, stdDev, min, max)
-    }
+    fun toStringWithRange(): String = String.format(Locale.ROOT, STATISTICAL_VALUE_RANGE_FORMAT, mean, stdDev, min, max)
 
     companion object {
         /**
@@ -47,19 +43,23 @@ data class StatisticalValue(
         }
 
         /**
-         * 计算数组的标准差（样本标准差）- 高性能版本
-         * 使用ND4J进行向量化计算，提升性能
+         * 计算数组的标准差（样本标准差）
          * @param values 输入数组
          * @return 标准差
          * @throws IllegalArgumentException 当数组为空或只有一个元素时
          */
         fun calculateStdDev(values: DoubleArray): Double {
-            if (values.isEmpty()) throw IllegalArgumentException("数组不能为空")
+            require(values.isNotEmpty()) { "数组不能为空" }
             if (values.size < 2) return 0.0
             validateArray(values, "计算标准差")
 
-            val array = Nd4j.create(values)
-            return array.std(true).getDouble(0) // true for sample standard deviation (divide by n-1)
+            val mean = values.average()
+            var sumSquaredDiff = 0.0
+            for (value in values) {
+                val diff = value - mean
+                sumSquaredDiff += diff * diff
+            }
+            return sqrt(sumSquaredDiff / (values.size - 1))
         }
 
         /**
@@ -71,7 +71,7 @@ data class StatisticalValue(
         fun calculateMin(values: DoubleArray): Double {
             require(values.isNotEmpty()) { "数组不能为空" }
             validateArray(values, "计算最小值")
-            return values.minOrNull() ?: throw IllegalStateException("无法计算最小值")
+            return checkNotNull(values.minOrNull()) { "无法计算最小值" }
         }
 
         /**
@@ -83,12 +83,11 @@ data class StatisticalValue(
         fun calculateMax(values: DoubleArray): Double {
             require(values.isNotEmpty()) { "数组不能为空" }
             validateArray(values, "计算最大值")
-            return values.maxOrNull() ?: throw IllegalStateException("无法计算最大值")
+            return checkNotNull(values.maxOrNull()) { "无法计算最大值" }
         }
 
         /**
-         * 从DoubleArray创建StatisticalValue - 高性能版本
-         * 使用ND4J进行批量向量化计算，一次遍历完成所有统计
+         * 从DoubleArray创建StatisticalValue
          * @param values 输入数组
          * @return StatisticalValue实例
          * @throws IllegalArgumentException 当数组无效时
@@ -97,22 +96,24 @@ data class StatisticalValue(
             require(values.isNotEmpty()) { "数组不能为空" }
             validateArray(values, "创建统计值")
 
-            return fromArrayOptimized(values)
-        }
+            val mean = values.average()
+            var sumSquaredDiff = 0.0
+            var min = Double.MAX_VALUE
+            var max = Double.MIN_VALUE
 
-        /**
-         * 高性能批量统计计算
-         */
-        private fun fromArrayOptimized(values: DoubleArray): StatisticalValue {
-            val array = Nd4j.create(values)
+            for (value in values) {
+                val diff = value - mean
+                sumSquaredDiff += diff * diff
+                if (value < min) min = value
+                if (value > max) max = value
+            }
 
-            // 批量计算所有统计值
-            val mean = array.meanNumber().toDouble()
-            val stdDev = if (values.size >= 2) {
-                array.std(true).getDouble(0)
-            } else 0.0
-            val min = array.minNumber().toDouble()
-            val max = array.maxNumber().toDouble()
+            val stdDev =
+                if (values.size >= 2) {
+                    sqrt(sumSquaredDiff / (values.size - 1))
+                } else {
+                    0.0
+                }
 
             return StatisticalValue(mean, stdDev, min, max)
         }
@@ -123,16 +124,14 @@ data class StatisticalValue(
          * @param operation 操作名称（用于错误消息）
          * @throws IllegalArgumentException 当数据无效时
          */
-        private fun validateArray(values: DoubleArray, operation: String) {
+        private fun validateArray(
+            values: DoubleArray,
+            operation: String,
+        ) {
             for ((index, value) in values.withIndex()) {
-                if (value.isNaN()) {
-                    throw IllegalArgumentException("$operation: 数组中第${index}个元素是NaN")
-                }
-                if (value.isInfinite()) {
-                    throw IllegalArgumentException("$operation: 数组中第${index}个元素是无穷大")
-                }
+                require(!value.isNaN()) { "$operation: 数组中第${index}个元素是NaN" }
+                require(!value.isInfinite()) { "$operation: 数组中第${index}个元素是无穷大" }
             }
         }
     }
 }
-

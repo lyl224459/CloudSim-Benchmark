@@ -2,12 +2,35 @@ package scheduler
 
 import datacenter.ObjectiveFunction
 import datacenter.SchedulerObjectiveFunction
-import org.apache.commons.math3.special.Gamma
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
-import java.util.*
+import java.util.Random
 import kotlin.math.min
+
+private const val DEFAULT_HHO_POPULATION = 30
+private const val DEFAULT_HHO_MAX_ITER = 100
+private const val HHO_BOUND_LOWER = 0.0
+private const val HHO_PROBABILITY_SWITCH = 0.5
+private const val HHO_EXPLORATION_THRESHOLD = 1.0
+private const val HHO_SOFT_BESIEGE_THRESHOLD = 0.5
+private const val HHO_ENERGY_SCALE = 2.0
+private const val DEBUG_ALLOCATION_PREVIEW_SIZE = 10
+
+private data class HhoParameters(
+    val population: Int,
+    val lowerBound: Double,
+    val upperBound: Double,
+    val dimensions: Int,
+    val maxIterations: Int,
+)
+
+private data class HhoRandomSamples(
+    val q: Double,
+    val r1: Double,
+    val r2: Double,
+    val r3: Double,
+)
 
 /**
  * 哈里斯鹰优化算法 (Harris Hawks Optimization) - 优化版本
@@ -15,74 +38,44 @@ import kotlin.math.min
  */
 private class HHO(
     private val optFunction: ObjectiveFunction,
-    private val population: Int,
-    private val lb: Double,
-    private val ub: Double,
-    private val dim: Int,
-    private val maxIter: Int,
-    private val random: Random
+    parameters: HhoParameters,
+    private val random: Random,
 ) {
+    private val population = parameters.population
+    private val lb = parameters.lowerBound
+    private val ub = parameters.upperBound
+    private val dim = parameters.dimensions
+    private val maxIter = parameters.maxIterations
+
     // 使用一维数组存储所有鹰的位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val rabbitLocation = DoubleArray(dim) { (lb + ub) / 2 } // 初始化为中间值
+    private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     private var rabbitEnergy = Double.POSITIVE_INFINITY
-    
+
     init {
         initPopulation()
     }
-    
+
     private fun initPopulation() {
         for (i in 0 until population) {
             val baseIndex = i * dim
             for (j in 0 until dim) {
                 positions[baseIndex + j] = lb + (ub - lb) * random.nextDouble()
             }
-            adjustPositions(i)
+            codec.clampRoundInPlace(positions, baseIndex)
         }
         updateRabbit()
     }
 
     // 获取鹰i的第j维位置
-    private fun getPosition(hawk: Int, dimension: Int): Double {
-        return positions[hawk * dim + dimension]
-    }
+    private fun getPosition(
+        hawk: Int,
+        dimension: Int,
+    ): Double = positions[hawk * dim + dimension]
 
-    // 设置鹰i的第j维位置
-    private fun setPosition(hawk: Int, dimension: Int, value: Double) {
-        positions[hawk * dim + dimension] = value
-    }
-    
-    private fun adjustPositions(agentIndex: Int) {
-        val baseIndex = agentIndex * dim
-        for (j in 0 until dim) {
-            val index = baseIndex + j
-            positions[index] = positions[index].round()
-            when {
-                positions[index] < lb -> positions[index] = lb
-                positions[index] > ub -> positions[index] = ub
-            }
-        }
-    }
+    private fun evaluate(hawk: Int): Double = codec.evaluate(positions, hawk * dim, optFunction)
 
-    private fun evaluate(hawk: Int): Double {
-        // 直接使用一维数组，避免创建临时数组
-        val params = IntArray(dim)
-        val baseIndex = hawk * dim
-        for (j in 0 until dim) {
-            params[j] = positions[baseIndex + j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
-
-    // 评估指定位置的适应度值
-    private fun evaluatePosition(position: DoubleArray): Double {
-        val params = IntArray(dim)
-        for (j in 0 until dim) {
-            params[j] = position[j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
-    
     private fun updateRabbit() {
         for (i in 0 until population) {
             val fitness = evaluate(i)
@@ -96,89 +89,30 @@ private class HHO(
             }
         }
     }
-    
-    private fun levyFlight(d: Int): DoubleArray {
-        val beta = 1.5
-        val sigma = Math.pow(
-            (Gamma.gamma(1 + beta) * Math.sin(Math.PI * beta / 2)) /
-                    (Gamma.gamma((1 + beta) / 2) * beta * Math.pow(2.0, (beta - 1) / 2)),
-            1.0 / beta
-        )
-        val u = DoubleArray(d) { random.nextGaussian() * sigma }
-        val v = DoubleArray(d) { random.nextGaussian() }
-        val levy = DoubleArray(d) { 
-            val step = u[it] / Math.pow(Math.abs(v[it]) + 1e-10, 1.0 / beta)
-            // 限制步长范围，避免过大的跳跃
-            step.coerceIn(-10.0, 10.0)
-        }
-        return levy
-    }
-    
+
     fun execute(): IntArray {
         for (t in 0 until maxIter) {
-            val E0 = 2 * random.nextDouble() - 1
-            val E = 2 * E0 * (1 - t.toDouble() / maxIter)
+            val initialEnergy = HHO_ENERGY_SCALE * random.nextDouble() - 1
+            val escapeEnergy = HHO_ENERGY_SCALE * initialEnergy * (1 - t.toDouble() / maxIter)
 
             for (i in 0 until population) {
-                val q = random.nextDouble()
-                val r = random.nextDouble()
-                val r1 = random.nextDouble()
-                val r2 = random.nextDouble()
-                val r3 = random.nextDouble()
-                val r4 = random.nextDouble()
+                val samples = nextRandomSamples()
                 val baseIndex = i * dim
-                
+
                 // 保存旧位置用于回滚
                 val oldPositions = DoubleArray(dim) { j -> positions[baseIndex + j] }
 
                 for (j in 0 until dim) {
-                    val index = baseIndex + j
-                    when {
-                        Math.abs(E) >= 1 -> {
-                            // 探索阶段（修复：使用正确的位置更新公式）
-                            if (q >= 0.5) {
-                                // 基于随机鹰的位置
-                                val randomHawk = random.nextInt(population)
-                                val randomHawkPos = getPosition(randomHawk, j)
-                                positions[index] = randomHawkPos - r1 * Math.abs(randomHawkPos - positions[index])
-                            } else {
-                                // 基于兔子位置
-                                positions[index] = rabbitLocation[j] - r2 * Math.abs(rabbitLocation[j] - 2 * r3 * positions[index])
-                            }
-                        }
-                        Math.abs(E) < 1 -> {
-                            // 开发阶段（修复：使用正确的围捕公式）
-                            if (r >= 0.5 && Math.abs(E) >= 0.5) {
-                                // 软包围
-                                val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = deltaX - E * Math.abs(deltaX)
-                            } else if (r >= 0.5 && Math.abs(E) < 0.5) {
-                                // 硬包围
-                                val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = rabbitLocation[j] - E * Math.abs(deltaX)
-                            } else if (r < 0.5 && Math.abs(E) >= 0.5) {
-                                // 渐进式快速俯冲软包围（延迟评估）
-                                val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = deltaX - E * Math.abs(deltaX)
-                            } else {
-                                // 渐进式快速俯冲硬包围（延迟评估）
-                                val deltaX = rabbitLocation[j] - positions[index]
-                                positions[index] = rabbitLocation[j] - E * Math.abs(deltaX)
-                            }
-                        }
-                    }
+                    updatePosition(baseIndex + j, j, escapeEnergy, samples)
                 }
 
                 // 整体调整位置（避免逐维度调整导致的问题）
-                adjustPositions(i)
-                
+                codec.clampRoundInPlace(positions, baseIndex)
+
                 // 评估新位置，如果变差则恢复
                 val newFitness = evaluate(i)
                 if (newFitness.isNaN() || newFitness.isInfinite()) {
-                    // 恢复旧位置
-                    for (j in 0 until dim) {
-                        positions[baseIndex + j] = oldPositions[j]
-                    }
+                    restorePositions(baseIndex, oldPositions)
                 }
             }
 
@@ -186,9 +120,71 @@ private class HHO(
         }
 
         // 确保返回的解在有效范围内
-        val result = rabbitLocation.map { it.round().toInt().coerceIn(lb.toInt(), ub.toInt()) }.toIntArray()
-        Logger.debug("HHO 最终解: {}", result.take(min(10, dim)))
+        val result = codec.toAllocation(rabbitLocation)
+        Logger.debug("HHO 最终解: {}", result.take(min(DEBUG_ALLOCATION_PREVIEW_SIZE, dim)))
         return result
+    }
+
+    private fun nextRandomSamples(): HhoRandomSamples {
+        val q = random.nextDouble()
+        random.nextDouble()
+        val r1 = random.nextDouble()
+        val r2 = random.nextDouble()
+        val r3 = random.nextDouble()
+        random.nextDouble()
+        return HhoRandomSamples(q, r1, r2, r3)
+    }
+
+    private fun updatePosition(
+        index: Int,
+        dimension: Int,
+        escapeEnergy: Double,
+        samples: HhoRandomSamples,
+    ) {
+        if (Math.abs(escapeEnergy) >= HHO_EXPLORATION_THRESHOLD) {
+            explore(index, dimension, samples)
+        } else {
+            exploit(index, dimension, escapeEnergy)
+        }
+    }
+
+    private fun explore(
+        index: Int,
+        dimension: Int,
+        samples: HhoRandomSamples,
+    ) {
+        if (samples.q >= HHO_PROBABILITY_SWITCH) {
+            val randomHawkPos = getPosition(random.nextInt(population), dimension)
+            positions[index] = randomHawkPos - samples.r1 * Math.abs(randomHawkPos - positions[index])
+        } else {
+            val rabbitPosition = rabbitLocation[dimension]
+            positions[index] =
+                rabbitPosition -
+                samples.r2 * Math.abs(rabbitPosition - HHO_ENERGY_SCALE * samples.r3 * positions[index])
+        }
+    }
+
+    private fun exploit(
+        index: Int,
+        dimension: Int,
+        escapeEnergy: Double,
+    ) {
+        val deltaX = rabbitLocation[dimension] - positions[index]
+        positions[index] =
+            if (Math.abs(escapeEnergy) >= HHO_SOFT_BESIEGE_THRESHOLD) {
+                deltaX - escapeEnergy * Math.abs(deltaX)
+            } else {
+                rabbitLocation[dimension] - escapeEnergy * Math.abs(deltaX)
+            }
+    }
+
+    private fun restorePositions(
+        baseIndex: Int,
+        oldPositions: DoubleArray,
+    ) {
+        for (j in 0 until dim) {
+            positions[baseIndex + j] = oldPositions[j]
+        }
     }
 }
 
@@ -199,30 +195,29 @@ class HHOScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
-    private val population: Int = 30,
-    private val maxIter: Int = 100,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val population: Int = DEFAULT_HHO_POPULATION,
+    private val maxIter: Int = DEFAULT_HHO_MAX_ITER,
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-    
     private val hho: HHO
-    
+
     init {
         val objFunc = objectiveFunction as SchedulerObjectiveFunction
-        hho = HHO(
-            optFunction = objFunc,
-            population = population,
-            lb = 0.0,
-            ub = (vmNum - 1).toDouble(),
-            dim = cloudletNum,
-            maxIter = maxIter,
-            random = random
-        )
+        hho =
+            HHO(
+                optFunction = objFunc,
+                parameters =
+                    HhoParameters(
+                        population = population,
+                        lowerBound = HHO_BOUND_LOWER,
+                        upperBound = (vmNum - 1).toDouble(),
+                        dimensions = cloudletNum,
+                        maxIterations = maxIter,
+                    ),
+                random = random,
+            )
         Logger.debug("使用 HHO (哈里斯鹰优化) 调度器")
     }
-    
-    override fun allocate(): IntArray {
-        return hho.execute()
-    }
-}
 
-private fun Double.round() = kotlin.math.round(this)
+    override fun allocate(): IntArray = hho.execute()
+}

@@ -1,0 +1,403 @@
+defaultProfile = "batch_small"
+
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "{mode}_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[jvm]
+maxHeapSize = "4g"
+gcAlgorithm = "ZGC"
+
+[random]
+seed = 42
+
+[optimizer]
+population = 20
+maxIter = 20
+
+[algorithms.PSO]
+enabled = true
+population = 30
+maxIter = 50
+
+[algorithms.WOA]
+enabled = true
+population = 25
+maxIter = 40
+
+[presets.small_scale]
+algorithms = ["PSO", "WOA", "GWO"]
+
+[presets.large_scale]
+algorithms = ["PSO", "WOA", "GWO", "HHO", "IMPROVED_RL"]
+
+[profiles.batch_small]
+mode = "batch"
+preset = "small_scale"
+runs = 5
+outputDir = "runs/batch_small"
+
+[profiles.batch_small.batch]
+cloudletCount = 100
+population = 30
+maxIter = 50
+
+[profiles.realtime_smoke]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "RANDOM"]
+runs = 1
+outputDir = "runs/realtime_smoke"
+
+[profiles.realtime_smoke.realtime]
+cloudletCount = 200
+simulationDuration = 500.0
+arrivalRate = 5.0
+
+[profiles.realtime_sla]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_sla"
+
+[profiles.realtime_sla.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 4.0
+
+[profiles.realtime_sla.realtime.scheduling]
+deadlineFactor = 1.2
+taskTimeout = 20.0
+timeoutAction = "retry"
+retryLimit = 1
+retryDelay = 1.0
+checkpointInterval = 5.0
+
+[profiles.realtime_overload]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_overload"
+
+[profiles.realtime_overload.realtime]
+cloudletCount = 180
+simulationDuration = 180.0
+arrivalRate = 12.0
+
+[profiles.realtime_overload.realtime.scheduling]
+vmQueueCapacity = 2
+overloadFailureMultiplier = 0.6
+runtimeFailureRate = 0.05
+nodeFailureRate = 0.03
+retryLimit = 2
+retryDelay = 0.5
+
+[profiles.realtime_priority]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "RANDOM"]
+runs = 1
+outputDir = "runs/realtime_priority"
+
+[profiles.realtime_priority.realtime]
+cloudletCount = 120
+simulationDuration = 300.0
+arrivalRate = 5.0
+
+[profiles.realtime_priority.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 4
+highPriorityRatio = 0.25
+deadlineFactor = 1.5
+
+[profiles.realtime_capacity]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_capacity"
+
+[profiles.realtime_capacity.realtime]
+cloudletCount = 150
+simulationDuration = 250.0
+arrivalRate = 8.0
+
+[profiles.realtime_capacity.realtime.scheduling]
+resourceModelEnabled = true
+networkLatency = 0.05
+imagePullDelay = 0.5
+ioWeight = 1.0
+ramWeight = 0.5
+bwWeight = 0.5
+vmQueueCapacity = 3
+
+[profiles.realtime_autoscaling]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_autoscaling"
+
+[profiles.realtime_autoscaling.realtime]
+cloudletCount = 180
+simulationDuration = 300.0
+arrivalRate = 10.0
+
+[profiles.realtime_autoscaling.realtime.scheduling]
+autoscalingEnabled = true
+scaleOutQueueThreshold = 2
+scaleInIdleTime = 20.0
+maxDynamicVms = 2
+vmColdStartDelay = 5.0
+scaleOutCost = 0.25
+scaleInProtectionTime = 15.0
+vmQueueCapacity = 3
+
+[profiles.realtime_preemptive_priority]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_preemptive_priority"
+
+[profiles.realtime_preemptive_priority.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_preemptive_priority.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 4
+highPriorityRatio = 0.35
+vmQueueCapacity = 1
+preemptionEnabled = true
+preemptionPolicy = "priority_then_deadline"
+preemptionMinPriorityGap = 1
+preemptionMaxPerTask = 1
+preemptionDelay = 0.2
+preemptionPenalty = 0.5
+retryLimit = 2
+checkpointInterval = 2.0
+
+[profiles.realtime_preemptive_deadline]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_preemptive_deadline"
+
+[profiles.realtime_preemptive_deadline.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_preemptive_deadline.realtime.scheduling]
+queuePolicy = "deadline"
+deadlineFactor = 1.1
+vmQueueCapacity = 1
+preemptionEnabled = true
+preemptionPolicy = "deadline_then_priority"
+preemptionMinPriorityGap = 1
+preemptionMaxPerTask = 1
+preemptionDelay = 0.2
+preemptionPenalty = 0.5
+retryLimit = 2
+checkpointInterval = 2.0
+
+[profiles.realtime_failure_migration]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_failure_migration"
+
+[profiles.realtime_failure_migration.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 6.0
+
+[profiles.realtime_failure_migration.realtime.scheduling]
+runtimeFailureRate = 0.08
+nodeFailureRate = 0.04
+retryLimit = 2
+retryDelay = 0.5
+checkpointInterval = 3.0
+migrationDelay = 0.5
+timeoutAction = "retry"
+
+[profiles.realtime_tenant_fairness]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_tenant_fairness"
+
+[profiles.realtime_tenant_fairness.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_tenant_fairness.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 3
+highPriorityRatio = 0.2
+vmQueueCapacity = 2
+multiTenantEnabled = true
+tenantCount = 3
+tenantQuota = [2, 1, 1]
+tenantWeights = [1.0, 2.0, 1.0]
+tenantFairnessPolicy = "weighted_fair"
+
+[profiles.realtime_region_latency]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_region_latency"
+
+[profiles.realtime_region_latency.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 6.0
+
+[profiles.realtime_region_latency.realtime.scheduling]
+topologyEnabled = true
+topologyPolicy = "latency_aware"
+regionCount = 3
+racksPerRegion = 2
+hostsPerRack = 2
+localRegion = 0
+crossRackLatency = 0.15
+crossRegionLatency = 1.25
+crossRegionCost = 0.4
+vmQueueCapacity = 3
+
+[profiles.realtime_fault_domain_spread]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_fault_domain_spread"
+
+[profiles.realtime_fault_domain_spread.realtime]
+cloudletCount = 150
+simulationDuration = 260.0
+arrivalRate = 8.0
+
+[profiles.realtime_fault_domain_spread.realtime.scheduling]
+topologyEnabled = true
+topologyPolicy = "spread_fault_domains"
+regionCount = 3
+racksPerRegion = 2
+hostsPerRack = 2
+localRegion = 0
+crossRackLatency = 0.1
+crossRegionLatency = 1.0
+crossRegionCost = 0.2
+hostFailureRate = 0.01
+rackFailureRate = 0.02
+regionFailureRate = 0.03
+vmQueueCapacity = 2
+autoscalingEnabled = true
+scaleOutQueueThreshold = 2
+maxDynamicVms = 2
+vmColdStartDelay = 1.0
+
+[profiles.realtime_trace_fairshare]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_trace_fairshare"
+
+[profiles.realtime_trace_fairshare.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+generatorType = "GOOGLE_TRACE"
+
+[profiles.realtime_trace_fairshare.realtime.scheduling]
+queuePolicy = "priority"
+priorityLevels = 4
+multiTenantEnabled = true
+tenantCount = 4
+tenantQuota = [2, 2, 1, 1]
+tenantWeights = [1.0, 1.5, 1.0, 2.0]
+tenantFairnessPolicy = "weighted_fair"
+tenantSchedulingPolicy = "weighted_fair"
+tenantBurstAllowance = 1
+resourceModelEnabled = true
+ramWeight = 0.2
+bwWeight = 0.2
+ioWeight = 0.2
+
+[profiles.realtime_trace_sla_cost]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_trace_sla_cost"
+
+[profiles.realtime_trace_sla_cost.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 8.0
+generatorType = "GOOGLE_TRACE"
+
+[profiles.realtime_trace_sla_cost.realtime.scheduling]
+queuePolicy = "deadline"
+deadlineFactor = 1.2
+multiTenantEnabled = true
+tenantCount = 3
+tenantCostBudget = [120.0, 180.0, 150.0]
+tenantSlaPenaltyWeight = 1.5
+tenantSchedulingPolicy = "dominant_resource_fairness"
+resourceModelEnabled = true
+networkLatency = 0.05
+imagePullDelay = 0.5
+retryLimit = 1
+physicalTopologyEnabled = true
+dataLocalityEnabled = true
+imageCacheEnabled = true
+regionCount = 3
+racksPerRegion = 2
+hostCountPerRack = 2
+hostCpuCapacity = 4.0
+hostRamCapacity = 16.0
+hostBwCapacity = 4000.0
+hostIoCapacity = 2000.0
+crossRackLatency = 0.1
+crossRegionLatency = 0.8
+crossRegionCost = 0.5
+crossRackBandwidth = 20.0
+crossRegionBandwidth = 5.0
+dataLocalityPolicy = "balanced"
+imageCacheCapacity = 4
+
+[profiles.realtime_drf_capacity]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+runs = 1
+outputDir = "runs/realtime_drf_capacity"
+
+[profiles.realtime_drf_capacity.realtime]
+cloudletCount = 150
+simulationDuration = 260.0
+arrivalRate = 10.0
+
+[profiles.realtime_drf_capacity.realtime.scheduling]
+multiTenantEnabled = true
+tenantCount = 3
+tenantQuota = [3, 3, 3]
+tenantCostBudget = [80.0, 80.0, 80.0]
+tenantSchedulingPolicy = "dominant_resource_fairness"
+resourceModelEnabled = true
+vmQueueCapacity = 2
+ramWeight = 0.4
+bwWeight = 0.3
+ioWeight = 0.3
+autoscalingEnabled = true
+scaleOutQueueThreshold = 3
+maxDynamicVms = 2
+vmColdStartDelay = 1.0

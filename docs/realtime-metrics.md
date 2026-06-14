@@ -1,0 +1,62 @@
+# Realtime 指标定义
+
+实时调度 CSV 的指标列由 `RealtimeMetricSchema` 统一维护。`*_Mean` 表示成功 run 的平均值，`*_StdDev` 表示成功 run 的标准差；失败 run 的指标单元格为空，并通过 `Status`、`ErrorType`、`ErrorMessage` 记录失败信息。
+
+| CSV 指标 | 单位 | 趋势 | 定义 |
+| :--- | :--- | :--- | :--- |
+| Makespan | seconds | 越低越好 | 所有完成任务中的最大完成时间。 |
+| LoadBalance | ratio | 越低越好 | VM 负载不均衡程度。 |
+| Cost | cost | 越低越好 | 根据 VM 价格估算的总执行成本。 |
+| TotalTime | seconds | 越低越好 | 按调度结果估算的总执行时间。 |
+| Fitness | score | 越低越好 | 多目标权重计算出的调度适应度。 |
+| AvgWaitingTime | seconds | 越低越好 | 任务从到达到开始执行的平均等待时间。 |
+| AvgResponseTime | seconds | 越低越好 | 任务从到达到完成的平均响应时间。 |
+| RejectedCount | count | 越低越好 | 被实时准入或资源策略拒绝的任务数。 |
+| TimeoutCount | count | 越低越好 | 达到 SLA 超时时间的任务数。 |
+| FailedCount | count | 越低越好 | 最终进入失败状态的任务数。 |
+| RetryCount | count | 越低越好 | Broker 发起的重试次数。 |
+| PermanentFailedCount | count | 越低越好 | 重试耗尽或不可恢复失败的任务数。 |
+| AvgDecisionDelay | seconds | 越低越好 | 调度决策延迟的平均值。 |
+| CompletedCount | count | 越高越好 | 成功完成的任务数。 |
+| SubmittedCount | count | 越高越好 | 已提交给 CloudSim 的任务数。 |
+| SlaViolationCount | count | 越低越好 | 完成但超过 deadline 的任务数。 |
+| SlaViolationRate | ratio | 越低越好 | SLA 违约数除以成功完成任务数。 |
+| CapacityRejectedCount | count | 越低越好 | VM 队列容量导致的拒绝数。 |
+| AvgQueueDepth | count | 越低越好 | 被选中 VM 的队列深度采样平均值。 |
+| MaxQueueDepth | count | 越低越好 | 队列深度采样最大值。 |
+| P95ResponseTime | seconds | 越低越好 | 响应时间第 95 百分位。 |
+| P99ResponseTime | seconds | 越低越好 | 响应时间第 99 百分位。 |
+| ScaleOutCount | count | 中性 | 自动扩容次数。 |
+| ScaleInCount | count | 中性 | 自动缩容次数。 |
+| ActiveVmPeak | count | 中性 | 运行过程中活跃 VM 峰值。 |
+| AutoscalingCost | cost | 越低越好 | 自动伸缩带来的额外成本。 |
+| ColdStartDelayTotal | seconds | 越低越好 | VM 冷启动延迟总量。 |
+| ResourceRejectedCount | count | 越低越好 | RAM、带宽或 I/O 资源约束导致的拒绝数。 |
+| RuntimeFailureCount | count | 越低越好 | 运行期失败事件数。 |
+| TimeoutCancelledCount | count | 越低越好 | 超时处理中被取消的任务数。 |
+| MigrationCount | count | 越低越好 | 任务迁移事件数。 |
+| CheckpointRecoveryCount | count | 越高越好 | 重试或迁移中成功复用 checkpoint 的次数。 |
+| RetrySuccessRate | ratio | 越高越好 | 重试成功数除以重试总数。 |
+| SlaPenalty | score | 越低越好 | SLA 延迟按权重累计的惩罚值。 |
+| PreemptedCount | count | 越低越好 | 被高优先级任务抢占的任务数。 |
+| PreemptionSuccessCount | count | 越高越好 | 成功执行的抢占决策数。 |
+| PreemptionFailedCount | count | 越低越好 | 未能执行的抢占决策数。 |
+| AvgPreemptionDelay | seconds | 越低越好 | 抢占引入的平均延迟。 |
+| PreemptionPenalty | score | 越低越好 | 抢占策略累计的惩罚值。 |
+| CheckpointLossTotal | MI | 越低越好 | 重试或迁移中未恢复的工作量。 |
+| TenantQuotaRejectedCount | count | 越低越好 | 租户配额导致的拒绝数。 |
+| TenantBudgetRejectedCount | count | 越低越好 | 租户成本预算导致的拒绝数。 |
+| TenantFairnessIndex | ratio | 越高越好 | 多租户公平性得分。 |
+| FairnessViolationCount | count | 越低越好 | 租户公平策略违约次数。 |
+| TenantSlaPenalty | score | 越低越好 | 按租户策略加权后的 SLA 惩罚。 |
+| DominantResourceFairnessIndex | ratio | 越高越好 | 基于主导资源份额的公平性得分。 |
+| CostSlaTradeoffScore | score | 越低越好 | 成本与 SLA 惩罚组合后的折中得分。 |
+| RetrySuccessByTenant | ratio | 越高越好 | 按租户视角聚合的重试成功表现。 |
+| CrossRackAssignmentCount | count | 越低越好 | 分配到非本地 rack 的次数。 |
+| CrossRegionAssignmentCount | count | 越低越好 | 分配到非本地 region 的次数。 |
+| AverageTopologyLatency | seconds | 越低越好 | 拓扑放置带来的平均网络延迟。 |
+| TopologyCost | cost | 越低越好 | 跨 rack 或跨 region 放置带来的拓扑成本。 |
+| HostFailureCount | count | 越低越好 | Host 故障域事件数。 |
+| RackFailureCount | count | 越低越好 | Rack 故障域事件数。 |
+| RegionFailureCount | count | 越低越好 | Region 故障域事件数。 |
+| FailureDomainSpreadScore | ratio | 越高越好 | 工作负载跨故障域分散程度。 |

@@ -1,0 +1,36 @@
+defaultProfile = "realtime_test"
+
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "realtime_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[jvm]
+maxHeapSize = "2g"
+gcAlgorithm = "ZGC"
+
+[random]
+seed = 42
+
+[profiles.realtime_test]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+runs = 3
+outputDir = "runs/realtime_test"
+
+[profiles.realtime_test.realtime]
+cloudletCount = 200
+simulationDuration = 500.0
+arrivalRate = 5.0

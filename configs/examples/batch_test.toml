@@ -1,0 +1,36 @@
+defaultProfile = "batch_test"
+
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "batch_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[jvm]
+maxHeapSize = "2g"
+gcAlgorithm = "ZGC"
+
+[random]
+seed = 42
+
+[profiles.batch_test]
+mode = "batch"
+algorithms = ["PSO", "WOA", "GWO", "HHO"]
+runs = 3
+outputDir = "runs/batch_test"
+
+[profiles.batch_test.batch]
+cloudletCount = 100
+population = 30
+maxIter = 50

@@ -1,61 +1,34 @@
 # CloudSim-Benchmark 批处理模式配置
 
-# ========== 批处理实验参数 ==========
-[batch]
-# 任务数量
-cloudletCount = 100
+defaultProfile = "batch_compare"
 
-# 算法种群大小（将被algorithms.toml中的设置覆盖）
-population = 30
+[output]
+resultsDir = "runs"
 
-# 最大迭代次数（将被algorithms.toml中的设置覆盖）
-maxIter = 50
+[output.csv]
+enabled = true
+delimiter = ","
 
-# 实验运行次数（用于计算平均值）
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "batch_{timestamp}_{algorithms}"
+maxConcurrent = 4
+
+[random]
+seed = 42
+
+[profiles.batch_compare]
+mode = "batch"
+algorithms = ["RANDOM", "PSO", "WOA", "GWO", "HHO"]
 runs = 3
+outputDir = "runs/batch_compare"
 
-# 任务生成器类型
-generatorType = "LOG_NORMAL"
-
-# ========== 批处理专用设置 ==========
-# 任务生成器配置
-# 注意：使用 generatorType 字段（向后兼容格式）
-# [batch.generator] 格式暂不支持，将在未来版本中支持
-# type = "LOG_NORMAL"  # LOG_NORMAL, UNIFORM, GOOGLE_TRACE
-# 生成器参数（可选，根据类型不同）
-# 对于LOG_NORMAL:
-# meanLength = 1000.0
-# varianceLength = 200.0
-
-# 目标函数权重配置
-[batch.objective]
-cost = 0.4         # 成本权重 (0.0-1.0)
-totalTime = 0.3    # 总时间权重 (0.0-1.0)
-loadBalance = 0.2  # 负载均衡权重 (0.0-1.0)
-makespan = 0.1     # Makespan权重 (0.0-1.0，可选)
-
-# ========== Google Trace 配置 ==========
-[batch.googleTrace]
-# Google Trace 数据文件路径
-filePath = "data/google_trace/task_events.csv"
-# 最大读取任务数（避免内存溢出）
-maxTasks = 1000
-# 时间窗口开始时间（Unix时间戳）
-timeWindowStart = 0
-# 时间窗口结束时间（Unix时间戳，最大值表示不限制）
-timeWindowEnd = 9223372036854775807
-
-# ========== 批处理实验预设 ==========
-# 注意：presets 功能暂未实现，将在未来版本中支持
-# [batch.presets]
-# # 小规模测试
-# small = { cloudletCount = 50, runs = 1 }
-#
-# # 中等规模测试
-# medium = { cloudletCount = 100, runs = 3 }
-#
-# # 大规模测试
-# large = { cloudletCount = 500, runs = 5 }
-#
-# # 超大规模测试
-# xlarge = { cloudletCount = 1000, runs = 10 }
+[profiles.batch_compare.batch]
+cloudletCount = 100
+population = 30
+maxIter = 50

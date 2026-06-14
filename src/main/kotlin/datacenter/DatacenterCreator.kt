@@ -1,79 +1,52 @@
 package datacenter
 
 import config.DatacenterConfig
-import org.cloudsimplus.brokers.DatacenterBroker
-import org.cloudsimplus.brokers.DatacenterBrokerSimple
 import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.datacenters.Datacenter
 import org.cloudsimplus.datacenters.DatacenterSimple
-import org.cloudsimplus.hosts.Host
 import org.cloudsimplus.hosts.HostSimple
-import org.cloudsimplus.resources.Pe
 import org.cloudsimplus.resources.PeSimple
+import org.cloudsimplus.schedulers.cloudlet.CloudletSchedulerSpaceShared
 import org.cloudsimplus.schedulers.vm.VmSchedulerTimeShared
 import org.cloudsimplus.vms.Vm
 import org.cloudsimplus.vms.VmSimple
-import org.cloudsimplus.schedulers.cloudlet.CloudletSchedulerSpaceShared
 
 /**
  * 数据中心创建器
  */
 object DatacenterCreator {
-    
     /**
      * 创建数据中心
      */
-    fun createDatacenter(simulation: CloudSimPlus, name: String, type: DatacenterType): Datacenter {
-        val (ram, bw, mips, storage, costPerSec) = when (type) {
-            DatacenterType.LOW -> {
-                Tuple5(
-                    DatacenterConfig.RAM * DatacenterConfig.L_VM_N,
-                    DatacenterConfig.BW * DatacenterConfig.L_VM_N,
-                    DatacenterConfig.L_MIPS * DatacenterConfig.L_VM_N,
-                    DatacenterConfig.STORAGE * DatacenterConfig.L_VM_N,
-                    DatacenterConfig.L_PRICE
-                )
-            }
-            DatacenterType.MEDIUM -> {
-                Tuple5(
-                    DatacenterConfig.RAM * DatacenterConfig.M_VM_N,
-                    DatacenterConfig.BW * DatacenterConfig.M_VM_N,
-                    DatacenterConfig.M_MIPS * DatacenterConfig.M_VM_N,
-                    DatacenterConfig.STORAGE * DatacenterConfig.M_VM_N,
-                    DatacenterConfig.M_PRICE
-                )
-            }
-            DatacenterType.HIGH -> {
-                Tuple5(
-                    DatacenterConfig.RAM * DatacenterConfig.H_VM_N,
-                    DatacenterConfig.BW * DatacenterConfig.H_VM_N,
-                    DatacenterConfig.H_MIPS * DatacenterConfig.H_VM_N,
-                    DatacenterConfig.STORAGE * DatacenterConfig.H_VM_N,
-                    DatacenterConfig.H_PRICE
-                )
-            }
-        }
-        
-        val peList = listOf(PeSimple(mips.toDouble()))
-        val hostList = listOf(
-            HostSimple(ram.toLong(), bw.toLong(), storage, peList)
-                .setVmScheduler(VmSchedulerTimeShared())
-        )
-        
-        return DatacenterSimple(simulation, hostList)
-            .setSchedulingInterval(1.0)
+    fun createDatacenter(
+        simulation: CloudSimPlus,
+        name: String,
+        type: DatacenterType,
+    ): Datacenter {
+        val capacity = capacityFor(type)
+
+        val peList = listOf(PeSimple(capacity.mips.toDouble()))
+        val hostList =
+            listOf(
+                HostSimple(capacity.ram.toLong(), capacity.bw.toLong(), capacity.storage, peList)
+                    .setVmScheduler(VmSchedulerTimeShared()),
+            )
+
+        val datacenter = DatacenterSimple(simulation, hostList).setSchedulingInterval(1.0)
+        datacenter.name = name
+        return datacenter
     }
-    
+
     /**
      * 创建虚拟机列表
      */
     fun createVms(): List<Vm> {
         val vmList = mutableListOf<Vm>()
         val pesNumber: Long = 1L
-        
+
         val ram: Long = DatacenterConfig.RAM.toLong()
         val bw: Long = DatacenterConfig.BW.toLong()
-        
+
         // 创建低配置虚拟机
         repeat(DatacenterConfig.L_VM_N) {
             vmList.add(
@@ -81,10 +54,10 @@ object DatacenterCreator {
                     .setRam(ram)
                     .setBw(bw)
                     .setSize(DatacenterConfig.IMAGE_SIZE)
-                    .setCloudletScheduler(CloudletSchedulerSpaceShared())
+                    .setCloudletScheduler(CloudletSchedulerSpaceShared()),
             )
         }
-        
+
         // 创建中配置虚拟机
         repeat(DatacenterConfig.M_VM_N) {
             vmList.add(
@@ -92,10 +65,10 @@ object DatacenterCreator {
                     .setRam(ram)
                     .setBw(bw)
                     .setSize(DatacenterConfig.IMAGE_SIZE)
-                    .setCloudletScheduler(CloudletSchedulerSpaceShared())
+                    .setCloudletScheduler(CloudletSchedulerSpaceShared()),
             )
         }
-        
+
         // 创建高配置虚拟机
         repeat(DatacenterConfig.H_VM_N) {
             vmList.add(
@@ -103,22 +76,35 @@ object DatacenterCreator {
                     .setRam(ram)
                     .setBw(bw)
                     .setSize(DatacenterConfig.IMAGE_SIZE)
-                    .setCloudletScheduler(CloudletSchedulerSpaceShared())
+                    .setCloudletScheduler(CloudletSchedulerSpaceShared()),
             )
         }
-        
+
         return vmList
     }
+
+    private fun capacityFor(type: DatacenterType): DatacenterCapacity =
+        when (type) {
+            DatacenterType.LOW -> capacityFor(DatacenterConfig.L_VM_N, DatacenterConfig.L_MIPS)
+            DatacenterType.MEDIUM -> capacityFor(DatacenterConfig.M_VM_N, DatacenterConfig.M_MIPS)
+            DatacenterType.HIGH -> capacityFor(DatacenterConfig.H_VM_N, DatacenterConfig.H_MIPS)
+        }
+
+    private fun capacityFor(
+        vmCount: Int,
+        mipsPerVm: Int,
+    ): DatacenterCapacity =
+        DatacenterCapacity(
+            ram = DatacenterConfig.RAM * vmCount,
+            bw = DatacenterConfig.BW * vmCount,
+            mips = mipsPerVm * vmCount,
+            storage = DatacenterConfig.STORAGE * vmCount,
+        )
 }
 
-/**
- * 简单的元组类
- */
-private data class Tuple5<A, B, C, D, E>(
-    val first: A,
-    val second: B,
-    val third: C,
-    val fourth: D,
-    val fifth: E
+private data class DatacenterCapacity(
+    val ram: Int,
+    val bw: Int,
+    val mips: Int,
+    val storage: Long,
 )
-

@@ -7,22 +7,149 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-test:
-    runs-on: windows-latest
-    
+  build-test-package:
+    name: Full check and package smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Set up JDK 23
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Set up JDK 25
       uses: actions/setup-java@v4
       with:
-        java-version: '23'
+        java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
-          
-    - name: Build and Test
-      run: .\gradlew.bat clean build --no-daemon --stacktrace
+
+    - name: Audit build warnings
+      shell: pwsh
+      run: ./scripts/run-build-warning-audit.ps1
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
+
+    - name: Upload build warning audit
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-warning-audit-${{ matrix.os }}
+        path: build/reports/build-warnings/
+        if-no-files-found: error
+
+    - name: Full check and release package smoke (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        .\gradlew.bat fullCheck verifyReleasePackage --no-daemon --stacktrace --configuration-cache
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Full check and release package smoke (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        ./gradlew fullCheck verifyReleasePackage --no-daemon --stacktrace --configuration-cache
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Verify buildSrc and generate JaCoCo report
+      if: runner.os == 'Linux'
+      run: ./gradlew buildSrc:check buildSrc:jacocoTestReport --no-daemon --stacktrace --configuration-cache
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Upload buildSrc JaCoCo report
+      if: always() && runner.os == 'Linux'
+      uses: actions/upload-artifact@v4
+      with:
+        name: buildsrc-jacoco
+        path: buildSrc/build/reports/jacoco/
+        if-no-files-found: error
+
+  container-smoke:
+    name: Container image smoke
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: 'gradle'
+
+    - name: Build and smoke container image
+      run: |
+        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        ./gradlew containerImageSmoke --no-daemon --stacktrace --configuration-cache
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+  performance-trend:
+    name: Non-blocking performance trend
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v4
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: 'gradle'
+
+    - name: Load hosted-runner performance baseline
+      shell: bash
+      run: |
+        mkdir -p build/reports/performance
+        git fetch origin performance-history:refs/remotes/origin/performance-history || true
+        git show origin/performance-history:jmh-results.json \
+          > build/reports/performance/previous-jmh-results.json 2>/dev/null || \
+          rm -f build/reports/performance/previous-jmh-results.json
+
+    - name: Generate JMH trend report
+      shell: bash
+      run: |
+        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        args=(benchmarkPerformanceTrend --no-daemon --stacktrace --configuration-cache)
+        if test -s build/reports/performance/previous-jmh-results.json; then
+          args+=("-PperformanceBaseline=build/reports/performance/previous-jmh-results.json")
+        fi
+        ./gradlew "${args[@]}"
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Upload performance trend artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-trend
+        path: |
+          build/reports/performance/jmh-results.json
+          build/reports/performance/performance-trend.md
+          build/reports/performance/previous-jmh-results.json
+        if-no-files-found: warn

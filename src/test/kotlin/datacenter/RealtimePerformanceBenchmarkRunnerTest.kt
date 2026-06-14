@@ -1,0 +1,76 @@
+package datacenter
+
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+
+class RealtimePerformanceBenchmarkRunnerTest {
+    @TempDir
+    lateinit var tempDir: File
+
+    @Test
+    fun `smoke benchmark writes parseable json report`() {
+        val outputFile = File(tempDir, "benchmark.json")
+        val config =
+            RealtimePerformanceBenchmarkConfig(
+                cloudletCounts = listOf(5),
+                algorithms = listOf(RealtimePerformanceBenchmarkAlgorithm.REALTIME_MIN_LOAD),
+                measuredRuns = 1,
+                randomSeed = 7L,
+                outputFile = outputFile.absolutePath,
+            )
+        val runner = RealtimePerformanceBenchmarkRunner(config)
+        val report = runner.run()
+
+        runner.write(report)
+        val parsed = Json.decodeFromString<RealtimePerformanceBenchmarkReport>(outputFile.readText())
+
+        assertThat(parsed.config.cloudletCounts).containsExactly(5)
+        assertThat(parsed.results).hasSize(1)
+        assertThat(parsed.results.single().algorithm).isEqualTo("Realtime MinLoad")
+        assertThat(parsed.results.single().status).isEqualTo(RealtimePerformanceBenchmarkStatus.SUCCESS)
+        assertThat(parsed.results.single().runIndex).isEqualTo(1)
+        assertThat(parsed.results.single().elapsedMillis).isGreaterThanOrEqualTo(0L)
+        assertThat(parsed.results.single().memoryDeltaBytes).isGreaterThanOrEqualTo(0L)
+    }
+
+    @Test
+    fun `benchmark report can record failed results without breaking json schema`() {
+        val outputFile = File(tempDir, "failed-benchmark.json")
+        RealtimePerformanceBenchmarkReport(
+            generatedAt = "2026-01-01T00:00:00Z",
+            config =
+                RealtimePerformanceBenchmarkConfig(
+                    cloudletCounts = listOf(10),
+                    algorithms = listOf(RealtimePerformanceBenchmarkAlgorithm.REALTIME_MIN_LOAD),
+                    measuredRuns = 1,
+                    outputFile = outputFile.absolutePath,
+                ),
+            results =
+                listOf(
+                    RealtimePerformanceBenchmarkResult(
+                        algorithm = "Realtime MinLoad",
+                        mode = RealtimePerformanceBenchmarkMode.REALTIME,
+                        cloudletCount = 10,
+                        runIndex = 1,
+                        status = RealtimePerformanceBenchmarkStatus.FAILED,
+                        elapsedMillis = 2L,
+                        memoryDeltaBytes = 0L,
+                        errorType = "IllegalStateException",
+                        errorMessage = "boom",
+                    ),
+                ),
+        ).also { report ->
+            RealtimePerformanceBenchmarkRunner(report.config).write(report)
+        }
+
+        val parsed = Json.decodeFromString<RealtimePerformanceBenchmarkReport>(outputFile.readText())
+
+        assertThat(parsed.results.single().status).isEqualTo(RealtimePerformanceBenchmarkStatus.FAILED)
+        assertThat(parsed.results.single().errorType).isEqualTo("IllegalStateException")
+        assertThat(parsed.results.single().errorMessage).isEqualTo("boom")
+    }
+}

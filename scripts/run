@@ -2,21 +2,21 @@
 # CloudSim-Benchmark 统一运行脚本
 # 自动检测平台，支持所有功能
 #
-# 用法: ./run [mode] [options...]
+# 用法: ./run [command] [options...]
 #
-# 模式:
-#   batch          - 批处理调度模式
-#   realtime       - 实时调度模式 (默认)
-#   batch-multi    - 批量任务数实验 (批处理)
-#   realtime-multi - 批量任务数实验 (实时)
-#   coroutine-demo - 协程优化功能演示
+# 命令:
+#   run            - 运行实验
+#   list           - 列出算法或预设
+#   config         - 校验或打印配置
 #   build          - 构建项目
 #   help           - 显示帮助
 #
 # 示例:
-#   ./run batch PSO,WOA 42
-#   ./run realtime PSO_REALTIME,WOA_REALTIME
-#   ./run batch-multi 50,100,200,500 10 PSO,WOA
+#   ./run run --mode batch --algorithms PSO,WOA --seed 42
+#   ./run run --config configs/examples/single_config_example.toml --profile batch_small
+#   ./run run --config configs/examples/realtime_test.toml --profile realtime_test --dry-run
+#   ./run list algorithms --mode batch
+#   ./run config validate --config configs/examples/batch_test.toml
 #   ./run build
 
 # 获取脚本所在目录的父目录（项目根目录）
@@ -49,11 +49,38 @@ else
     JAVA_CMD="java"
 fi
 
+if [ -f "cloudsim-benchmark-all.jar" ]; then
+    JAR_PATH="cloudsim-benchmark-all.jar"
+fi
+
 # 设置编码
-export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8"
+export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dlogback.configurationFile=cloudsim-benchmark-logback.xml"
 # 设置终端语言环境
 export LANG="zh_CN.UTF-8"
 export LC_ALL="zh_CN.UTF-8"
+
+configure_proxy() {
+    if [ -n "${HTTP_PROXY:-}" ] || [ -n "${HTTPS_PROXY:-}" ] || [ -n "${http_proxy:-}" ] || [ -n "${https_proxy:-}" ]; then
+        return
+    fi
+
+    if [ "$OS" = "windows" ] && command -v powershell >/dev/null 2>&1; then
+        local proxy
+        proxy="$(powershell -NoProfile -Command "\$i=Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'; if (\$i.ProxyEnable -eq 1 -and \$i.ProxyServer) { \$server=(\$i.ProxyServer -split ';' | Select-Object -First 1); if (\$server -match '=') { \$server=(\$server -split '=' | Select-Object -Last 1) }; \$server }" 2>/dev/null | tr -d '\r')"
+        if [ -n "$proxy" ]; then
+            export HTTP_PROXY="http://$proxy"
+            export HTTPS_PROXY="http://$proxy"
+            local host="${proxy%%:*}"
+            local port="${proxy##*:}"
+            if [ -n "$host" ] && [ "$host" != "$port" ]; then
+                export GRADLE_OPTS="${GRADLE_OPTS:-} -Dhttp.proxyHost=$host -Dhttp.proxyPort=$port -Dhttps.proxyHost=$host -Dhttps.proxyPort=$port"
+                echo "[代理] 已使用系统代理: $proxy"
+            fi
+        fi
+    fi
+}
+
+configure_proxy
 
 # 显示帮助信息
 show_help() {
@@ -62,20 +89,21 @@ CloudSim-Benchmark 统一运行脚本
 
 自动检测平台: $(echo "$OS" | tr '[:lower:]' '[:upper:]')
 
-用法: ./run [mode] [options...]
+用法: ./run [command] [options...]
 
-模式:
-  batch          批处理调度模式
-  realtime       实时调度模式 (默认)
-  batch-multi    批量任务数实验 (批处理)
-  realtime-multi 批量任务数实验 (实时)
+命令:
+  run            运行实验
+  list           列出算法或预设
+  config         校验或打印配置
   build          构建项目
   help           显示此帮助
 
 示例:
-  ./run batch PSO,WOA 42
-  ./run realtime PSO_REALTIME,WOA_REALTIME
-  ./run batch-multi 50,100,200,500 10 PSO,WOA
+  ./run run --mode batch --algorithms PSO,WOA --seed 42
+  ./run run --config configs/examples/single_config_example.toml --profile batch_small
+  ./run run --config configs/examples/realtime_test.toml --profile realtime_test --dry-run
+  ./run list algorithms --mode batch
+  ./run config validate --config configs/examples/batch_test.toml
   ./run build
 
 快捷方式 (创建符号链接):
@@ -123,7 +151,7 @@ check_jar() {
 
 # 运行程序
 run_program() {
-    local mode="$1"
+    local command="$1"
     shift
 
     # 处理 Podman 模式
@@ -169,17 +197,15 @@ run_program() {
     echo "========================================"
     echo "平台: $(echo "$OS" | tr '[:lower:]' '[:upper:]')"
     echo "时间: $(date)"
-    echo "模式: $mode"
+    echo "命令: $command"
     echo ""
 
     # 构建参数
-    local args="$mode"
-    if [ $# -gt 0 ]; then
-        args="$args $@"
-    fi
+    local args=("$command" "$@")
 
     # JVM 选项 (同步 run.cmd)
     local jvm_opts="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 \
+        -Dlogback.configurationFile=cloudsim-benchmark-logback.xml \
         --enable-native-access=ALL-UNNAMED \
         --add-opens java.base/java.lang=ALL-UNNAMED \
         --add-opens java.base/java.util=ALL-UNNAMED \
@@ -189,10 +215,10 @@ run_program() {
         -XX:+UseZGC -XX:MaxGCPauseMillis=50"
 
     echo "[运行] 启动实验..."
-    echo "[运行] 命令: $JAVA_CMD $jvm_opts -jar $JAR_PATH $args"
+    echo "[运行] 命令: $JAVA_CMD $jvm_opts -jar $JAR_PATH ${args[*]}"
     echo ""
 
-    $JAVA_CMD $jvm_opts -jar "$JAR_PATH" $args
+    $JAVA_CMD $jvm_opts -jar "$JAR_PATH" "${args[@]}"
 
     local exit_code=$?
     if [ $exit_code -ne 0 ]; then
@@ -211,10 +237,10 @@ run_program() {
 handle_shortcut() {
     local script_name="$(basename "$0")"
     case "$script_name" in
-        run-batch)      set -- "batch" "$@" ;;
-        run-realtime)   set -- "realtime" "$@" ;;
-        run-batch-multi) set -- "batch-multi" "$@" ;;
-        run-realtime-multi) set -- "realtime-multi" "$@" ;;
+        run-batch)      set -- "run" "--mode" "batch" "$@" ;;
+        run-realtime)   set -- "run" "--mode" "realtime" "$@" ;;
+        run-batch-multi) set -- "run" "--mode" "batch-multi" "$@" ;;
+        run-realtime-multi) set -- "run" "--mode" "realtime-multi" "$@" ;;
         build)          set -- "build" "$@" ;;
         podman)         set -- "podman" "$@" ;;
     esac
@@ -238,7 +264,7 @@ main() {
         podman)
             run_program "podman" "${@:2}"
             ;;
-        batch|realtime|batch-multi|realtime-multi|coroutine-demo)
+        run|list|config)
             check_jar
             run_program "$@"
             ;;

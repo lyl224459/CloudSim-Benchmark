@@ -1,34 +1,44 @@
 package scheduler
 
-import datacenter.ObjectiveFunction
 import datacenter.SchedulerObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
 import util.Logger
-import java.util.*
+import java.util.Random
 
 /**
  * 鲸鱼优化算法 (Whale Optimization Algorithm) - 优化版本
  * 使用一维数组存储所有鲸鱼位置，提高内存访问效率
  */
 internal class WOA(
-    private val optFunction: ObjectiveFunction,
-    private val population: Int,
-    private val lb: Double,
-    private val ub: Double,
-    private val dim: Int,
-    private val maxIter: Int,
-    private val random: Random
+    private val runtime: OptimizerRuntime,
+    private val searchSpace: AssignmentSearchSpace,
 ) {
+    private val optFunction = runtime.optFunction
+    private val population = runtime.population
+    private val lb = searchSpace.lb
+    private val ub = searchSpace.ub
+    private val dim = searchSpace.dim
+    private val maxIter = runtime.maxIter
+    private val random = runtime.random
+
     // 使用一维数组存储所有鲸鱼位置，提高内存局部性
     private val positions = DoubleArray(population * dim)
     private val optimalPos = DoubleArray(dim)
+    private val codec = AssignmentVectorCodec(dim, lb.toInt(), ub.toInt())
     private var optimalScore = Double.POSITIVE_INFINITY
-    
+
+    companion object {
+        private const val LINEAR_COEFFICIENT = 2.0
+        private const val SPIRAL_SHAPE = 1.0
+        private const val EXPLOITATION_PROBABILITY = 0.5
+        private const val SPIRAL_MIN = -1.0
+    }
+
     init {
         initPopulation()
     }
-    
+
     private fun initPopulation() {
         for (i in 0 until population) {
             val baseIndex = i * dim
@@ -47,100 +57,99 @@ internal class WOA(
         }
     }
 
-    // 获取鲸鱼i的第j维位置
-    private fun getPosition(whale: Int, dimension: Int): Double {
-        return positions[whale * dim + dimension]
-    }
-
-    // 设置鲸鱼i的第j维位置
-    private fun setPosition(whale: Int, dimension: Int, value: Double) {
-        positions[whale * dim + dimension] = value
-    }
-    
     private fun adjustPositions(agentIndex: Int) {
-        val baseIndex = agentIndex * dim
-        for (j in 0 until dim) {
-            val index = baseIndex + j
-            positions[index] = positions[index].round()
-            when {
-                positions[index] < lb -> positions[index] = lb
-                positions[index] > ub -> positions[index] = ub
-            }
-        }
+        codec.clampRoundInPlace(positions, agentIndex * dim)
     }
 
-    private fun evaluate(whale: Int): Double {
-        // 直接使用一维数组，避免创建临时数组
-        val params = IntArray(dim)
-        val baseIndex = whale * dim
-        for (j in 0 until dim) {
-            params[j] = positions[baseIndex + j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
+    private fun evaluate(whale: Int): Double = codec.evaluate(positions, whale * dim, optFunction)
 
-    // 评估指定位置的适应度值
-    private fun evaluatePosition(position: DoubleArray): Double {
-        val params = IntArray(dim)
-        for (j in 0 until dim) {
-            params[j] = position[j].round().toInt()
-        }
-        return optFunction.calculate(params)
-    }
-    
     fun execute(): IntArray {
         for (t in 0 until maxIter) {
-            val a = 2.0 - t * (2.0 / maxIter.toDouble()) // a 从 2 线性递减到 0
-
+            val a = LINEAR_COEFFICIENT - t * (LINEAR_COEFFICIENT / maxIter.toDouble())
             for (i in 0 until population) {
-                val r1 = random.nextDouble()
-                val r2 = random.nextDouble()
-                val A = 2.0 * a * r1 - a
-                val C = 2.0 * r2
-                val b = 1.0
-                val l = (random.nextDouble() * 2.0) - 1.0
-
-                val p = random.nextDouble()
-                val baseIndex = i * dim
-
-                for (j in 0 until dim) {
-                    val index = baseIndex + j
-                    when {
-                        p < 0.5 -> {
-                            if (Math.abs(A) >= 1) {
-                                // 随机搜索
-                                val randLeaderIndex = random.nextInt(population) * dim + j
-                                val Xrand = positions[randLeaderIndex]
-                                positions[index] = Xrand - A * Math.abs(C * Xrand - positions[index])
-                            } else {
-                                // 包围猎物
-                                positions[index] = optimalPos[j] - A * Math.abs(C * optimalPos[j] - positions[index])
-                            }
-                        }
-                        else -> {
-                            // 螺旋更新位置
-                            val distance2Leader = Math.abs(optimalPos[j] - positions[index])
-                            positions[index] = distance2Leader * Math.exp(b * l) * Math.cos(l * 2 * Math.PI) + optimalPos[j]
-                        }
-                    }
-                }
-
-                adjustPositions(i)
-                val fitness = evaluate(i)
-
-                if (fitness < optimalScore) {
-                    optimalScore = fitness
-                    // 复制当前鲸鱼位置到最优位置
-                    for (j in 0 until dim) {
-                        optimalPos[j] = positions[baseIndex + j]
-                    }
-                }
+                updateWhale(i, a)
             }
         }
 
-        return optimalPos.map { it.round().toInt() }.toIntArray()
+        return codec.toAllocation(optimalPos)
+    }
+
+    private fun updateWhale(
+        whale: Int,
+        a: Double,
+    ) {
+        val motion =
+            WhaleMotion(
+                coefficientA = LINEAR_COEFFICIENT * a * random.nextDouble() - a,
+                coefficientC = LINEAR_COEFFICIENT * random.nextDouble(),
+                spiralDistance = random.nextDouble() * LINEAR_COEFFICIENT + SPIRAL_MIN,
+                probability = random.nextDouble(),
+            )
+        val baseIndex = whale * dim
+        for (j in 0 until dim) {
+            updateWhaleDimension(baseIndex, j, motion)
+        }
+        adjustPositions(whale)
+        updateOptimalPosition(whale)
+    }
+
+    private fun updateWhaleDimension(
+        baseIndex: Int,
+        dimension: Int,
+        motion: WhaleMotion,
+    ) {
+        val index = baseIndex + dimension
+        positions[index] =
+            if (motion.probability < EXPLOITATION_PROBABILITY) {
+                encirclingPosition(index, dimension, motion.coefficientA, motion.coefficientC)
+            } else {
+                spiralPosition(index, dimension, motion.spiralDistance)
+            }
+    }
+
+    private fun encirclingPosition(
+        index: Int,
+        dimension: Int,
+        coefficientA: Double,
+        coefficientC: Double,
+    ): Double =
+        if (Math.abs(coefficientA) >= SPIRAL_SHAPE) {
+            val randomLeaderPosition = positions[random.nextInt(population) * dim + dimension]
+            randomLeaderPosition - coefficientA * Math.abs(coefficientC * randomLeaderPosition - positions[index])
+        } else {
+            optimalPos[dimension] - coefficientA * Math.abs(coefficientC * optimalPos[dimension] - positions[index])
+        }
+
+    private fun spiralPosition(
+        index: Int,
+        dimension: Int,
+        spiralDistance: Double,
+    ): Double {
+        val distance2Leader = Math.abs(optimalPos[dimension] - positions[index])
+        return distance2Leader *
+            Math.exp(SPIRAL_SHAPE * spiralDistance) *
+            Math.cos(spiralDistance * LINEAR_COEFFICIENT * Math.PI) +
+            optimalPos[dimension]
+    }
+
+    private fun updateOptimalPosition(whale: Int) {
+        val fitness = evaluate(whale)
+        if (fitness < optimalScore) {
+            optimalScore = fitness
+            val baseIndex = whale * dim
+            for (j in 0 until dim) {
+                optimalPos[j] = positions[baseIndex + j]
+            }
+        }
     }
 }
+
+private data class WhaleMotion(
+    val coefficientA: Double,
+    val coefficientC: Double,
+    val spiralDistance: Double,
+    val probability: Double,
+)
 
 /**
  * WOA 调度器
@@ -151,28 +160,19 @@ class WOAScheduler(
     objectiveWeights: config.ObjectiveWeightsConfig = config.ObjectiveWeightsConfig(),
     private val population: Int = 30,
     private val maxIter: Int = 100,
-    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED)
+    private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
 ) : Scheduler(cloudletList, vmList, objectiveWeights) {
-    
     private val woa: WOA
-    
+
     init {
         val objFunc = objectiveFunction as SchedulerObjectiveFunction
-        woa = WOA(
-            optFunction = objFunc,
-            population = population,
-            lb = 0.0,
-            ub = (vmNum - 1).toDouble(),
-            dim = cloudletNum,
-            maxIter = maxIter,
-            random = random
-        )
+        woa =
+            WOA(
+                runtime = OptimizerRuntime(objFunc, population, maxIter, random),
+                searchSpace = AssignmentSearchSpace(0.0, (vmNum - 1).toDouble(), cloudletNum),
+            )
         Logger.debug("使用 WOA (鲸鱼优化) 调度器")
     }
-    
-    override fun allocate(): IntArray {
-        return woa.execute()
-    }
-}
 
-private fun Double.round() = kotlin.math.round(this)
+    override fun allocate(): IntArray = woa.execute()
+}
