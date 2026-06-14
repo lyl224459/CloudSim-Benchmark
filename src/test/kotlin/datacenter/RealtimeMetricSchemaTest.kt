@@ -89,5 +89,38 @@ class RealtimeMetricSchemaTest {
         assertThat(doc).isEqualTo(RealtimeMetricDocumentationGenerator.render().normalizeLineEndings())
     }
 
+    @Test
+    fun `metric catalog matches committed snapshot`() {
+        val snapshot =
+            File("src/test/resources/snapshots/realtime-metric-catalog.txt")
+                .readText()
+                .normalizeLineEndings()
+
+        assertThat(renderCatalogSnapshot()).isEqualTo(snapshot)
+    }
+
+    @Test
+    fun `metric headers match committed snapshot`() {
+        val snapshot =
+            File("src/test/resources/snapshots/realtime-metric-headers.txt")
+                .readText()
+                .normalizeLineEndings()
+
+        assertThat(renderHeaderSnapshot()).isEqualTo(snapshot)
+    }
+
+    private fun renderCatalogSnapshot(): String =
+        RealtimeMetricSchema.metrics.joinToString(separator = "\n", postfix = "\n") { metric ->
+            "${metric.key}|${metric.csvName}|${metric.unit}|${metric.direction}|${metric.kind}"
+        }
+
+    private fun renderHeaderSnapshot(): String =
+        listOf(
+            listOf("[metric]") + RealtimeMetricSchema.metricHeaders,
+            listOf("[trial]") + RealtimeMetricSchema.trialHeaders,
+            listOf("[summary]") + RealtimeMetricSchema.summaryHeaders,
+            listOf("[cloudlet-count-summary]") + RealtimeMetricSchema.cloudletCountSummaryHeaders,
+        ).flatten().joinToString(separator = "\n", postfix = "\n")
+
     private fun String.normalizeLineEndings(): String = replace("\r\n", "\n")
 }
