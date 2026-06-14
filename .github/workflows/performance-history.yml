@@ -28,6 +28,14 @@ jobs:
         distribution: temurin
         cache: gradle
 
+    - name: Cache CloudSim Plus Maven dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
+        restore-keys: |
+          ${{ runner.os }}-m2-cloudsimplus-
+
     - name: Load previous hosted-runner baseline
       shell: bash
       run: |

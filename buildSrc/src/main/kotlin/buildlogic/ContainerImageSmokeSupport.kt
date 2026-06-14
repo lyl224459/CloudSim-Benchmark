@@ -7,16 +7,26 @@ internal object ContainerImageSmokeSupport {
         dockerExecutable: String,
         imageName: String,
         containerFile: File,
+        useBuildx: Boolean = false,
+        useGitHubActionsCache: Boolean = false,
     ): List<String> =
-        listOf(
-            dockerExecutable,
-            "build",
-            "-t",
-            imageName,
-            "-f",
-            containerFile.absolutePath,
-            ".",
-        )
+        buildList {
+            add(dockerExecutable)
+            if (useBuildx) {
+                addAll(listOf("buildx", "build", "--load"))
+                if (useGitHubActionsCache) {
+                    addAll(
+                        listOf(
+                            "--cache-from=type=gha,scope=container-smoke",
+                            "--cache-to=type=gha,mode=max,scope=container-smoke",
+                        ),
+                    )
+                }
+            } else {
+                add("build")
+            }
+            addAll(listOf("-t", imageName, "-f", containerFile.absolutePath, "."))
+        }
 
     fun runCommand(
         dockerExecutable: String,

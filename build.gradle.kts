@@ -9,8 +9,10 @@ import buildlogic.ReleaseManifest
 import buildlogic.ReleaseManifestSupport
 import buildlogic.SanitizeCloudSimPlusJarManifestTask
 import buildlogic.UpdateCloudSimPlusLockTask
+import buildlogic.UpdateJUnitTestInventoryTask
 import buildlogic.VerifyCloudSimPlusLockTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
+import buildlogic.VerifyJUnitTestInventoryTask
 import buildlogic.VerifyJUnitTestSignaturesTask
 import io.gitlab.arturbosch.detekt.Detekt
 import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
@@ -53,8 +55,16 @@ val cloudSimPlusRawMavenRepo = layout.buildDirectory.dir("cloudsimplus-raw-m2")
 val cloudSimPlusLocalMavenRepo = layout.buildDirectory.dir("cloudsimplus-m2")
 val cloudSimPlusVersionFile = layout.buildDirectory.file("cloudsimplus-version.txt")
 val cloudSimPlusLockFile = layout.projectDirectory.file("gradle/cloudsimplus.lock")
+val junitTestInventoryFile = layout.projectDirectory.file("gradle/junit-test-inventory.lock")
 val cloudSimPlusLockedMetadata =
     providers.fileContents(cloudSimPlusLockFile).asText.map(CloudSimPlusLockSupport::parse)
+val cloudSimPlusActualMetadata =
+    providers.fileContents(cloudSimPlusVersionFile).asText.map(CloudSimPlusLockSupport::parse)
+val cloudSimPlusMavenCacheDir =
+    providers
+        .gradleProperty("cloudsimplus.mavenCacheDir")
+        .orElse(providers.systemProperty("user.home").map { home -> "$home/.m2/repository" })
+val cloudSimPlusMavenCacheDirectory = layout.dir(cloudSimPlusMavenCacheDir.map(::File))
 val cloudSimPlusAutoUpdate =
     providers
         .gradleProperty("cloudsimplus.autoUpdate")
@@ -238,7 +248,7 @@ val cloudSimPlusBuildLock =
 
 val buildCloudSimPlusFromSource by tasks.registering(BuildCloudSimPlusFromSourceTask::class) {
     group = "build"
-    description = "使用 CloudSim Plus submodule 源码构建并 install 到 build/cloudsimplus-raw-m2"
+    description = "使用独立 Maven 依赖缓存构建 CloudSim Plus，并将 JAR/POM stage 到 build/cloudsimplus-raw-m2"
 
     val sourceDir = cloudSimPlusSubmoduleDir.asFile
     dependsOn(verifyCloudSimPlusLock)
@@ -249,7 +259,11 @@ val buildCloudSimPlusFromSource by tasks.registering(BuildCloudSimPlusFromSource
         },
     )
     this.sourceDir.set(cloudSimPlusSubmoduleDir)
+    mavenCacheDir.set(cloudSimPlusMavenCacheDirectory)
     rawMavenRepo.set(cloudSimPlusRawMavenRepo)
+    metadataFile.set(cloudSimPlusVersionFile)
+    artifactGroup.set(cloudSimPlusGroup)
+    artifactName.set(cloudSimPlusArtifact)
     networkProxy.set(cloudSimPlusNetworkProxy)
 }
 
@@ -263,6 +277,7 @@ val sanitizeCloudSimPlusJarManifest by tasks.registering(SanitizeCloudSimPlusJar
     sanitizedMavenRepo.set(cloudSimPlusLocalMavenRepo)
     artifactGroup.set(cloudSimPlusGroup)
     artifactName.set(cloudSimPlusArtifact)
+    artifactVersion.set(cloudSimPlusActualMetadata.map { metadata -> metadata.version })
 }
 
 val verifyCloudSimPlusSourceBuild by tasks.registering(VerifyCloudSimPlusSourceBuildTask::class) {
@@ -399,6 +414,27 @@ val verifyJUnitTestSignatures by tasks.registering(VerifyJUnitTestSignaturesTask
     testRuntimeClasspath.from(sourceSets["test"].runtimeClasspath)
 }
 
+val updateJUnitTestInventory by tasks.registering(UpdateJUnitTestInventoryTask::class) {
+    group = "verification"
+    description = "显式更新已编译 JUnit 测试入口精确清单"
+
+    dependsOn(tasks.named("testClasses"))
+    testClassesDirs.from(sourceSets["test"].output.classesDirs)
+    testRuntimeClasspath.from(sourceSets["test"].runtimeClasspath)
+    inventoryFile.set(junitTestInventoryFile)
+}
+
+val verifyJUnitTestInventory by tasks.registering(VerifyJUnitTestInventoryTask::class) {
+    group = "verification"
+    description = "验证已编译 JUnit 测试入口与提交的精确清单一致"
+
+    dependsOn(tasks.named("testClasses"))
+    testClassesDirs.from(sourceSets["test"].output.classesDirs)
+    testRuntimeClasspath.from(sourceSets["test"].runtimeClasspath)
+    inventoryFile.set(junitTestInventoryFile)
+    mustRunAfter(updateJUnitTestInventory)
+}
+
 detekt {
     buildUponDefaultConfig = true
     allRules = false
@@ -460,6 +496,7 @@ tasks.named("check") {
         "jacocoTestReport",
         "jacocoTestCoverageVerification",
         verifyJUnitTestSignatures,
+        verifyJUnitTestInventory,
         verifyCloudSimPlusSourceBuild,
     )
 }
@@ -665,6 +702,8 @@ tasks.named<JavaExec>("run") {
 }
 
 val isCiBuildProvider = providers.environmentVariable("CI").map { it == "true" || it == "1" }.orElse(false)
+val isGitHubActionsProvider =
+    providers.environmentVariable("GITHUB_ACTIONS").map { it.equals("true", ignoreCase = true) }.orElse(false)
 val forceJarCompressionProvider = providers.gradleProperty("compress").map { it == "true" }.orElse(false)
 val skipJarCompressionProvider = providers.gradleProperty("skipCompress").map { true }.orElse(false)
 val fastBuildProvider = providers.gradleProperty("fast").map { true }.orElse(false)
@@ -1045,6 +1084,8 @@ val containerImageSmoke by tasks.registering(ContainerImageSmokeTask::class) {
     imageName.set("cloudsim-benchmark:smoke")
     dockerExecutable.set("docker")
     ci.set(isCiBuildProvider)
+    useBuildx.set(isGitHubActionsProvider)
+    useGitHubActionsCache.set(isGitHubActionsProvider)
     contextDirectory.set(layout.projectDirectory)
     containerFile.set(layout.projectDirectory.file("Containerfile"))
 }

@@ -14,18 +14,25 @@ internal object CloudSimPlusJarSanitizer {
         sanitizedMavenRepo: File,
         artifactGroup: String,
         artifactName: String,
+        artifactVersion: String,
     ): List<File> {
         if (!rawMavenRepo.isDirectory) {
             throw GradleException("Raw CloudSim Plus Maven repo not found: ${rawMavenRepo.path}")
         }
         sanitizedMavenRepo.deleteRecursively()
-        rawMavenRepo.copyRecursively(sanitizedMavenRepo, overwrite = true)
-
-        val runtimeJars = runtimeJars(sanitizedMavenRepo, artifactGroup, artifactName)
-        if (runtimeJars.isEmpty()) {
-            val artifactRoot = artifactRoot(sanitizedMavenRepo, artifactGroup, artifactName)
-            throw GradleException("No CloudSim Plus runtime jar found in ${artifactRoot.path}")
+        val rawArtifactDir = artifactVersionRoot(rawMavenRepo, artifactGroup, artifactName, artifactVersion)
+        val sanitizedArtifactDir = artifactVersionRoot(sanitizedMavenRepo, artifactGroup, artifactName, artifactVersion)
+        val runtimeJar = rawArtifactDir.resolve("$artifactName-$artifactVersion.jar")
+        val pom = rawArtifactDir.resolve("$artifactName-$artifactVersion.pom")
+        listOf(runtimeJar, pom).forEach { artifact ->
+            if (!artifact.isFile) {
+                throw GradleException("Required CloudSim Plus staged artifact not found: ${artifact.path}")
+            }
         }
+        sanitizedArtifactDir.mkdirs()
+        val sanitizedJar = runtimeJar.copyTo(sanitizedArtifactDir.resolve(runtimeJar.name), overwrite = true)
+        pom.copyTo(sanitizedArtifactDir.resolve(pom.name), overwrite = true)
+        val runtimeJars = listOf(sanitizedJar)
         runtimeJars.forEach(::sanitizeJar)
         return runtimeJars
     }
@@ -76,6 +83,13 @@ internal object CloudSimPlusJarSanitizer {
         artifactGroup: String,
         artifactName: String,
     ): File = mavenRepo.resolve("${artifactGroup.replace('.', File.separatorChar)}${File.separator}$artifactName")
+
+    private fun artifactVersionRoot(
+        mavenRepo: File,
+        artifactGroup: String,
+        artifactName: String,
+        artifactVersion: String,
+    ): File = artifactRoot(mavenRepo, artifactGroup, artifactName).resolve(artifactVersion)
 
     private fun isRuntimeJar(
         file: File,

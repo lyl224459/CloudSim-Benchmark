@@ -13,13 +13,13 @@ class CloudSimPlusMavenSupportTest {
     lateinit var tempDir: File
 
     @Test
-    fun `install arguments disable upstream artifact attachment profile`() {
-        val arguments = CloudSimPlusMavenSupport.installArguments(tempDir)
+    fun `package arguments use dependency cache and disable upstream artifact attachment profile`() {
+        val arguments = CloudSimPlusMavenSupport.packageArguments(tempDir)
 
         assertTrue("-Dmaven.repo.local=${tempDir.absolutePath}" in arguments)
         assertTrue("-P!default" in arguments)
         assertTrue("-Dmaven.javadoc.skip=true" in arguments)
-        assertEquals("install", arguments.last())
+        assertEquals("package", arguments.last())
     }
 
     @Test
