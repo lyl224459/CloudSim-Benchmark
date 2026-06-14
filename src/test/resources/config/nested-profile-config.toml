@@ -1,0 +1,103 @@
+defaultProfile = "realtime_nested"
+
+[profiles.batch_nested]
+mode = "batch"
+algorithms = ["PSO"]
+
+[profiles.batch_nested.batch]
+cloudletCount = 64
+
+[profiles.batch_nested.batch.objective]
+cost = 0.2
+totalTime = 0.3
+loadBalance = 0.4
+makespan = 0.1
+
+[profiles.realtime_nested]
+mode = "realtime"
+algorithms = ["MIN_LOAD"]
+
+[profiles.realtime_nested.realtime]
+cloudletCount = 80
+simulationDuration = 200.0
+arrivalRate = 2.0
+
+[profiles.realtime_nested.realtime.arrival]
+distribution = "burst"
+burstIntensity = 3.5
+burstDuration = 25.0
+
+[profiles.realtime_nested.realtime.scheduling]
+strategy = "static"
+maxQueueSize = 10
+taskTimeout = 15.0
+resourceReservation = "partial"
+decisionDelay = 0.5
+decisionJitter = 0.2
+failureRate = 0.1
+retryLimit = 2
+retryDelay = 1.5
+retryBackoffMultiplier = 2.0
+queuePolicy = "priority"
+priorityLevels = 4
+highPriorityRatio = 0.25
+deadlineFactor = 1.5
+vmQueueCapacity = 3
+overloadFailureMultiplier = 0.2
+autoscalingEnabled = true
+scaleOutQueueThreshold = 2
+scaleInIdleTime = 10.0
+maxDynamicVms = 3
+vmColdStartDelay = 4.0
+scaleOutCost = 0.25
+scaleInProtectionTime = 8.0
+resourceModelEnabled = true
+networkLatency = 0.05
+imagePullDelay = 0.5
+ioWeight = 1.0
+ramWeight = 0.5
+bwWeight = 0.25
+runtimeFailureRate = 0.03
+nodeFailureRate = 0.02
+checkpointInterval = 5.0
+migrationDelay = 1.5
+timeoutAction = "retry"
+preemptionEnabled = true
+preemptionPolicy = "deadline_then_priority"
+preemptionMinPriorityGap = 2
+preemptionMaxPerTask = 3
+preemptionDelay = 0.4
+preemptionPenalty = 0.7
+multiTenantEnabled = true
+tenantCount = 3
+tenantQuota = [2, 1, 1]
+tenantWeights = [1.0, 2.0, 1.0]
+tenantFairnessPolicy = "weighted_fair"
+tenantSchedulingPolicy = "dominant_resource_fairness"
+tenantBurstAllowance = 2
+tenantSlaPenaltyWeight = 1.5
+tenantCostBudget = [10.0, 20.0, 15.0]
+topologyEnabled = true
+topologyPolicy = "spread_fault_domains"
+regionCount = 4
+racksPerRegion = 3
+hostsPerRack = 2
+localRegion = 1
+crossRackLatency = 0.15
+crossRegionLatency = 2.5
+crossRegionCost = 0.8
+hostFailureRate = 0.01
+rackFailureRate = 0.02
+regionFailureRate = 0.03
+physicalTopologyEnabled = true
+dataLocalityEnabled = true
+imageCacheEnabled = true
+hostCountPerRack = 4
+hostCpuCapacity = 8.0
+hostRamCapacity = 32768.0
+hostBwCapacity = 10000.0
+hostIoCapacity = 5000.0
+crossRackBandwidth = 20.0
+crossRegionBandwidth = 5.0
+dataLocalityPolicy = "balanced"
+imageCacheCapacity = 3

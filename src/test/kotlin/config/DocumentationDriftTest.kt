@@ -77,16 +77,12 @@ class DocumentationDriftTest {
     }
 
     @Test
-    fun `release readiness detekt baseline count matches current baseline`() {
+    fun `detekt baseline remains removed`() {
         val docs = File("docs/release-readiness.md").readText()
-        val documentedCount =
-            Regex("""detekt-baseline\.xml.*当前\s+(\d+)\s+项""")
-                .find(docs)
-                ?.groupValues
-                ?.get(1)
-                ?.toInt()
 
-        assertThat(documentedCount).isEqualTo(currentDetektBaselineCount())
+        assertThat(File("detekt-baseline.xml")).doesNotExist()
+        assertThat(File("build.gradle.kts").readText()).doesNotContain("baseline = file(")
+        assertThat(docs).contains("Detekt baseline 已清零")
     }
 
     @Test
@@ -119,9 +115,4 @@ class DocumentationDriftTest {
             .map { it.groupValues[1].trim() }
             .filter { it.isNotBlank() }
             .toList()
-
-    private fun currentDetektBaselineCount(): Int =
-        Regex("<ID>")
-            .findAll(File("detekt-baseline.xml").readText())
-            .count()
 }

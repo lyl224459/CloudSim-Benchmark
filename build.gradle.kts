@@ -14,8 +14,8 @@ import buildlogic.VerifyCloudSimPlusLockTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
 import buildlogic.VerifyJUnitTestInventoryTask
 import buildlogic.VerifyJUnitTestSignaturesTask
+import buildlogic.VerifyNoDetektBaselineTask
 import io.gitlab.arturbosch.detekt.Detekt
-import io.gitlab.arturbosch.detekt.DetektCreateBaselineTask
 import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.bundling.Compression
 import org.gradle.api.tasks.bundling.Tar
@@ -439,7 +439,6 @@ detekt {
     buildUponDefaultConfig = true
     allRules = false
     parallel = true
-    baseline = file("detekt-baseline.xml")
 }
 
 tasks.withType<Detekt>().configureEach {
@@ -470,23 +469,15 @@ tasks.withType<Detekt>().configureEach {
     }
 }
 
-tasks.withType<DetektCreateBaselineTask>().configureEach {
-    jvmTarget = "22"
+val verifyNoDetektBaseline by tasks.registering(VerifyNoDetektBaselineTask::class) {
+    group = "verification"
+    description = "验证项目未重新引入 detekt baseline 文件或配置"
 
-    var originalJavaVersion: String? = null
-    doFirst {
-        originalJavaVersion = System.getProperty("java.version")
-        val majorVersion =
-            originalJavaVersion
-                ?.substringBefore(".")
-                ?.toIntOrNull()
-        if (majorVersion != null && majorVersion > 22) {
-            System.setProperty("java.version", "22")
-        }
-    }
-    doLast {
-        originalJavaVersion?.let { System.setProperty("java.version", it) }
-    }
+    baselineFiles.from(layout.projectDirectory.file("detekt-baseline.xml"))
+    buildScripts.from(
+        layout.projectDirectory.file("build.gradle.kts"),
+        layout.projectDirectory.file("buildSrc/build.gradle.kts"),
+    )
 }
 
 tasks.named("check") {
@@ -497,6 +488,7 @@ tasks.named("check") {
         "jacocoTestCoverageVerification",
         verifyJUnitTestSignatures,
         verifyJUnitTestInventory,
+        verifyNoDetektBaseline,
         verifyCloudSimPlusSourceBuild,
     )
 }
