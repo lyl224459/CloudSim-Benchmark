@@ -63,7 +63,7 @@ jobs:
         else
           git worktree add --detach "${history_dir}"
           git -C "${history_dir}" switch --orphan performance-history
-          git -C "${history_dir}" rm -rf .
+          git -C "${history_dir}" rm -rf --ignore-unmatch .
         fi
         cp build/reports/performance/jmh-results.json "${history_dir}/jmh-results.json"
         cp build/reports/performance/performance-trend.md "${history_dir}/performance-trend.md"
