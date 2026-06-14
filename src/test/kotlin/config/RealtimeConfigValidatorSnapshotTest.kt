@@ -27,7 +27,10 @@ class RealtimeConfigValidatorSnapshotTest {
             error.errors.joinToString(separator = "\n", postfix = "\n") {
                 "${it.field}|${it.message}"
             }
-        val snapshot = File("src/test/resources/snapshots/realtime-validation-errors.txt").readText()
+        val snapshot =
+            File("src/test/resources/snapshots/realtime-validation-errors.txt")
+                .readText()
+                .replace("\r\n", "\n")
 
         assertThat(rendered).isEqualTo(snapshot)
     }
