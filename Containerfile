@@ -19,6 +19,9 @@ COPY gradle.properties .
 COPY buildSrc buildSrc
 COPY configs configs
 COPY .gitmodules .
+# Locked source verification needs the parent gitlink and submodule gitdir.
+# This metadata remains in the builder stage and is not copied into the runtime image.
+COPY .git .git
 COPY third_party third_party
 
 # 修复权限问题：确保 gradlew 可执行
