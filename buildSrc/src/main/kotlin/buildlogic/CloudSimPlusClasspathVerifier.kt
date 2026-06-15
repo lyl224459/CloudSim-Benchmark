@@ -12,6 +12,7 @@ internal object CloudSimPlusClasspathVerifier {
         localRepoRoot: Path,
         artifactName: String,
     ) {
+        val canonicalRepoRoot = localRepoRoot.toFile().canonicalFile.toPath()
         val cloudSimJars =
             files.filter { file ->
                 file.name.startsWith("$artifactName-") && file.extension == "jar"
@@ -20,7 +21,7 @@ internal object CloudSimPlusClasspathVerifier {
             "No CloudSim Plus jar found in $configurationName"
         }
         cloudSimJars.forEach { jar ->
-            check(jar.canonicalFile.toPath().startsWith(localRepoRoot)) {
+            check(jar.canonicalFile.toPath().startsWith(canonicalRepoRoot)) {
                 "CloudSim Plus jar for $configurationName is not from source build repo: ${jar.path}"
             }
             JarFile(jar).use { jarFile ->

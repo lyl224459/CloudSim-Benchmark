@@ -16,8 +16,9 @@ class CloudSimPlusClasspathVerifierTest {
     fun `accepts source-built jar without manifest classpath`() {
         val repo = tempDir.resolve("repo").apply(File::mkdirs)
         val jar = createJar(repo.resolve("cloudsimplus-8.5.7.jar"))
+        val nonCanonicalRepoPath = repo.resolve("child").resolve("..").toPath()
 
-        CloudSimPlusClasspathVerifier.verifyClasspath("runtime", setOf(jar), repo.toPath(), "cloudsimplus")
+        CloudSimPlusClasspathVerifier.verifyClasspath("runtime", setOf(jar), nonCanonicalRepoPath, "cloudsimplus")
     }
 
     @Test
