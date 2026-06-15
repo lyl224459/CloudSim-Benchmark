@@ -2,6 +2,7 @@ package buildlogic
 
 import java.io.File
 import kotlin.test.Test
+import kotlin.test.assertContains
 import kotlin.test.assertEquals
 
 class ContainerImageSmokeSupportTest {
@@ -23,6 +24,12 @@ class ContainerImageSmokeSupportTest {
                 dockerExecutable = "docker",
                 imageName = "cloudsim-benchmark:smoke",
             ),
+        )
+        assertContains(
+            ContainerImageSmokeSupport
+                .inspectCommand("docker", "cloudsim-benchmark:smoke")
+                .joinToString(" "),
+            "test ! -e /app/.git",
         )
     }
 

@@ -76,6 +76,14 @@ abstract class ContainerImageSmokeTask
                     ),
                 )
             }
+            execOperations.exec {
+                commandLine(
+                    ContainerImageSmokeSupport.inspectCommand(
+                        dockerExecutable = docker,
+                        imageName = imageName.get(),
+                    ),
+                )
+            }
         }
 
         private fun isDockerAvailable(docker: String): Boolean =

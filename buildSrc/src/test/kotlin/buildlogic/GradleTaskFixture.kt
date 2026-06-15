@@ -135,4 +135,17 @@ internal fun createJarWithClassPath(file: File) {
     }
 }
 
+internal fun createPlainJar(file: File) {
+    file.parentFile.mkdirs()
+    val manifest =
+        Manifest().also {
+            it.mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
+        }
+    JarOutputStream(file.outputStream(), manifest).use { output ->
+        output.putNextEntry(JarEntry("fixture.txt"))
+        output.write("fixture".toByteArray())
+        output.closeEntry()
+    }
+}
+
 internal fun String.gradlePath(): String = replace("\\", "\\\\")

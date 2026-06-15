@@ -40,6 +40,22 @@ internal object ContainerImageSmokeSupport {
             "--help",
         )
 
+    fun inspectCommand(
+        dockerExecutable: String,
+        imageName: String,
+    ): List<String> =
+        listOf(
+            dockerExecutable,
+            "run",
+            "--rm",
+            "--entrypoint",
+            "sh",
+            imageName,
+            "-c",
+            "test ! -e /app/.git && test ! -e /app/.gradle && " +
+                "test ! -e /app/src && test ! -e /app/buildSrc && test ! -e /app/gradlew",
+        )
+
     fun missingDockerMessage(
         dockerExecutable: String,
         ci: Boolean,

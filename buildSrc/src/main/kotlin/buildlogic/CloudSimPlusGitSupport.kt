@@ -60,16 +60,17 @@ internal class CloudSimPlusGitClient(
     private val timeoutSeconds: Long,
     private val temporaryDir: File,
     private val logInfo: (String) -> Unit,
+    private val gitExecutable: String = "git",
 ) : CloudSimPlusGitOperations {
     override fun exec(
         args: List<String>,
         workDir: File,
         ignoreExit: Boolean,
     ): String {
-        var lastCommand = listOf("git") + args
+        var lastCommand = listOf(gitExecutable) + args
         var lastOutput = ""
         gitOptionFallbacks().forEach { optionPrefix ->
-            val command = listOf("git") + optionPrefix + args
+            val command = listOf(gitExecutable) + optionPrefix + args
             val result = runGitProcess(args, workDir, optionPrefix)
             if (result.exitCode == 0) {
                 return result.output
@@ -95,7 +96,7 @@ internal class CloudSimPlusGitClient(
         workDir: File,
         optionPrefix: List<String>,
     ): GitResult {
-        val command = listOf("git") + optionPrefix + args
+        val command = listOf(gitExecutable) + optionPrefix + args
         val outputDir = temporaryDir.also(File::mkdirs)
         val outputFile = File.createTempFile("git-", ".log", outputDir)
         val process =
@@ -105,17 +106,30 @@ internal class CloudSimPlusGitClient(
                 .redirectOutput(outputFile)
                 .start()
         val completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        if (!completed) {
+            terminateProcessTree(process)
+        }
         val output = outputFile.readText().trim()
         outputFile.delete()
         if (!completed) {
-            process.destroyForcibly()
-            process.waitFor(PROCESS_SHUTDOWN_SECONDS, TimeUnit.SECONDS)
             return GitResult(
                 exitCode = -1,
                 output = "Timed out after ${timeoutSeconds}s: ${command.joinToString(" ")}\n$output",
             )
         }
         return GitResult(process.exitValue(), output)
+    }
+
+    private fun terminateProcessTree(process: Process) {
+        val descendants = process.descendants().toList()
+        descendants.asReversed().forEach(ProcessHandle::destroyForcibly)
+        process.destroyForcibly()
+        process.waitFor(PROCESS_SHUTDOWN_SECONDS, TimeUnit.SECONDS)
+        descendants.forEach { descendant ->
+            runCatching {
+                descendant.onExit().get(PROCESS_SHUTDOWN_SECONDS, TimeUnit.SECONDS)
+            }
+        }
     }
 
     private fun gitOptionFallbacks(): List<List<String>> =

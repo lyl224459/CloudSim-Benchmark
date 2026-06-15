@@ -80,6 +80,7 @@ abstract class VerifyGitHubActionsPolicyTask : DefaultTask() {
             mapOf(
                 "actions/cache" to "v5",
                 "actions/checkout" to "v6",
+                "actions/download-artifact" to "v8",
                 "actions/setup-java" to "v5",
                 "actions/upload-artifact" to "v7",
                 "docker/build-push-action" to "v7",

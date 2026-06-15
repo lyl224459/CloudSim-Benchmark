@@ -6,6 +6,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import kotlin.test.assertFailsWith
 
 class RealtimePerformanceBenchmarkRunnerTest {
     @TempDir
@@ -72,5 +73,38 @@ class RealtimePerformanceBenchmarkRunnerTest {
         assertThat(parsed.results.single().status).isEqualTo(RealtimePerformanceBenchmarkStatus.FAILED)
         assertThat(parsed.results.single().errorType).isEqualTo("IllegalStateException")
         assertThat(parsed.results.single().errorMessage).isEqualTo("boom")
+    }
+
+    @Test
+    fun `runner records injected failures and coerces measured runs`() {
+        val runner =
+            RealtimePerformanceBenchmarkRunner(
+                RealtimePerformanceBenchmarkConfig(
+                    cloudletCounts = listOf(1),
+                    algorithms = listOf(RealtimePerformanceBenchmarkAlgorithm.PSO),
+                    measuredRuns = 0,
+                ),
+            ) { _, _, _ -> error("benchmark failed") }
+
+        val result = runner.run().results.single()
+
+        assertThat(result.runIndex).isEqualTo(1)
+        assertThat(result.status).isEqualTo(RealtimePerformanceBenchmarkStatus.FAILED)
+        assertThat(result.errorType).isEqualTo("IllegalStateException")
+        assertThat(result.errorMessage).isEqualTo("benchmark failed")
+    }
+
+    @Test
+    fun `algorithm parsing covers blank aliases distinct and unknown values`() {
+        assertThat(RealtimePerformanceBenchmarkAlgorithm.parseList(""))
+            .containsExactlyElementsOf(RealtimePerformanceBenchmarkAlgorithm.entries)
+        assertThat(RealtimePerformanceBenchmarkAlgorithm.parseList("pso,pso,realtime-min-load"))
+            .containsExactly(
+                RealtimePerformanceBenchmarkAlgorithm.PSO,
+                RealtimePerformanceBenchmarkAlgorithm.REALTIME_MIN_LOAD,
+            )
+        assertFailsWith<IllegalArgumentException> {
+            RealtimePerformanceBenchmarkAlgorithm.parseList("unknown")
+        }
     }
 }

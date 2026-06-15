@@ -94,8 +94,13 @@ data class RealtimePerformanceBenchmarkReport(
     val results: List<RealtimePerformanceBenchmarkResult>,
 )
 
+private typealias RealtimeBenchmarkExecution = (RealtimePerformanceBenchmarkAlgorithm, Int, Long) -> Unit
+
 class RealtimePerformanceBenchmarkRunner(
     private val config: RealtimePerformanceBenchmarkConfig,
+    private val executeBenchmark: RealtimeBenchmarkExecution = { algorithm, count, seed ->
+        executeBenchmark(config, algorithm, count, seed)
+    },
 ) {
     fun run(): RealtimePerformanceBenchmarkReport {
         val results =
@@ -138,10 +143,7 @@ class RealtimePerformanceBenchmarkRunner(
         val started = System.nanoTime()
         val outcome =
             runCatching {
-                when (algorithm.mode) {
-                    RealtimePerformanceBenchmarkMode.BATCH -> runBatchBenchmark(algorithm, cloudletCount, seed)
-                    RealtimePerformanceBenchmarkMode.REALTIME -> runRealtimeBenchmark(algorithm, cloudletCount, seed)
-                }
+                executeBenchmark(algorithm, cloudletCount, seed)
             }
         val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLISECOND
         val after = usedMemoryBytes()
@@ -175,60 +177,6 @@ class RealtimePerformanceBenchmarkRunner(
         )
     }
 
-    private fun runBatchBenchmark(
-        algorithm: RealtimePerformanceBenchmarkAlgorithm,
-        cloudletCount: Int,
-        seed: Long,
-    ) {
-        val cloudlets = CloudletGenerator(Random(seed)).createCloudlets(userId = 0, count = cloudletCount)
-        val vms = DatacenterCreator.createVms()
-        val definition = AlgorithmRegistry.resolveBatch(algorithm.registryName)
-        val scheduler =
-            definition.createBatchScheduler(
-                cloudlets,
-                vms,
-                ObjectiveWeightsConfig(),
-                ResolvedAlgorithmSettings(config.population, config.maxIter),
-                seed,
-            )
-        scheduler.schedule()
-    }
-
-    private fun runRealtimeBenchmark(
-        algorithm: RealtimePerformanceBenchmarkAlgorithm,
-        cloudletCount: Int,
-        seed: Long,
-    ) {
-        val vms = DatacenterCreator.createVms()
-        val scheduler =
-            AlgorithmRegistry
-                .resolveRealtime(algorithm.registryName)
-                .createRealtimeScheduler(
-                    vms,
-                    ObjectiveWeightsConfig(),
-                    ResolvedAlgorithmSettings(config.population, config.maxIter),
-                    seed,
-                )
-        val cloudlets =
-            RealtimeCloudletGenerator(
-                random = Random(seed),
-                arrivalRate = cloudletCount.toDouble().coerceAtLeast(1.0),
-            ).createRealtimeCloudletBatch(userId = 0, count = cloudletCount, simulationDuration = 1.0).cloudlets
-
-        val assignedCloudlets = ArrayList<Cloudlet>(cloudlets.size)
-        cloudlets.forEach { cloudlet ->
-            val vmIndex = scheduler.safeSchedule(cloudlet, assignedCloudlets, vms)
-            cloudlet.setVm(vms[vmIndex])
-            assignedCloudlets.add(cloudlet)
-        }
-    }
-
-    private fun RealtimeScheduler.safeSchedule(
-        cloudlet: Cloudlet,
-        assignedCloudlets: List<Cloudlet>,
-        vms: List<Vm>,
-    ): Int = scheduleOnArrival(cloudlet, assignedCloudlets, vms).coerceIn(vms.indices)
-
     private fun usedMemoryBytes(): Long {
         val runtime = Runtime.getRuntime()
         return runtime.totalMemory() - runtime.freeMemory()
@@ -248,6 +196,74 @@ class RealtimePerformanceBenchmarkRunner(
             }
     }
 }
+
+private fun executeBenchmark(
+    config: RealtimePerformanceBenchmarkConfig,
+    algorithm: RealtimePerformanceBenchmarkAlgorithm,
+    cloudletCount: Int,
+    seed: Long,
+) {
+    when (algorithm.mode) {
+        RealtimePerformanceBenchmarkMode.BATCH -> runBatchBenchmark(config, algorithm, cloudletCount, seed)
+        RealtimePerformanceBenchmarkMode.REALTIME -> runRealtimeBenchmark(config, algorithm, cloudletCount, seed)
+    }
+}
+
+private fun runBatchBenchmark(
+    config: RealtimePerformanceBenchmarkConfig,
+    algorithm: RealtimePerformanceBenchmarkAlgorithm,
+    cloudletCount: Int,
+    seed: Long,
+) {
+    val cloudlets = CloudletGenerator(Random(seed)).createCloudlets(userId = 0, count = cloudletCount)
+    val vms = DatacenterCreator.createVms()
+    val definition = AlgorithmRegistry.resolveBatch(algorithm.registryName)
+    val scheduler =
+        definition.createBatchScheduler(
+            cloudlets,
+            vms,
+            ObjectiveWeightsConfig(),
+            ResolvedAlgorithmSettings(config.population, config.maxIter),
+            seed,
+        )
+    scheduler.schedule()
+}
+
+private fun runRealtimeBenchmark(
+    config: RealtimePerformanceBenchmarkConfig,
+    algorithm: RealtimePerformanceBenchmarkAlgorithm,
+    cloudletCount: Int,
+    seed: Long,
+) {
+    val vms = DatacenterCreator.createVms()
+    val scheduler =
+        AlgorithmRegistry
+            .resolveRealtime(algorithm.registryName)
+            .createRealtimeScheduler(
+                vms,
+                ObjectiveWeightsConfig(),
+                ResolvedAlgorithmSettings(config.population, config.maxIter),
+                seed,
+            )
+    val cloudlets =
+        RealtimeCloudletGenerator(
+            random = Random(seed),
+            arrivalRate = cloudletCount.toDouble().coerceAtLeast(1.0),
+        ).createRealtimeCloudletBatch(userId = 0, count = cloudletCount, simulationDuration = 1.0).cloudlets
+
+    val assignedCloudlets = ArrayList<Cloudlet>(cloudlets.size)
+    cloudlets.forEach { cloudlet ->
+        val vmIndex = scheduler.safeSchedule(cloudlet, assignedCloudlets, vms)
+        cloudlet.setVm(vms[vmIndex])
+        assignedCloudlets.add(cloudlet)
+    }
+}
+
+private fun RealtimeScheduler.safeSchedule(
+    cloudlet: Cloudlet,
+    assignedCloudlets: List<Cloudlet>,
+    vms: List<Vm>,
+): Int = scheduleOnArrival(cloudlet, assignedCloudlets, vms).coerceIn(vms.indices)
 
 fun main(args: Array<String>) {
     val options = args.toBenchmarkOptions()

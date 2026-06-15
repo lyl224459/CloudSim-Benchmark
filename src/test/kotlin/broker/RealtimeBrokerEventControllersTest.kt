@@ -115,6 +115,43 @@ class RealtimeBrokerEventControllersTest {
     }
 
     @Test
+    fun `autoscaling controller covers disabled empty and dynamic tick branches`() {
+        val disabledScheduling = RealtimeSchedulingConfig(autoscalingEnabled = false)
+        val disabledManager =
+            RealtimeVmLifecycleManager(
+                initialVms = listOf(createVm()),
+                scheduling = disabledScheduling,
+                topologyModel = RealtimeTopologyModel.Disabled,
+            )
+        val disabled = RealtimeAutoscalingController(disabledScheduling, disabledManager)
+        disabled.refresh(currentTime = 1.0, activeVmIndexes = emptySet())
+
+        assertThat(
+            disabled.scaleOutCommands(queueDepth = 100, currentTime = 1.0, activeVmIndexes = emptySet()),
+        ).isEmpty()
+        assertThat(disabled.tickCommands(currentTime = 2.0, activeVmIndexes = emptySet())).isEmpty()
+
+        val scaling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                scaleOutQueueThreshold = 1,
+                maxDynamicVms = 1,
+                scaleInIdleTime = 2.0,
+            )
+        val manager =
+            RealtimeVmLifecycleManager(
+                initialVms = listOf(createVm()),
+                scheduling = scaling,
+                topologyModel = RealtimeTopologyModel.Disabled,
+            )
+        val controller = RealtimeAutoscalingController(scaling, manager)
+        controller.scaleOutCommands(queueDepth = 1, currentTime = 0.0, activeVmIndexes = emptySet())
+
+        assertThat(controller.tickCommands(currentTime = 0.5, activeVmIndexes = emptySet()))
+            .containsExactly(RealtimeBrokerCommand.ScheduleAutoscaleTick(2.0))
+    }
+
+    @Test
     fun `preemption executor retries active victim and records recovery metrics`() {
         val scheduling =
             RealtimeSchedulingConfig(

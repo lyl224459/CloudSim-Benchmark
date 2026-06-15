@@ -330,8 +330,11 @@ JMH 结果写入 `build/reports/performance/jmh-results.json`，Markdown 趋势�
 项目支持容器化部署，使用 Podman 或 Docker 运行：
 
 ```bash
+# 生成并验证最小运行时上下文
+./gradlew prepareContainerImageContext verifyContainerBuildContext
+
 # 构建镜像
-podman build -t cloudsim-benchmark .
+podman build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
 
 # 运行批处理实验
 ./run.cmd podman batch --algorithms ALL --runs 3
@@ -348,7 +351,8 @@ podman build -t cloudsim-benchmark .
 `containerImageSmoke` 在 CI 中要求 Docker 可用，Docker 缺失或镜像 smoke 失败都会阻断构建；本地开发机缺少 Docker 时会给出明确诊断并跳过该 smoke。
 - **资源管控**: 限制容器资源使用，避免过度消耗
 
-Containerfile 配置了完整的运行时环境，包括 JDK 25、ZGC 优化等。
+`Containerfile` 只组装 JRE 运行镜像。Gradle 负责构建 fatJar，并将 `app.jar`、配置、数据和 provenance 写入
+`build/container-context`；`verifyContainerBuildContext` 限制上下文不超过 50 MiB，并禁止 Git、Gradle 和源码进入镜像。
 
 ---
 
@@ -418,11 +422,13 @@ CloudSim-Benchmark/
 - pwsh -File scripts/run-build-warning-audit.ps1
 ```
 
-发布流程由 `.github/workflows/release.yml` 在 `v*.*.*` 标签或手动触发时执行，复用 Gradle release package tasks 生成可执行 JAR、Windows zip、Unix tar.gz、源码包和清单，并推送容器镜像到 GHCR。发布前验收清单见 `docs/release-readiness.md`。
+发布流程由 `.github/workflows/release.yml` 在 `v*.*.*` 标签或手动触发时执行，复用 Gradle release package tasks 生成可执行 JAR、Windows zip、Unix tar.gz、源码包、SBOM、许可证报告和清单，并使用最小运行时上下文推送容器镜像到 GHCR。发布前验收清单见 `docs/release-readiness.md`。
 
 warning audit 分别捕获 `compileKotlin`、`detekt`、`ktlintCheck` 和 CloudSim Plus Maven 源码构建日志，仅精确允许 detekt `1.23.8` 的 Gradle 10 deprecation 和 ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning；任何新增 warning 都会阻断 CI。审计报告和原始日志保存在 `build/reports/build-warnings/` 并由 CI 始终上传。
 
 每周 CloudSim Plus latest compatibility workflow 会在 Windows、Ubuntu、macOS 上测试最新 release，但不会自动修改 lock。发布清单记录实际 CloudSim Plus ref、commit、version 与全部资产；`buildSrc` JaCoCo 报告位于 `buildSrc/build/reports/jacoco/`，合并普通单测与 TestKit 子构建 task action 覆盖，并执行 line 55% / branch 45% 门禁。根项目使用 `verifyJUnitTestSignatures` 阻止非 `Unit` 测试入口被静默忽略，并使用 `gradle/junit-test-inventory.lock` 精确跟踪测试入口；有意新增、删除或重命名测试后运行 `updateJUnitTestInventory` 更新清单。
+
+依赖供应链由 Gradle dependency verification、Dependabot 和 OSV workflow 共同检查。`generateSupplyChainReports` 基于发布 runtime classpath 生成 CycloneDX SBOM 与第三方许可证报告；许可证插件当前不支持 configuration cache，因此该任务作为独立发布步骤运行。
 
 ### 迁移说明
 
