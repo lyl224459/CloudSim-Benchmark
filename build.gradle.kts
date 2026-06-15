@@ -17,8 +17,11 @@ import buildlogic.VerifyContainerImageContextTask
 import buildlogic.VerifyGitHubActionsPolicyTask
 import buildlogic.VerifyJUnitTestInventoryTask
 import buildlogic.VerifyJUnitTestSignaturesTask
+import buildlogic.VerifyLicensePolicyTask
 import buildlogic.VerifyLockedCloudSimPlusSourceTask
 import buildlogic.VerifyNoDetektBaselineTask
+import com.github.jk1.license.filter.DependencyFilter
+import com.github.jk1.license.filter.SpdxLicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import io.gitlab.arturbosch.detekt.Detekt
@@ -57,6 +60,8 @@ tasks.cyclonedxDirectBom {
 
 licenseReport {
     configurations = arrayOf("runtimeClasspath")
+    filters = arrayOf<DependencyFilter>(SpdxLicenseBundleNormalizer())
+    allowedLicensesFile = layout.projectDirectory.file("gradle/allowed-licenses.json")
     outputDir =
         layout.buildDirectory
             .dir("reports/supply-chain/licenses")
@@ -495,6 +500,10 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             "cli.RunResolver" to "0.60",
             "broker.RealtimeAutoscalingController" to "0.70",
             "datacenter.RealtimePerformanceBenchmarkRunner" to "0.55",
+            "datacenter.RealtimePerformanceBenchmarkRunnerKt" to "0.50",
+            "datacenter.BatchAlgorithmExecutor" to "0.60",
+            "datacenter.PerformanceTrendReportGenerator" to "0.70",
+            "broker.RealtimeVmSelectionFacade" to "0.65",
         ).forEach { (className, minimumBranchCoverage) ->
             rule {
                 element = "CLASS"
@@ -1067,6 +1076,20 @@ tasks.named("generateLicenseReport") {
     dependsOn(sanitizeCloudSimPlusJarManifest)
 }
 
+val verifyRuntimeLicensePolicy by tasks.registering(VerifyLicensePolicyTask::class) {
+    group = "verification"
+    description = "验证 runtime SBOM 中所有依赖许可证均在精确允许列表中"
+
+    dependsOn("cyclonedxDirectBom")
+    sbomFile.set(layout.buildDirectory.file("reports/supply-chain/cloudsim-benchmark-sbom.json"))
+    policyFile.set(layout.projectDirectory.file("gradle/allowed-licenses.json"))
+    reportFile.set(layout.buildDirectory.file("reports/supply-chain/license-policy.txt"))
+}
+
+tasks.named("checkLicense") {
+    dependsOn(sanitizeCloudSimPlusJarManifest, verifyRuntimeLicensePolicy)
+}
+
 val copySupplyChainReports by tasks.registering(Copy::class) {
     group = "distribution"
     description = "复制 runtime SBOM 和许可证报告到发布产物目录"
@@ -1085,7 +1108,7 @@ val generateSupplyChainReports by tasks.registering {
     group = "verification"
     description = "生成 runtime classpath SBOM 和许可证报告"
 
-    dependsOn(copySupplyChainReports)
+    dependsOn(copySupplyChainReports, verifyRuntimeLicensePolicy)
 }
 
 val generateReleaseManifest by tasks.registering {

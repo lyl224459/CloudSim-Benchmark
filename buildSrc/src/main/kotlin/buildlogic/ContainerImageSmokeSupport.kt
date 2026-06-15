@@ -36,6 +36,11 @@ internal object ContainerImageSmokeSupport {
             dockerExecutable,
             "run",
             "--rm",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev",
+            "--tmpfs",
+            "/app/runs:rw,nosuid,nodev",
             imageName,
             "--help",
         )
@@ -48,11 +53,17 @@ internal object ContainerImageSmokeSupport {
             dockerExecutable,
             "run",
             "--rm",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev",
+            "--tmpfs",
+            "/app/runs:rw,nosuid,nodev",
             "--entrypoint",
             "sh",
             imageName,
             "-c",
-            "test ! -e /app/.git && test ! -e /app/.gradle && " +
+            "test \"$(id -u)\" = 10001 && touch /app/runs/smoke && " +
+                "test ! -e /app/.git && test ! -e /app/.gradle && " +
                 "test ! -e /app/src && test ! -e /app/buildSrc && test ! -e /app/gradlew",
         )
 

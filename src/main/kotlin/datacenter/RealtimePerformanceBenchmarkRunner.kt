@@ -197,7 +197,7 @@ class RealtimePerformanceBenchmarkRunner(
     }
 }
 
-private fun executeBenchmark(
+internal fun executeBenchmark(
     config: RealtimePerformanceBenchmarkConfig,
     algorithm: RealtimePerformanceBenchmarkAlgorithm,
     cloudletCount: Int,
@@ -259,7 +259,7 @@ private fun runRealtimeBenchmark(
     }
 }
 
-private fun RealtimeScheduler.safeSchedule(
+internal fun RealtimeScheduler.safeSchedule(
     cloudlet: Cloudlet,
     assignedCloudlets: List<Cloudlet>,
     vms: List<Vm>,
@@ -274,7 +274,7 @@ fun main(args: Array<String>) {
     println("Realtime performance benchmark written to ${File(config.outputFile).absolutePath}")
 }
 
-private fun Array<String>.toBenchmarkOptions(): Map<String, String> =
+internal fun Array<String>.toBenchmarkOptions(): Map<String, String> =
     asList().chunked(2).associate { chunk ->
         require(chunk.size == 2 && chunk[0].startsWith("--")) {
             "Invalid benchmark argument list: ${joinToString(" ")}"
@@ -282,7 +282,7 @@ private fun Array<String>.toBenchmarkOptions(): Map<String, String> =
         chunk[0].removePrefix("--") to chunk[1]
     }
 
-private fun Map<String, String>.toBenchmarkConfig(): RealtimePerformanceBenchmarkConfig =
+internal fun Map<String, String>.toBenchmarkConfig(): RealtimePerformanceBenchmarkConfig =
     RealtimePerformanceBenchmarkConfig(
         cloudletCounts = this["sizes"]?.toIntList() ?: DEFAULT_BENCHMARK_CLOUDLET_COUNTS,
         algorithms =
@@ -295,7 +295,7 @@ private fun Map<String, String>.toBenchmarkConfig(): RealtimePerformanceBenchmar
         outputFile = this["output"] ?: "build/reports/realtime-performance/benchmark-results.json",
     )
 
-private fun String.toIntList(): List<Int> =
+internal fun String.toIntList(): List<Int> =
     split(",")
         .mapNotNull { it.trim().toIntOrNull()?.takeIf { value -> value > 0 } }
         .ifEmpty { DEFAULT_BENCHMARK_CLOUDLET_COUNTS }

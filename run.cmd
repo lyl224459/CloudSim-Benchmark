@@ -23,11 +23,7 @@ if "%~1"=="podman" (
     if not exist "benchmark_workspace" mkdir benchmark_workspace
     if not exist "runs" mkdir runs
     podman run --rm ^
-        -v "%cd%\runs:/app/benchmark_workspace/runs" ^
-        -v "%cd%\configs:/app/benchmark_workspace/configs" ^
-        -v "%cd%\src:/app/benchmark_workspace/src" ^
-        -v "%cd%\data:/app/benchmark_workspace/data" ^
-        --workdir /app/benchmark_workspace ^
+        -v "%cd%\runs:/app/runs" ^
         cloudsim-benchmark:latest %*
     exit /b %errorlevel%
 )

@@ -19,7 +19,18 @@ class ContainerImageSmokeSupportTest {
             ),
         )
         assertEquals(
-            listOf("docker", "run", "--rm", "cloudsim-benchmark:smoke", "--help"),
+            listOf(
+                "docker",
+                "run",
+                "--rm",
+                "--read-only",
+                "--tmpfs",
+                "/tmp:rw,nosuid,nodev",
+                "--tmpfs",
+                "/app/runs:rw,nosuid,nodev",
+                "cloudsim-benchmark:smoke",
+                "--help",
+            ),
             ContainerImageSmokeSupport.runCommand(
                 dockerExecutable = "docker",
                 imageName = "cloudsim-benchmark:smoke",

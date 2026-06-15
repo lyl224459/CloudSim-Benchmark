@@ -96,6 +96,7 @@ val verificationFunctionalTest =
             listOf(
                 "buildlogic.BuildWarningAuditTaskFunctionalTest",
                 "buildlogic.JUnitVerificationTaskFunctionalTest",
+                "buildlogic.LicensePolicyTaskFunctionalTest",
                 "buildlogic.VerifyGitHubActionsPolicyTaskFunctionalTest",
             ),
     )
@@ -105,6 +106,7 @@ val containerFunctionalTest =
         includes =
             listOf(
                 "buildlogic.ContainerImageSmokeTaskFunctionalTest",
+                "buildlogic.ContainerImageContextTaskFunctionalTest",
                 "buildlogic.CliEndToEndSmokeTaskFunctionalTest",
         ),
     )
@@ -175,6 +177,20 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
                 minimum = "0.60".toBigDecimal()
+            }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf("buildlogic.VerifyContainerImageContextTask")
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.80".toBigDecimal()
+            }
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.70".toBigDecimal()
             }
         }
     }

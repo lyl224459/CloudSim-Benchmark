@@ -1,0 +1,13 @@
+* text=auto
+
+*.kt text eol=lf
+*.kts text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=lf
+*.sh text eol=lf
+Containerfile text eol=lf
+run text eol=lf
+
+*.cmd text eol=crlf
+*.bat text eol=crlf
