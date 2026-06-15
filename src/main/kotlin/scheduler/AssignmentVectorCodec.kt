@@ -4,6 +4,13 @@ import datacenter.ObjectiveFunction
 import kotlin.math.round
 
 internal object SchedulerAllocationValidator {
+    fun requireAvailableCloudlets(
+        cloudletNum: Int,
+        schedulerName: String,
+    ) {
+        require(cloudletNum > 0) { "$schedulerName 需要至少 1 个可调度任务" }
+    }
+
     fun requireAvailableVms(
         vmNum: Int,
         schedulerName: String,

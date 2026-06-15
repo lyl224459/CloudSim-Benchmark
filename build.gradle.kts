@@ -394,12 +394,12 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                minimum = "0.68".toBigDecimal()
+                minimum = "0.75".toBigDecimal()
             }
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = "0.50".toBigDecimal()
+                minimum = "0.55".toBigDecimal()
             }
         }
         rule {
@@ -427,6 +427,15 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
                 minimum = "0.65".toBigDecimal()
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("scheduler")
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.55".toBigDecimal()
             }
         }
     }

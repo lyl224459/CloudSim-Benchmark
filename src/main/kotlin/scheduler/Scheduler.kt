@@ -20,6 +20,7 @@ abstract class Scheduler(
         get() = javaClass.simpleName.ifBlank { "Scheduler" }
 
     init {
+        SchedulerAllocationValidator.requireAvailableCloudlets(cloudletNum, schedulerName)
         SchedulerAllocationValidator.requireAvailableVms(vmNum, schedulerName)
     }
 
