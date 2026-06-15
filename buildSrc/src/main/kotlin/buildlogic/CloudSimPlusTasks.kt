@@ -123,10 +123,6 @@ abstract class VerifyLockedCloudSimPlusSourceTask : DefaultTask() {
         check(checkoutCommit == expected.commit) {
             "CloudSim Plus checkout drift: expected=${expected.commit} actual=$checkoutCommit"
         }
-        val exactTag = runGit(source, "describe", "--tags", "--exact-match")
-        check(exactTag == expected.ref) {
-            "CloudSim Plus tag drift: expected=${expected.ref} actual=$exactTag"
-        }
         val actualVersion = CloudSimPlusVersioning.readCloudSimPlusVersion(source)
         check(actualVersion == expected.version) {
             "CloudSim Plus POM version drift: expected=${expected.version} actual=$actualVersion"

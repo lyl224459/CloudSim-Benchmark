@@ -14,8 +14,7 @@ class CloudSimPlusPrepareTaskFunctionalTest {
     @Test
     fun `locked source verification becomes up to date and supports configuration cache`() {
         val fixture = fixture("locked-success")
-        val (source, commit) = fixture.createGitCheckout()
-        fixture.git(source, "tag", "v8.5.7")
+        val (_, commit) = fixture.createGitCheckout()
         fixture.resolve("lock.txt").writeText(metadata(commit))
         fixture.writeBuild(lockedTask())
 
@@ -36,25 +35,16 @@ class CloudSimPlusPrepareTaskFunctionalTest {
         assertContains(missing.runAndFail("verifyLocked").output, "git submodule update --init --recursive")
 
         val drift = fixture("locked-drift")
-        val (source, _) = drift.createGitCheckout()
-        drift.git(source, "tag", "v8.5.7")
+        drift.createGitCheckout()
         drift.resolve("lock.txt").writeText(metadata("b".repeat(40)))
         drift.writeBuild(lockedTask())
         assertContains(drift.runAndFail("verifyLocked").output, "checkout drift")
     }
 
     @Test
-    fun `locked source verification reports tag and POM version drift`() {
-        val tagDrift = fixture("locked-tag-drift")
-        val (tagSource, tagCommit) = tagDrift.createGitCheckout()
-        tagDrift.git(tagSource, "tag", "v8.5.6")
-        tagDrift.resolve("lock.txt").writeText(metadata(tagCommit))
-        tagDrift.writeBuild(lockedTask())
-        assertContains(tagDrift.runAndFail("verifyLocked").output, "tag drift")
-
+    fun `locked source verification reports POM version drift`() {
         val versionDrift = fixture("locked-version-drift")
         val (versionSource, versionCommit) = versionDrift.createGitCheckout()
-        versionDrift.git(versionSource, "tag", "v8.5.7")
         versionSource.resolve("pom.xml").writeText("<project><version>8.5.6</version></project>")
         versionDrift.resolve("lock.txt").writeText(metadata(versionCommit))
         versionDrift.writeBuild(lockedTask())
@@ -64,8 +54,7 @@ class CloudSimPlusPrepareTaskFunctionalTest {
     @Test
     fun `locked source verification reports parent repository gitlink drift`() {
         val fixture = fixture("locked-gitlink-drift")
-        val (source, commit) = fixture.createGitCheckout()
-        fixture.git(source, "tag", "v8.5.7")
+        val (_, commit) = fixture.createGitCheckout()
         fixture.git(fixture.project, "init")
         fixture.resolve("lock.txt").writeText(metadata(commit))
         fixture.writeBuild(lockedTask())

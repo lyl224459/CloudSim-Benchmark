@@ -207,7 +207,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 val verifyLockedCloudSimPlusSource by tasks.registering(VerifyLockedCloudSimPlusSourceTask::class) {
     group = "build setup"
-    description = "增量验证默认锁定的 CloudSim Plus checkout、gitlink、tag 和 POM version"
+    description = "增量验证默认锁定的 CloudSim Plus checkout、gitlink 和 POM version"
     enabled = cloudSimPlusEnforceLock.get()
     lockFile.set(cloudSimPlusLockFile)
     sourcePom.from(cloudSimPlusSubmoduleDir.file("pom.xml"))
