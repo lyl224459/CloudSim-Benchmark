@@ -16,19 +16,19 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Set up JDK 25
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
 
     - name: Cache CloudSim Plus Maven dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
@@ -38,7 +38,7 @@ jobs:
     - name: Test latest release (Windows)
       if: runner.os == 'Windows'
       run: |
-        .\gradlew.bat clean verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
+        .\gradlew.bat verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
@@ -46,17 +46,17 @@ jobs:
     - name: Test latest release (Unix)
       if: runner.os != 'Windows'
       run: |
-        ./gradlew clean verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
+        ./gradlew verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
     - name: Upload compatibility metadata and reports
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: cloudsimplus-latest-${{ matrix.os }}
         path: |
-          build/cloudsimplus-version.txt
+          build/cloudsimplus-mutable-version.txt
           build/reports/
         if-no-files-found: warn

@@ -18,11 +18,13 @@ import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
+import org.gradle.api.tasks.CacheableTask
 import org.gradle.work.DisableCachingByDefault
+import java.io.File
 import javax.inject.Inject
 
 @DisableCachingByDefault(because = "Updates a mutable Git checkout")
-abstract class PrepareCloudSimPlusSourceTask : DefaultTask() {
+abstract class PrepareMutableCloudSimPlusSourceTask : DefaultTask() {
     @get:Input
     abstract val repositoryUrl: Property<String>
 
@@ -34,12 +36,6 @@ abstract class PrepareCloudSimPlusSourceTask : DefaultTask() {
 
     @get:Input
     abstract val requestedRef: Property<String>
-
-    @get:InputFile
-    abstract val lockFile: RegularFileProperty
-
-    @get:Input
-    abstract val enforceLock: Property<Boolean>
 
     @get:Input
     abstract val networkProxy: Property<String>
@@ -81,9 +77,91 @@ abstract class PrepareCloudSimPlusSourceTask : DefaultTask() {
             offlineMode = offline.get(),
             autoUpdateEnabled = autoUpdate.get(),
             selectedOverride = requestedRef.get().trim(),
-            lockedMetadata = CloudSimPlusLockSupport.read(lockFile.get().asFile).takeIf { enforceLock.get() },
+            lockedMetadata = null,
         )
     }
+}
+
+@CacheableTask
+abstract class VerifyLockedCloudSimPlusSourceTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val lockFile: RegularFileProperty
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sourcePom: ConfigurableFileCollection
+
+    @get:Optional
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val gitStateFiles: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val rootDir: DirectoryProperty
+
+    @get:Internal
+    abstract val sourceDir: DirectoryProperty
+
+    @get:OutputFile
+    abstract val versionFile: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val source = sourceDir.get().asFile
+        val gitMarker = source.resolve(".git")
+        val pom = sourcePom.files.singleOrNull()
+        if (!gitMarker.exists() || pom == null || !pom.isFile) {
+            throw org.gradle.api.GradleException(
+                "CloudSim Plus locked source is missing at ${source.path}; " +
+                    "run git submodule update --init --recursive.",
+            )
+        }
+
+        val expected = CloudSimPlusLockSupport.read(lockFile.get().asFile)
+        val checkoutCommit = runGit(source, "rev-parse", "HEAD")
+        check(checkoutCommit == expected.commit) {
+            "CloudSim Plus checkout drift: expected=${expected.commit} actual=$checkoutCommit"
+        }
+        val exactTag = runGit(source, "describe", "--tags", "--exact-match")
+        check(exactTag == expected.ref) {
+            "CloudSim Plus tag drift: expected=${expected.ref} actual=$exactTag"
+        }
+        val actualVersion = CloudSimPlusVersioning.readCloudSimPlusVersion(source)
+        check(actualVersion == expected.version) {
+            "CloudSim Plus POM version drift: expected=${expected.version} actual=$actualVersion"
+        }
+
+        val repositoryRoot = rootDir.get().asFile
+        if (repositoryRoot.resolve(".git").exists()) {
+            val indexedCommit =
+                runGit(repositoryRoot, "ls-files", "-s", "--", "third_party/cloudsimplus")
+                    .split(Regex("\\s+"))
+                    .getOrNull(1)
+            check(indexedCommit == expected.commit) {
+                "CloudSim Plus submodule gitlink drift: expected=${expected.commit} actual=$indexedCommit"
+            }
+        } else {
+            logger.lifecycle("Root Git metadata is unavailable; skipping submodule gitlink verification")
+        }
+
+        CloudSimPlusLockSupport.writeIfChanged(versionFile.get().asFile, expected)
+        logger.lifecycle("CloudSim Plus locked source verified: ${expected.ref} ${expected.commit} ${expected.version}")
+    }
+
+    private fun runGit(
+        directory: File,
+        vararg arguments: String,
+    ): String =
+        ProcessBuilder(listOf("git") + arguments)
+            .directory(directory)
+            .redirectErrorStream(true)
+            .start()
+            .run {
+                val output = inputStream.bufferedReader().readText().trim()
+                check(waitFor() == 0) { "Git command failed in ${directory.path}: $output" }
+                output
+            }
 }
 
 @DisableCachingByDefault(because = "Runs Maven in a mutable source checkout")

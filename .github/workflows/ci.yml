@@ -17,20 +17,20 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
         fetch-depth: 0
 
     - name: Set up JDK 25
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
 
     - name: Cache CloudSim Plus Maven dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
@@ -46,7 +46,7 @@ jobs:
 
     - name: Upload build warning audit
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: build-warning-audit-${{ matrix.os }}
         path: build/reports/build-warnings/
@@ -55,7 +55,6 @@ jobs:
     - name: Full check and release package smoke (Windows)
       if: runner.os == 'Windows'
       run: |
-        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
         .\gradlew.bat fullCheck verifyReleasePackage --no-daemon --stacktrace --configuration-cache
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
@@ -64,11 +63,31 @@ jobs:
     - name: Full check and release package smoke (Unix)
       if: runner.os != 'Windows'
       run: |
-        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
         ./gradlew fullCheck verifyReleasePackage --no-daemon --stacktrace --configuration-cache
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
+
+  buildsrc-check:
+    name: BuildSrc check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ windows-latest, ubuntu-latest, macos-latest ]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        submodules: recursive
+
+    - name: Set up JDK 25
+      uses: actions/setup-java@v5
+      with:
+        java-version: '25'
+        distribution: 'temurin'
+        cache: 'gradle'
 
     - name: Verify buildSrc and generate merged JaCoCo report
       shell: pwsh
@@ -84,7 +103,7 @@ jobs:
 
     - name: Upload buildSrc JaCoCo report
       if: always() && runner.os == 'Linux'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: buildsrc-jacoco
         path: buildSrc/build/reports/jacoco/
@@ -96,19 +115,19 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Set up JDK 25
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
 
     - name: Cache CloudSim Plus Maven dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
@@ -116,11 +135,11 @@ jobs:
           ${{ runner.os }}-m2-cloudsimplus-
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Build and smoke container image
       run: |
-        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        ./gradlew sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
         ./gradlew containerImageSmoke --no-daemon --stacktrace --configuration-cache
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
@@ -133,20 +152,20 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
         fetch-depth: 0
 
     - name: Set up JDK 25
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
 
     - name: Cache CloudSim Plus Maven dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
@@ -165,7 +184,7 @@ jobs:
     - name: Generate JMH trend report
       shell: bash
       run: |
-        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        ./gradlew sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
         args=(benchmarkPerformanceTrend --no-daemon --stacktrace --configuration-cache)
         if test -s build/reports/performance/previous-jmh-results.json; then
           args+=("-PperformanceBaseline=build/reports/performance/previous-jmh-results.json")
@@ -177,7 +196,7 @@ jobs:
 
     - name: Upload performance trend artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: performance-trend
         path: |

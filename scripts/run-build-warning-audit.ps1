@@ -10,7 +10,8 @@ $sourceFailures = [System.Collections.Generic.List[string]]::new()
 @(
     (Join-Path $root "build/cloudsimplus-raw-m2"),
     (Join-Path $root "build/cloudsimplus-m2"),
-    (Join-Path $root "build/cloudsimplus-version.txt"),
+    (Join-Path $root "build/cloudsimplus-locked-version.txt"),
+    (Join-Path $root "build/cloudsimplus-mutable-version.txt"),
     (Join-Path $root "build/reports/build-warnings")
 ) | ForEach-Object {
     if (Test-Path -LiteralPath $_) {

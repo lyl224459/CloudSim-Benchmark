@@ -10,6 +10,7 @@
 - `.\gradlew.bat fullCheck --no-daemon --stacktrace --rerun-tasks`
 - `.\gradlew.bat verifyCloudSimPlusSourceBuild --no-daemon --stacktrace --configuration-cache`
 - `.\gradlew.bat verifyCloudSimPlusLock --no-daemon --stacktrace --configuration-cache`
+- `.\gradlew.bat verifyGitHubActionsPolicy --no-daemon --stacktrace --configuration-cache`
 - `.\gradlew.bat benchmarkPerformanceSmoke --no-daemon --stacktrace --rerun-tasks`
 - `.\gradlew.bat benchmarkPerformanceTrend --no-daemon --stacktrace`
 - `.\gradlew.bat verifyReleasePackage --no-daemon --stacktrace`
@@ -32,6 +33,8 @@
   报告写入 `performance-history` 分支，仅用于趋势观察。
 - Windows、Ubuntu、macOS CI 和 release 构建均执行 build warning audit，并始终上传 `build/reports/build-warnings/`。
 - 普通构建严格使用 `gradle/cloudsimplus.lock`；每周 latest compatibility workflow 单独测试上游最新 release。发布清单必须记录实际 CloudSim Plus ref、commit 和 version。
+- 默认锁定模式下 `prepareCloudSimPlusSource` 仅增量验证 checkout/lock，不执行网络或 checkout；缺失 submodule 时先运行 `git submodule update --init --recursive`。
+- GitHub workflow JavaScript Action 必须使用 `verifyGitHubActionsPolicy` 批准的 Node.js 24 主版本。
 - CloudSim Plus Maven 依赖缓存与 raw/sanitized staging repo 必须分离；两个 staging repo 各只允许包含锁定版本的 JAR/POM。
 - `verifyJUnitTestSignatures` 与 `verifyJUnitTestInventory` 必须通过；有意调整测试入口时使用 `updateJUnitTestInventory` 更新精确清单。
 - `buildSrc` JaCoCo 生成 XML/HTML 报告并执行保守覆盖率门禁。

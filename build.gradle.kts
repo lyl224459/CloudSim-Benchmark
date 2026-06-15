@@ -2,18 +2,20 @@ import buildlogic.BuildCloudSimPlusFromSourceTask
 import buildlogic.BuildWarningAuditTask
 import buildlogic.CliEndToEndSmokeTask
 import buildlogic.CloudSimPlusBuildService
+import buildlogic.CloudSimPlusGitStateFiles
 import buildlogic.CloudSimPlusLockSupport
 import buildlogic.ContainerImageSmokeTask
-import buildlogic.PrepareCloudSimPlusSourceTask
+import buildlogic.PrepareMutableCloudSimPlusSourceTask
 import buildlogic.ReleaseManifest
 import buildlogic.ReleaseManifestSupport
 import buildlogic.SanitizeCloudSimPlusJarManifestTask
 import buildlogic.UpdateCloudSimPlusLockTask
 import buildlogic.UpdateJUnitTestInventoryTask
-import buildlogic.VerifyCloudSimPlusLockTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
+import buildlogic.VerifyGitHubActionsPolicyTask
 import buildlogic.VerifyJUnitTestInventoryTask
 import buildlogic.VerifyJUnitTestSignaturesTask
+import buildlogic.VerifyLockedCloudSimPlusSourceTask
 import buildlogic.VerifyNoDetektBaselineTask
 import io.gitlab.arturbosch.detekt.Detekt
 import org.gradle.api.provider.ProviderFactory
@@ -53,13 +55,12 @@ val cloudSimPlusRepositoryUrl = "https://github.com/cloudsimplus/cloudsimplus.gi
 val cloudSimPlusSubmoduleDir = layout.projectDirectory.dir("third_party/cloudsimplus")
 val cloudSimPlusRawMavenRepo = layout.buildDirectory.dir("cloudsimplus-raw-m2")
 val cloudSimPlusLocalMavenRepo = layout.buildDirectory.dir("cloudsimplus-m2")
-val cloudSimPlusVersionFile = layout.buildDirectory.file("cloudsimplus-version.txt")
+val cloudSimPlusLockedVersionFile = layout.buildDirectory.file("cloudsimplus-locked-version.txt")
+val cloudSimPlusMutableVersionFile = layout.buildDirectory.file("cloudsimplus-mutable-version.txt")
 val cloudSimPlusLockFile = layout.projectDirectory.file("gradle/cloudsimplus.lock")
 val junitTestInventoryFile = layout.projectDirectory.file("gradle/junit-test-inventory.lock")
 val cloudSimPlusLockedMetadata =
     providers.fileContents(cloudSimPlusLockFile).asText.map(CloudSimPlusLockSupport::parse)
-val cloudSimPlusActualMetadata =
-    providers.fileContents(cloudSimPlusVersionFile).asText.map(CloudSimPlusLockSupport::parse)
 val cloudSimPlusMavenCacheDir =
     providers
         .gradleProperty("cloudsimplus.mavenCacheDir")
@@ -83,6 +84,12 @@ val cloudSimPlusEnforceLock =
     cloudSimPlusAutoUpdate.zip(cloudSimPlusRequestedRef) { autoUpdate, requestedRef ->
         !autoUpdate && requestedRef.isBlank()
     }
+val cloudSimPlusVersionFile =
+    cloudSimPlusEnforceLock.flatMap { enforceLock ->
+        if (enforceLock) cloudSimPlusLockedVersionFile else cloudSimPlusMutableVersionFile
+    }
+val cloudSimPlusActualMetadata =
+    providers.fileContents(cloudSimPlusVersionFile).asText.map(CloudSimPlusLockSupport::parse)
 val cloudSimPlusNetworkProxy =
     providers
         .gradleProperty("cloudsimplus.gitProxy")
@@ -198,31 +205,48 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
-val prepareCloudSimPlusSource by tasks.registering(PrepareCloudSimPlusSourceTask::class) {
+val verifyLockedCloudSimPlusSource by tasks.registering(VerifyLockedCloudSimPlusSourceTask::class) {
     group = "build setup"
-    description = "初始化 CloudSim Plus submodule，fetch tags，并 checkout 最新 release tag 或 -Pcloudsimplus.ref"
+    description = "增量验证默认锁定的 CloudSim Plus checkout、gitlink、tag 和 POM version"
+    enabled = cloudSimPlusEnforceLock.get()
+    lockFile.set(cloudSimPlusLockFile)
+    sourcePom.from(cloudSimPlusSubmoduleDir.file("pom.xml"))
+    gitStateFiles.from(
+        CloudSimPlusGitStateFiles.resolve(
+            rootDir = layout.projectDirectory.asFile,
+            sourceDir = cloudSimPlusSubmoduleDir.asFile,
+        ),
+    )
+    rootDir.set(layout.projectDirectory)
+    sourceDir.set(cloudSimPlusSubmoduleDir)
+    versionFile.set(cloudSimPlusLockedVersionFile)
+}
+
+val prepareMutableCloudSimPlusSource by tasks.registering(PrepareMutableCloudSimPlusSourceTask::class) {
+    group = "build setup"
+    description = "初始化并更新显式 ref 或 latest compatibility CloudSim Plus checkout"
+    enabled = !cloudSimPlusEnforceLock.get()
     repositoryUrl.set(cloudSimPlusRepositoryUrl)
     autoUpdate.set(cloudSimPlusAutoUpdate)
     offline.set(cloudSimPlusOffline)
     requestedRef.set(cloudSimPlusRequestedRef)
-    lockFile.set(cloudSimPlusLockFile)
-    enforceLock.set(cloudSimPlusEnforceLock)
     networkProxy.set(cloudSimPlusNetworkProxy)
     gitTimeoutSeconds.set(cloudSimPlusGitTimeoutSeconds)
     rootDir.set(layout.projectDirectory)
     sourceDir.set(cloudSimPlusSubmoduleDir)
-    versionFile.set(cloudSimPlusVersionFile)
+    versionFile.set(cloudSimPlusMutableVersionFile)
 }
 
-val verifyCloudSimPlusLock by tasks.registering(VerifyCloudSimPlusLockTask::class) {
+val prepareCloudSimPlusSource by tasks.registering {
+    group = "build setup"
+    description = "按锁定或动态模式准备 CloudSim Plus 源码"
+    dependsOn(verifyLockedCloudSimPlusSource, prepareMutableCloudSimPlusSource)
+}
+
+val verifyCloudSimPlusLock by tasks.registering {
     group = "verification"
     description = "验证 CloudSim Plus checkout、实际元数据与 gradle/cloudsimplus.lock 一致"
     dependsOn(prepareCloudSimPlusSource)
-    lockFile.set(cloudSimPlusLockFile)
-    metadataFile.set(cloudSimPlusVersionFile)
-    rootDir.set(layout.projectDirectory)
-    sourceDir.set(cloudSimPlusSubmoduleDir)
-    enforceLock.set(cloudSimPlusEnforceLock)
 }
 
 val updateCloudSimPlusLock by tasks.registering(UpdateCloudSimPlusLockTask::class) {
@@ -516,6 +540,17 @@ val verifyNoDetektBaseline by tasks.registering(VerifyNoDetektBaselineTask::clas
     )
 }
 
+val verifyGitHubActionsPolicy by tasks.registering(VerifyGitHubActionsPolicyTask::class) {
+    group = "verification"
+    description = "验证 GitHub Actions 使用批准的 Node.js 24 主版本"
+    workflowFiles.from(
+        layout.projectDirectory.dir(".github/workflows").asFileTree.matching {
+            include("*.yml", "*.yaml")
+        },
+    )
+    reportFile.set(layout.buildDirectory.file("reports/github-actions-policy.txt"))
+}
+
 tasks.named("check") {
     dependsOn(
         "ktlintCheck",
@@ -525,6 +560,7 @@ tasks.named("check") {
         verifyJUnitTestSignatures,
         verifyJUnitTestInventory,
         verifyNoDetektBaseline,
+        verifyGitHubActionsPolicy,
         verifyCloudSimPlusSourceBuild,
     )
 }

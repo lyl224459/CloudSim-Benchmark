@@ -28,7 +28,7 @@ RUN chmod +x gradlew
 RUN --mount=type=cache,target=/root/.m2/repository \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.gradle/wrapper \
-    ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
+    ./gradlew sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
 RUN --mount=type=cache,target=/root/.m2/repository \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.gradle/wrapper \
