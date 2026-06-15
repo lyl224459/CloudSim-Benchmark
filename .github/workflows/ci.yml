@@ -70,9 +70,14 @@ jobs:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
-    - name: Verify buildSrc and generate JaCoCo report
-      if: runner.os == 'Linux'
-      run: ./gradlew buildSrc:check buildSrc:jacocoTestReport --no-daemon --stacktrace --configuration-cache
+    - name: Verify buildSrc and generate merged JaCoCo report
+      shell: pwsh
+      run: |
+        if ($IsWindows) {
+          .\gradlew.bat buildSrc:check buildSrc:jacocoTestReport --no-daemon --stacktrace --configuration-cache
+        } else {
+          ./gradlew buildSrc:check buildSrc:jacocoTestReport --no-daemon --stacktrace --configuration-cache
+        }
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"

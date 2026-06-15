@@ -422,7 +422,7 @@ CloudSim-Benchmark/
 
 warning audit 分别捕获 `compileKotlin`、`detekt`、`ktlintCheck` 和 CloudSim Plus Maven 源码构建日志，仅精确允许 detekt `1.23.8` 的 Gradle 10 deprecation 和 ktlint 内嵌 Kotlin compiler 的 JDK 25 Unsafe warning；任何新增 warning 都会阻断 CI。审计报告和原始日志保存在 `build/reports/build-warnings/` 并由 CI 始终上传。
 
-每周 CloudSim Plus latest compatibility workflow 会在 Windows、Ubuntu、macOS 上测试最新 release，但不会自动修改 lock。发布清单记录实际 CloudSim Plus ref、commit、version 与全部资产；`buildSrc` JaCoCo 报告位于 `buildSrc/build/reports/jacoco/`，并执行 line 50% / branch 40% 门禁。根项目使用 `verifyJUnitTestSignatures` 阻止非 `Unit` 测试入口被静默忽略，并使用 `gradle/junit-test-inventory.lock` 精确跟踪测试入口；有意新增、删除或重命名测试后运行 `updateJUnitTestInventory` 更新清单。
+每周 CloudSim Plus latest compatibility workflow 会在 Windows、Ubuntu、macOS 上测试最新 release，但不会自动修改 lock。发布清单记录实际 CloudSim Plus ref、commit、version 与全部资产；`buildSrc` JaCoCo 报告位于 `buildSrc/build/reports/jacoco/`，合并普通单测与 TestKit 子构建 task action 覆盖，并执行 line 55% / branch 45% 门禁。根项目使用 `verifyJUnitTestSignatures` 阻止非 `Unit` 测试入口被静默忽略，并使用 `gradle/junit-test-inventory.lock` 精确跟踪测试入口；有意新增、删除或重命名测试后运行 `updateJUnitTestInventory` 更新清单。
 
 ### 迁移说明
 
