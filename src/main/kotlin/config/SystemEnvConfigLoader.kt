@@ -1,63 +1,75 @@
 package config
 
+internal fun interface EnvReader {
+    fun get(name: String): String?
+}
+
+private object SystemEnvReader : EnvReader {
+    override fun get(name: String): String? = System.getenv(name)
+}
+
 internal object SystemEnvConfigLoader {
-    fun load(): SystemConfig? {
-        if (!envBoolean("USE_ENV_CONFIG", false)) {
+    fun load(env: EnvReader = SystemEnvReader): SystemConfig? {
+        if (!envBoolean(env, "USE_ENV_CONFIG", false)) {
             return null
         }
         return SystemConfig(
-            output = outputConfig(),
-            logging = loggingConfig(),
-            experiment = experimentConfig(),
-            jvm = jvmConfig(),
+            output = outputConfig(env),
+            logging = loggingConfig(env),
+            experiment = experimentConfig(env),
+            jvm = jvmConfig(env),
         )
     }
 
-    private fun outputConfig(): OutputConfig {
+    private fun outputConfig(env: EnvReader): OutputConfig {
         val defaults = OutputConfig()
         return OutputConfig(
-            resultsDir = System.getenv("OUTPUT_RESULTS_DIR") ?: defaults.resultsDir,
-            csv = csvConfig(defaults.csv),
+            resultsDir = env.get("OUTPUT_RESULTS_DIR") ?: defaults.resultsDir,
+            csv = csvConfig(env, defaults.csv),
         )
     }
 
-    private fun csvConfig(defaults: CsvConfig): CsvConfig =
+    private fun csvConfig(
+        env: EnvReader,
+        defaults: CsvConfig,
+    ): CsvConfig =
         CsvConfig(
-            enabled = envBoolean("CSV_ENABLED", defaults.enabled),
-            delimiter = System.getenv("CSV_DELIMITER") ?: defaults.delimiter,
+            enabled = envBoolean(env, "CSV_ENABLED", defaults.enabled),
+            delimiter = env.get("CSV_DELIMITER") ?: defaults.delimiter,
         )
 
-    private fun loggingConfig(): LoggingConfig {
+    private fun loggingConfig(env: EnvReader): LoggingConfig {
         val defaults = LoggingConfig()
         return LoggingConfig(
-            level = System.getenv("LOGGING_LEVEL") ?: defaults.level,
-            file = envBoolean("LOGGING_FILE", defaults.file),
-            console = envBoolean("LOGGING_CONSOLE", defaults.console),
+            level = env.get("LOGGING_LEVEL") ?: defaults.level,
+            file = envBoolean(env, "LOGGING_FILE", defaults.file),
+            console = envBoolean(env, "LOGGING_CONSOLE", defaults.console),
         )
     }
 
-    private fun experimentConfig(): SystemExperimentConfig {
+    private fun experimentConfig(env: EnvReader): SystemExperimentConfig {
         val defaults = SystemExperimentConfig()
         return SystemExperimentConfig(
-            autoCreateDirs = envBoolean("EXPERIMENT_AUTO_CREATE_DIRS", defaults.autoCreateDirs),
-            nameFormat = System.getenv("EXPERIMENT_NAME_FORMAT") ?: defaults.nameFormat,
-            maxConcurrent = System.getenv("EXPERIMENT_MAX_CONCURRENT")?.toIntOrNull() ?: defaults.maxConcurrent,
+            autoCreateDirs = envBoolean(env, "EXPERIMENT_AUTO_CREATE_DIRS", defaults.autoCreateDirs),
+            nameFormat = env.get("EXPERIMENT_NAME_FORMAT") ?: defaults.nameFormat,
+            maxConcurrent = env.get("EXPERIMENT_MAX_CONCURRENT")?.toIntOrNull() ?: defaults.maxConcurrent,
         )
     }
 
-    private fun jvmConfig(): JvmConfig {
+    private fun jvmConfig(env: EnvReader): JvmConfig {
         val defaults = JvmConfig()
         return JvmConfig(
-            maxHeapSize = System.getenv("JVM_MAX_HEAP_SIZE") ?: defaults.maxHeapSize,
-            gcAlgorithm = System.getenv("JVM_GC_ALGORITHM") ?: defaults.gcAlgorithm,
+            maxHeapSize = env.get("JVM_MAX_HEAP_SIZE") ?: defaults.maxHeapSize,
+            gcAlgorithm = env.get("JVM_GC_ALGORITHM") ?: defaults.gcAlgorithm,
         )
     }
 
     private fun envBoolean(
+        env: EnvReader,
         name: String,
         default: Boolean,
     ): Boolean {
-        val value = System.getenv(name)
-        return value?.toBooleanStrictOrNull() ?: value?.toBoolean() ?: default
+        val value = env.get(name)
+        return value?.toBooleanStrictOrNull() ?: default
     }
 }

@@ -55,12 +55,13 @@ class ImprovedRLScheduler(
         Logger.info("开始改进版 RL 预训练 ({} episodes)...", episodes)
         var currentEpsilon = initialExplorationRate
         val epsilonDecay = (initialExplorationRate - minExplorationRate) / episodes
+        val progressInterval = (episodes / PRETRAIN_PROGRESS_BUCKETS).coerceAtLeast(1)
 
         repeat(episodes) { episode ->
             trainOneEpisode(currentEpsilon)
             currentEpsilon = maxOf(minExplorationRate, currentEpsilon - epsilonDecay)
 
-            if (episode % (episodes / PRETRAIN_PROGRESS_BUCKETS) == 0) {
+            if (episode % progressInterval == 0) {
                 Logger.debug("进度: {}/{} | Epsilon: %.2f | Q表大小: {}", episode, episodes, currentEpsilon, qTable.size)
             }
         }
