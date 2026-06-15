@@ -86,10 +86,14 @@ class ResultExporterTest {
     @Test
     fun `export failure propagates to caller`() {
         val outputPath = File(tempDir, "not-a-directory").also { it.writeText("file") }
-        val exporter = BatchResultExporter(ExperimentOutputContext(outputPath), runs = 1)
 
         assertThrows<Exception> {
-            exporter.exportToCsv(listOf(partialBatchSummary()))
+            BatchResultExporter(ExperimentOutputContext(outputPath), runs = 1)
+                .exportToCsv(listOf(partialBatchSummary()))
+        }
+        assertThrows<Exception> {
+            RealtimeResultExporter(ExperimentOutputContext(outputPath))
+                .exportRealtimeToCSV(listOf(failedRealtimeSummary()))
         }
     }
 
