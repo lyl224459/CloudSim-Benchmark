@@ -22,20 +22,20 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0
         submodules: recursive
       
     - name: Set up JDK 25
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: '25'
         distribution: 'temurin'
         cache: 'gradle'
 
     - name: Cache CloudSim Plus Maven dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
@@ -64,7 +64,7 @@ jobs:
 
     - name: Upload build warning audit
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: build-warning-audit-release
         path: build/reports/build-warnings/
@@ -78,14 +78,13 @@ jobs:
 
     - name: Build, package and smoke release assets
       run: |
-        .\gradlew.bat clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
         .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
     - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ steps.ver.outputs.tag }}
         name: CloudSim-Benchmark v${{ steps.ver.outputs.version }}
@@ -120,23 +119,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
 
     - name: Log in to GHCR
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Extract metadata
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@v6
       with:
         images: ghcr.io/${{ github.repository }}
         tags: |
@@ -144,7 +143,7 @@ jobs:
           type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
     - name: Build and push Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v7
       with:
         context: .
         file: Containerfile

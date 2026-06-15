@@ -12,51 +12,99 @@ class CloudSimPlusPrepareTaskFunctionalTest {
     lateinit var tempDir: File
 
     @Test
-    fun `prepare locked offline checkout always runs and writes metadata`() {
-        val fixture = fixture("prepare-success")
+    fun `locked source verification becomes up to date and supports configuration cache`() {
+        val fixture = fixture("locked-success")
         val (_, commit) = fixture.createGitCheckout()
         fixture.resolve("lock.txt").writeText(metadata(commit))
-        fixture.writeBuild(prepareTask())
+        fixture.writeBuild(lockedTask())
 
-        val first = fixture.run("prepareSource")
-        val second = fixture.run("prepareSource")
+        val first = fixture.run("verifyLocked", "--configuration-cache")
+        val second = fixture.run("verifyLocked", "--configuration-cache")
 
-        assertEquals(TaskOutcome.SUCCESS, first.task(":prepareSource")?.outcome)
-        assertEquals(TaskOutcome.SUCCESS, second.task(":prepareSource")?.outcome)
-        assertEquals(metadata(commit).normalizedLines(), fixture.resolve("build/cloudsimplus-version.txt").readText().normalizedLines())
+        assertEquals(TaskOutcome.SUCCESS, first.task(":verifyLocked")?.outcome)
+        assertEquals(TaskOutcome.UP_TO_DATE, second.task(":verifyLocked")?.outcome)
+        assertContains(second.output, "Reusing configuration cache")
+        assertEquals(metadata(commit).normalizedLines(), fixture.resolve("build/locked-version.txt").readText().normalizedLines())
     }
 
     @Test
-    fun `prepare reports missing offline checkout and supports configuration cache`() {
-        val missing = fixture("prepare-missing")
+    fun `locked source verification reports missing source and checkout drift`() {
+        val missing = fixture("locked-missing")
         missing.resolve("lock.txt").writeText(metadata())
-        missing.writeBuild(prepareTask(source = "missing-source"))
-        assertContains(missing.runAndFail("prepareSource").output, "CloudSim Plus source is missing")
+        missing.writeBuild(lockedTask(source = "missing-source"))
+        assertContains(missing.runAndFail("verifyLocked").output, "git submodule update --init --recursive")
 
-        val cached = fixture("prepare-cache")
-        val (_, commit) = cached.createGitCheckout()
-        cached.resolve("lock.txt").writeText(metadata(commit))
-        cached.writeBuild(prepareTask())
-        cached.run("prepareSource", "--configuration-cache")
-        assertContains(cached.run("prepareSource", "--configuration-cache").output, "Reusing configuration cache")
+        val drift = fixture("locked-drift")
+        drift.createGitCheckout()
+        drift.resolve("lock.txt").writeText(metadata("b".repeat(40)))
+        drift.writeBuild(lockedTask())
+        assertContains(drift.runAndFail("verifyLocked").output, "checkout drift")
     }
 
-    private fun prepareTask(source: String = "source"): String =
-        """
-        import buildlogic.PrepareCloudSimPlusSourceTask
+    @Test
+    fun `locked source verification reports POM version drift`() {
+        val versionDrift = fixture("locked-version-drift")
+        val (versionSource, versionCommit) = versionDrift.createGitCheckout()
+        versionSource.resolve("pom.xml").writeText("<project><version>8.5.6</version></project>")
+        versionDrift.resolve("lock.txt").writeText(metadata(versionCommit))
+        versionDrift.writeBuild(lockedTask())
+        assertContains(versionDrift.runAndFail("verifyLocked").output, "POM version drift")
+    }
 
-        tasks.register('prepareSource', PrepareCloudSimPlusSourceTask) {
+    @Test
+    fun `locked source verification reports parent repository gitlink drift`() {
+        val fixture = fixture("locked-gitlink-drift")
+        val (_, commit) = fixture.createGitCheckout()
+        fixture.git(fixture.project, "init")
+        fixture.resolve("lock.txt").writeText(metadata(commit))
+        fixture.writeBuild(lockedTask())
+
+        assertContains(fixture.runAndFail("verifyLocked").output, "submodule gitlink drift")
+    }
+
+    @Test
+    fun `mutable source preparation always runs for explicit ref`() {
+        val fixture = fixture("mutable-success")
+        val (source, commit) = fixture.createGitCheckout()
+        fixture.git(source, "tag", "v8.5.7")
+        fixture.writeBuild(mutableTask())
+
+        val first = fixture.run("prepareMutable")
+        val second = fixture.run("prepareMutable")
+
+        assertEquals(TaskOutcome.SUCCESS, first.task(":prepareMutable")?.outcome)
+        assertEquals(TaskOutcome.SUCCESS, second.task(":prepareMutable")?.outcome)
+        assertEquals(metadata(commit).normalizedLines(), fixture.resolve("build/mutable-version.txt").readText().normalizedLines())
+    }
+
+    private fun lockedTask(source: String = "source"): String =
+        """
+        import buildlogic.VerifyLockedCloudSimPlusSourceTask
+
+        tasks.register('verifyLocked', VerifyLockedCloudSimPlusSourceTask) {
+            lockFile.set(layout.projectDirectory.file('lock.txt'))
+            sourcePom.from(layout.projectDirectory.file('$source/pom.xml'))
+            gitStateFiles.from(layout.projectDirectory.files('$source/.git/HEAD', '$source/.git/index'))
+            rootDir.set(layout.projectDirectory)
+            sourceDir.set(layout.projectDirectory.dir('$source'))
+            versionFile.set(layout.buildDirectory.file('locked-version.txt'))
+        }
+        """
+
+    private fun mutableTask(): String =
+        """
+        import buildlogic.PrepareMutableCloudSimPlusSourceTask
+
+        tasks.register('prepareMutable', PrepareMutableCloudSimPlusSourceTask) {
             repositoryUrl.set('https://invalid.example/cloudsimplus.git')
             autoUpdate.set(false)
             offline.set(true)
-            requestedRef.set('')
-            lockFile.set(layout.projectDirectory.file('lock.txt'))
-            enforceLock.set(true)
+            requestedRef.set('v8.5.7')
             networkProxy.set('')
             gitTimeoutSeconds.set(5L)
             rootDir.set(layout.projectDirectory)
-            sourceDir.set(layout.projectDirectory.dir('$source'))
-            versionFile.set(layout.buildDirectory.file('cloudsimplus-version.txt'))
+            sourceDir.set(layout.projectDirectory.dir('source'))
+            versionFile.set(layout.buildDirectory.file('mutable-version.txt'))
         }
         """
 

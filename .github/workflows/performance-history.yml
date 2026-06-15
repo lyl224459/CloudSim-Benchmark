@@ -16,20 +16,20 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         submodules: recursive
         fetch-depth: 0
 
     - name: Set up JDK 25
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5
       with:
         java-version: "25"
         distribution: temurin
         cache: gradle
 
     - name: Cache CloudSim Plus Maven dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-m2-cloudsimplus-${{ hashFiles('gradle/cloudsimplus.lock', 'third_party/cloudsimplus/pom.xml', 'third_party/cloudsimplus/.mvn/wrapper/**') }}
@@ -51,7 +51,7 @@ jobs:
     - name: Generate performance trend
       shell: bash
       run: |
-        ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
+        ./gradlew sanitizeCloudSimPlusJarManifest --no-daemon --stacktrace --configuration-cache
         args=(benchmarkPerformanceTrend --no-daemon --stacktrace --configuration-cache)
         if test -s build/reports/performance/previous-jmh-results.json; then
           args+=("-PperformanceBaseline=build/reports/performance/previous-jmh-results.json")
@@ -87,7 +87,7 @@ jobs:
 
     - name: Upload performance history artifacts
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: weekly-performance-history
         path: |

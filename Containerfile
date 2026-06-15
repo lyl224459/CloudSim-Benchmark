@@ -19,6 +19,9 @@ COPY gradle.properties .
 COPY buildSrc buildSrc
 COPY configs configs
 COPY .gitmodules .
+# Locked source verification needs the parent gitlink and submodule gitdir.
+# This metadata remains in the builder stage and is not copied into the runtime image.
+COPY .git .git
 COPY third_party third_party
 
 # 修复权限问题：确保 gradlew 可执行
@@ -28,7 +31,7 @@ RUN chmod +x gradlew
 RUN --mount=type=cache,target=/root/.m2/repository \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.gradle/wrapper \
-    ./gradlew clean sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
+    ./gradlew sanitizeCloudSimPlusJarManifest --no-daemon --configuration-cache
 RUN --mount=type=cache,target=/root/.m2/repository \
     --mount=type=cache,target=/root/.gradle/caches \
     --mount=type=cache,target=/root/.gradle/wrapper \

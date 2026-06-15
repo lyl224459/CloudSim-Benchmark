@@ -12,6 +12,48 @@ internal fun interface CloudSimPlusGitOperations {
     ): String
 }
 
+object CloudSimPlusGitStateFiles {
+    fun resolve(
+        rootDir: File,
+        sourceDir: File,
+    ): List<File> =
+        buildList {
+            addGitState(rootDir)
+            addGitState(sourceDir)
+        }.distinct()
+
+    private fun MutableList<File>.addGitState(directory: File) {
+        val gitDir = resolveGitDir(directory) ?: return
+        val head = gitDir.resolve("HEAD")
+        listOf(head, gitDir.resolve("index"), gitDir.resolve("packed-refs"))
+            .filterTo(this, File::isFile)
+        val reference =
+            head
+                .takeIf(File::isFile)
+                ?.readText()
+                ?.trim()
+                ?.removePrefix("ref:")
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+        reference
+            ?.let(gitDir::resolve)
+            ?.takeIf(File::isFile)
+            ?.let(::add)
+    }
+
+    private fun resolveGitDir(directory: File): File? {
+        val marker = directory.resolve(".git")
+        if (marker.isDirectory) {
+            return marker
+        }
+        if (!marker.isFile) {
+            return null
+        }
+        val relativePath = marker.readText().trim().removePrefix("gitdir:").trim()
+        return relativePath.takeIf(String::isNotBlank)?.let { directory.resolve(it).canonicalFile }
+    }
+}
+
 internal class CloudSimPlusGitClient(
     private val rootDir: File,
     private val networkProxy: String,
