@@ -105,6 +105,7 @@ jobs:
 
     - name: Full check and release package smoke (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
       run: |
         .\gradlew.bat fullCheck verifyReleasePackage --no-daemon --stacktrace --configuration-cache
       env:

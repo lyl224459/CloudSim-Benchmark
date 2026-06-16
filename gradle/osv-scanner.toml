@@ -1,0 +1,39 @@
+[[IgnoredVulns]]
+id = "GHSA-25qh-j22f-pwp8"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-6fmv-xxpf-w3cw"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-6v67-2wr5-gvf4"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-72hv-8253-57qq"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-j288-q9x7-2f5v"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-pr98-23f8-jwxv"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-qqpg-mvqg-649v"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
+
+[[IgnoredVulns]]
+id = "GHSA-rqfh-9r24-8c9r"
+ignoreUntil = 2026-12-31
+reason = "Accepted initial Gradle verification metadata baseline; reviewed by the scheduled full OSV scan."
