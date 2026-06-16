@@ -25,7 +25,7 @@ internal data class RealtimeArrivalControlServices(
     val commandExecutor: RealtimeBrokerCommandExecutor,
 )
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions") // Workflow adapter must implement the full arrival context contract.
 internal class RealtimeArrivalWorkflowAdapter(
     private val core: RealtimeArrivalCoreServices,
     private val controls: RealtimeArrivalControlServices,

@@ -2,9 +2,11 @@ package datacenter
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import util.CsvRowWriter
 import util.StatisticalValue
 import java.io.File
+import java.nio.file.Path
 
 class RealtimeMetricSchemaTest {
     @Test
@@ -87,6 +89,43 @@ class RealtimeMetricSchemaTest {
         val doc = File("docs/realtime-metrics.md").readText().normalizeLineEndings()
 
         assertThat(doc).isEqualTo(RealtimeMetricDocumentationGenerator.render().normalizeLineEndings())
+    }
+
+    @Test
+    fun `metric documentation generator writes parent directories`(
+        @TempDir tempDir: Path,
+    ) {
+        val output = tempDir.resolve("nested").resolve("realtime-metrics.md").toFile()
+
+        RealtimeMetricDocumentationGenerator.writeTo(output)
+
+        assertThat(output).exists()
+        assertThat(output.readText().normalizeLineEndings())
+            .isEqualTo(RealtimeMetricDocumentationGenerator.render().normalizeLineEndings())
+    }
+
+    @Test
+    fun `metric documentation generator writes file without parent directory`() {
+        val output = File("realtime-metric-doc-generator-test.md")
+
+        try {
+            output.delete()
+            RealtimeMetricDocumentationGenerator.writeTo(output)
+
+            assertThat(output).exists()
+            assertThat(output.readText()).contains("# Realtime 指标定义")
+        } finally {
+            output.delete()
+        }
+    }
+
+    @Test
+    fun `metric documentation renderer handles empty metric list`() {
+        val doc = RealtimeMetricDocumentationGenerator.render(emptyList()).normalizeLineEndings()
+
+        assertThat(doc).contains("# Realtime 指标定义")
+        assertThat(doc).contains("| CSV 指标 | 单位 | 趋势 | 定义 |")
+        assertThat(doc.lines().filter { it.startsWith("| ") }).hasSize(2)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package scheduler
 
+import config.DataLocalityPolicy
 import datacenter.RealtimeCloudletSpec
 import datacenter.RealtimeTraceMetadata
 import datacenter.RealtimeTraceMetadataProvider
@@ -13,6 +14,110 @@ import org.cloudsimplus.vms.VmSimple
 import org.junit.jupiter.api.Test
 
 class RealtimeCloudResourceComponentsTest {
+    @Test
+    fun `topology annotator returns empty candidates when no topology feature is enabled`() {
+        val annotator = annotator(config = annotationConfig())
+
+        val candidates =
+            annotator.annotate(
+                states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                workload = workload(),
+                records = emptyList(),
+            )
+
+        assertThat(candidates).isEmpty()
+    }
+
+    @Test
+    fun `topology annotator scores data locality and image cache decisions`() {
+        val local = location(0, region = 0)
+        val remote = location(1, region = 1)
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        dataLocalityEnabled = true,
+                        imageCacheEnabled = true,
+                    ),
+                imageCacheByHost = mapOf(local to setOf("image-a")),
+                locationOf = { index -> if (index == 0) local else remote },
+                latencyFor = { 0.5 },
+            )
+
+        val candidates =
+            annotator.annotate(
+                states =
+                    listOf(
+                        nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0),
+                        nodeState(vmIndex = 1, acceptingWork = true, availableTime = 0.0),
+                    ),
+                vmList =
+                    listOf(
+                        createVm(id = 0, ram = 1024, bw = 1000, storage = 1000),
+                        createVm(id = 1, ram = 1024, bw = 1000, storage = 1000),
+                    ),
+                workload = workload(dataRegion = RegionId(0), imageId = "image-a"),
+                records = emptyList(),
+            )
+
+        val localPlacement = requireNotNull(candidates.first { it.vmIndex == 0 }.acceptedPlacement)
+        val remotePlacement = requireNotNull(candidates.first { it.vmIndex == 1 }.acceptedPlacement)
+        assertThat(candidates.first().vmIndex).isEqualTo(0)
+        assertThat(localPlacement.dataLocal).isTrue()
+        assertThat(localPlacement.imageCacheHit).isTrue()
+        assertThat(remotePlacement.dataLocal).isFalse()
+        assertThat(remotePlacement.imageCacheHit).isFalse()
+        assertThat(remotePlacement.networkTransferDelay).isGreaterThan(0.0)
+        assertThat(remotePlacement.imagePullDelay).isGreaterThan(0.0)
+        assertThat(remotePlacement.score).isGreaterThan(localPlacement.score)
+    }
+
+    @Test
+    fun `topology annotator rejects projected physical demand above capacity`() {
+        val host0 = location(0)
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        physicalTopologyEnabled = true,
+                        hostCpuCapacity = 2.0,
+                    ),
+                locationOf = { index -> location(index) },
+            )
+        val active =
+            RealtimeTaskRecord(
+                cloudletId = 1,
+                originalArrivalTime = 0.0,
+                assignedVmIndex = 0,
+                lifecycle = RealtimeTaskLifecycle.RUNNING,
+                requestedCpu = 1.0,
+            )
+
+        val candidates =
+            annotator.annotate(
+                states =
+                    listOf(
+                        nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0),
+                        nodeState(vmIndex = 1, acceptingWork = true, availableTime = 0.0),
+                    ),
+                vmList =
+                    listOf(
+                        createVm(id = 0, ram = 1024, bw = 1000, storage = 1000),
+                        createVm(id = 1, ram = 1024, bw = 1000, storage = 1000),
+                    ),
+                workload = workload(requestedCpu = 1.5),
+                records = listOf(active, active.copy(cloudletId = 2, lifecycle = RealtimeTaskLifecycle.COMPLETED)),
+            )
+
+        val rejected = candidates.first { it.vmIndex == 0 }.placement
+        val accepted = requireNotNull(candidates.first { it.vmIndex == 1 }.acceptedPlacement)
+        assertThat(rejected).isEqualTo(
+            RealtimePlacementDecision.Rejected(VmIndex(0), host0, "physical_cpu_capacity"),
+        )
+        assertThat(accepted.hostState.allocatedCpu).isEqualTo(1.5)
+    }
+
     @Test
     fun `resource snapshot combines active reservations and incoming resource demand`() {
         val vm = createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)
@@ -170,8 +275,69 @@ class RealtimeCloudResourceComponentsTest {
             failurePressure = 0.0,
         )
 
-    private fun location(index: Int): RealtimeTopologyLocation =
-        RealtimeTopologyLocation(RegionId(0), RackId(0), HostId(index), FailureDomainId(index))
+    private fun annotator(
+        config: TopologyCandidateAnnotationConfig,
+        imageCacheByHost: Map<RealtimeTopologyLocation, Set<String>> = emptyMap(),
+        locationOf: (Int) -> RealtimeTopologyLocation = { index -> location(index) },
+        latencyFor: (RealtimeTopologyLocation) -> Double = { 0.0 },
+        costFor: (RealtimeTopologyLocation) -> Double = { 0.0 },
+    ): TopologyCandidateAnnotator =
+        TopologyCandidateAnnotator(
+            config = config,
+            locationOf = locationOf,
+            latencyFor = latencyFor,
+            costFor = costFor,
+            imageCacheByHost = imageCacheByHost,
+        )
+
+    private fun annotationConfig(
+        physicalTopologyEnabled: Boolean = false,
+        dataLocalityEnabled: Boolean = false,
+        imageCacheEnabled: Boolean = false,
+        hostCpuCapacity: Double = 100.0,
+    ): TopologyCandidateAnnotationConfig =
+        TopologyCandidateAnnotationConfig(
+            enabled = physicalTopologyEnabled || dataLocalityEnabled || imageCacheEnabled,
+            physicalTopologyEnabled = physicalTopologyEnabled,
+            dataLocalityEnabled = dataLocalityEnabled,
+            imageCacheEnabled = imageCacheEnabled,
+            localRegion = RegionId(0),
+            hostCpuCapacity = hostCpuCapacity,
+            hostRamCapacity = 100.0,
+            hostBwCapacity = 100.0,
+            hostIoCapacity = 100.0,
+            crossRackBandwidth = 4.0,
+            crossRegionBandwidth = 2.0,
+            dataLocalityPolicy = DataLocalityPolicy.BALANCED,
+        )
+
+    private fun workload(
+        requestedCpu: Double = 1.0,
+        dataRegion: RegionId = RegionId(0),
+        imageId: String? = null,
+    ): RealtimeWorkloadDescriptor =
+        RealtimeWorkloadDescriptor(
+            cloudletId = CloudletId(99),
+            tenantId = TenantId(0),
+            priority = 0,
+            deadline = null,
+            requestedCpu = requestedCpu,
+            requestedRam = 0.0,
+            requestedBw = 0.0,
+            requestedIo = 0.0,
+            dataRegion = dataRegion,
+            inputDataSizeGb = 4.0,
+            imageId = imageId,
+            imageSizeGb = 2.0,
+        )
+
+    private fun location(
+        index: Int,
+        region: Int = 0,
+    ): RealtimeTopologyLocation {
+        val regionId = RegionId(region)
+        return RealtimeTopologyLocation(regionId, RackId(0), HostId(index), FailureDomainId(index))
+    }
 
     private fun createCloudlet(id: Int): Cloudlet {
         val utilizationModel = UtilizationModelFull()

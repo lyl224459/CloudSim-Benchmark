@@ -373,13 +373,13 @@ dependencies {
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
     // 日志实现：slf4j + logback
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
+    implementation("org.slf4j:slf4j-api:2.0.18")
+    implementation("ch.qos.logback:logback-classic:1.5.34")
 
     // TOML配置文件解析库
     implementation("com.akuleshov7:ktoml-core:0.7.1")
     implementation("com.akuleshov7:ktoml-file:0.7.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // Kotlin协程
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
@@ -504,6 +504,10 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             "datacenter.BatchAlgorithmExecutor" to "0.60",
             "datacenter.PerformanceTrendReportGenerator" to "0.70",
             "broker.RealtimeVmSelectionFacade" to "0.65",
+            "scheduler.AlgorithmRegistry" to "0.65",
+            "scheduler.TopologyCandidateAnnotator" to "0.65",
+            "datacenter.RealtimeMetricsCollector" to "0.65",
+            "datacenter.RealtimeMetricDocumentationGenerator" to "0.70",
         ).forEach { (className, minimumBranchCoverage) ->
             rule {
                 element = "CLASS"
