@@ -7,9 +7,26 @@ updates:
       interval: weekly
       day: monday
     groups:
-      gradle-dependencies:
+      kotlin-toolchain:
         patterns:
-          - "*"
+          - "org.jetbrains.kotlin*"
+      kotlinx-runtime:
+        patterns:
+          - "org.jetbrains.kotlinx*"
+      logging:
+        patterns:
+          - "org.slf4j*"
+          - "ch.qos.logback*"
+          - "io.github.microutils*"
+      junit:
+        patterns:
+          - "org.junit*"
+      mockito:
+        patterns:
+          - "org.mockito*"
+      assertions:
+        patterns:
+          - "org.assertj*"
 
   - package-ecosystem: github-actions
     directory: /
@@ -17,10 +34,6 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    groups:
-      github-actions:
-        patterns:
-          - "*"
 
   - package-ecosystem: docker
     directory: /
@@ -28,7 +41,3 @@ updates:
     schedule:
       interval: weekly
       day: monday
-    groups:
-      container-images:
-        patterns:
-          - "*"
