@@ -103,7 +103,7 @@ data class RealtimeMetricValues(
     }
 }
 
-@Suppress("LongParameterList")
+@Suppress("LongParameterList") // Metric schema rows intentionally expose all CSV metadata fields.
 data class RealtimeMetricDefinition(
     val key: RealtimeMetricKey,
     val csvName: String,

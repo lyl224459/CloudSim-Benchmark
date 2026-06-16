@@ -2,7 +2,7 @@ package datacenter
 
 import util.StatisticalValue
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions") // Compatibility facade keeps existing statistics getter names stable.
 data class RealtimeAlgorithmStatistics(
     val algorithmName: String,
     val metrics: Map<RealtimeMetricKey, StatisticalValue>,

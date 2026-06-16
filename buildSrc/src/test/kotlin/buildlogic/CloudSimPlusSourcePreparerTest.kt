@@ -109,6 +109,33 @@ class CloudSimPlusSourcePreparerTest {
     }
 
     @Test
+    fun `explicit missing ref reports checkout failure`() {
+        val source = sourceCheckout("8.5.7")
+        val operations =
+            FakeGitOperations(COMMIT, exactTag = "") { args ->
+                if (args.containsAll(listOf("checkout", "v9.9.9"))) {
+                    throw org.gradle.api.GradleException("tag not found: v9.9.9")
+                }
+                null
+            }
+
+        val error =
+            assertFailsWith<org.gradle.api.GradleException> {
+                preparer(operations).prepare(
+                    source = source,
+                    versionFile = tempDir.resolve("metadata.txt"),
+                    offlineMode = false,
+                    autoUpdateEnabled = true,
+                    selectedOverride = "v9.9.9",
+                    lockedMetadata = null,
+                )
+            }
+
+        assertTrue(error.message.orEmpty().contains("tag not found: v9.9.9"))
+        assertTrue(operations.commands.any { it.containsAll(listOf("fetch", "v9.9.9")) })
+    }
+
+    @Test
     fun `nonempty directory without git checkout is rejected`() {
         val source =
             tempDir.resolve("non-checkout").apply {
