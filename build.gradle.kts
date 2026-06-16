@@ -379,7 +379,7 @@ dependencies {
     // TOML配置文件解析库
     implementation("com.akuleshov7:ktoml-core:0.7.1")
     implementation("com.akuleshov7:ktoml-file:0.7.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // Kotlin协程
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
