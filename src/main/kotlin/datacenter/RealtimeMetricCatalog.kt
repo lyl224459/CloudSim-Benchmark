@@ -23,7 +23,7 @@ internal object RealtimeMetricCatalog {
     }
 }
 
-@Suppress("LongParameterList")
+@Suppress("LongParameterList") // Schema builder mirrors the metric definition columns one-to-one.
 internal fun realtimeMetric(
     key: RealtimeMetricKey,
     csvName: String,

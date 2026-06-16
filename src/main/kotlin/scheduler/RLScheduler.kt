@@ -31,7 +31,7 @@ private const val PROGRESS_STATE_LEVELS = 10
  * 动作空间：选择哪个VM执行任务
  * 奖励函数：基于负载均衡和任务完成效率
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList") // Public scheduler constructor keeps existing RL tuning parameters stable.
 class RLScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,

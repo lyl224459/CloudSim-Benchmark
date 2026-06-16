@@ -1,6 +1,6 @@
 package datacenter
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions") // Compatibility facade keeps existing metric getter names stable.
 data class RealtimeAlgorithmResult(
     val algorithmName: String,
     val metrics: RealtimeMetricValues,

@@ -3,7 +3,9 @@ package datacenter
 import java.io.File
 
 object RealtimeMetricDocumentationGenerator {
-    fun render(): String =
+    fun render(): String = render(RealtimeMetricSchema.metrics)
+
+    internal fun render(metrics: List<RealtimeMetricDefinition>): String =
         buildString {
             appendLine("# Realtime 指标定义")
             appendLine()
@@ -15,7 +17,7 @@ object RealtimeMetricDocumentationGenerator {
             appendLine()
             appendLine("| CSV 指标 | 单位 | 趋势 | 定义 |")
             appendLine("| :--- | :--- | :--- | :--- |")
-            RealtimeMetricSchema.metrics.forEach { metric ->
+            metrics.forEach { metric ->
                 appendLine("| ${metric.csvName} | ${metric.unit} | ${metric.direction.label} | ${metric.description} |")
             }
         }

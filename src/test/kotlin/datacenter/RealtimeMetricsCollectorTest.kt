@@ -84,20 +84,55 @@ class RealtimeMetricsCollectorTest {
         assertThat(result.timeoutCount).isEqualTo(2)
         assertThat(result.retryCount).isEqualTo(3)
         assertThat(result.permanentFailedCount).isEqualTo(4)
+        assertThat(result.averageDecisionDelay).isEqualTo(0.25)
+        assertThat(result.submittedCount).isEqualTo(9)
+        assertThat(result.capacityRejectedCount).isEqualTo(10)
+        assertThat(result.averageQueueDepth).isEqualTo(2.5)
+        assertThat(result.maxQueueDepth).isEqualTo(11)
         assertThat(result.activeVmPeak).isEqualTo(5)
+        assertThat(result.scaleOutCount).isEqualTo(12)
+        assertThat(result.scaleInCount).isEqualTo(13)
+        assertThat(result.autoscalingCost).isEqualTo(14.0)
+        assertThat(result.coldStartDelayTotal).isEqualTo(15.0)
+        assertThat(result.resourceRejectedCount).isEqualTo(16)
+        assertThat(result.runtimeFailureCount).isEqualTo(17)
+        assertThat(result.timeoutCancelledCount).isEqualTo(18)
+        assertThat(result.migrationCount).isEqualTo(19)
+        assertThat(result.checkpointRecoveryCount).isEqualTo(20)
+        assertThat(result.retrySuccessRate).isEqualTo(0.5)
+        assertThat(result.preemptedCount).isEqualTo(21)
+        assertThat(result.preemptionSuccessCount).isEqualTo(22)
+        assertThat(result.preemptionFailedCount).isEqualTo(23)
+        assertThat(result.averagePreemptionDelay).isEqualTo(1.25)
+        assertThat(result.checkpointLossTotal).isEqualTo(24)
+        assertThat(result.costSlaTradeoffScore).isEqualTo(25.0)
+        assertThat(result.tenantQuotaRejectedCount).isEqualTo(26)
+        assertThat(result.tenantBudgetRejectedCount).isEqualTo(27)
         assertThat(result.tenantFairnessIndex).isEqualTo(0.75)
+        assertThat(result.fairnessViolationCount).isEqualTo(28)
+        assertThat(result.dominantResourceFairnessIndex).isEqualTo(0.8)
+        assertThat(result.retrySuccessByTenant).isEqualTo(0.9)
         assertThat(result.crossRackAssignmentCount).isEqualTo(6)
         assertThat(result.hostFailureCount).isEqualTo(7)
+        assertThat(result.rackFailureCount).isEqualTo(29)
+        assertThat(result.regionFailureCount).isEqualTo(30)
         assertThat(result.slaPenalty).isEqualTo(8.5)
         assertThat(result.metrics.values.keys).containsAll(RealtimeMetricKey.entries)
     }
 
-    @Suppress("LongMethod")
     private fun brokerWithMetrics(): RealtimeBroker {
         val broker = mock<RealtimeBroker>()
+        stubCoreMetrics(broker)
+        stubQueueAutoscalingMetrics(broker)
+        stubReliabilityMetrics(broker)
+        stubTenantMetrics(broker)
+        stubTopologyMetrics(broker)
+        return broker
+    }
+
+    private fun stubCoreMetrics(broker: RealtimeBroker) {
         whenever(broker.getActiveVmPeak()).thenReturn(5)
         whenever(broker.getSlaViolationCount(any())).thenReturn(1)
-        whenever(broker.getTopologyMetrics(any())).thenReturn(RealtimeTopologyMetrics(6, 2, 1.5, 2.5, 0.5))
         whenever(broker.getTenantSlaPenalty(any())).thenReturn(1.5)
         whenever(broker.getPreemptionPenalty()).thenReturn(7.0)
         whenever(broker.getRejectedCount()).thenReturn(1)
@@ -105,6 +140,10 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getRetryCount()).thenReturn(3)
         whenever(broker.getPermanentFailedCount()).thenReturn(4)
         whenever(broker.getAverageDecisionDelay()).thenReturn(0.25)
+        whenever(broker.getCostSlaTradeoffScore(any(), any())).thenReturn(25.0)
+    }
+
+    private fun stubQueueAutoscalingMetrics(broker: RealtimeBroker) {
         whenever(broker.getSubmittedCount()).thenReturn(9)
         whenever(broker.getCapacityRejectedCount()).thenReturn(10)
         whenever(broker.getAverageQueueDepth()).thenReturn(2.5)
@@ -114,6 +153,9 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getAutoscalingCost()).thenReturn(14.0)
         whenever(broker.getColdStartDelayTotal()).thenReturn(15.0)
         whenever(broker.getResourceRejectedCount()).thenReturn(16)
+    }
+
+    private fun stubReliabilityMetrics(broker: RealtimeBroker) {
         whenever(broker.getRuntimeFailureCount()).thenReturn(17)
         whenever(broker.getTimeoutCancelledCount()).thenReturn(18)
         whenever(broker.getMigrationCount()).thenReturn(19)
@@ -124,17 +166,22 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getPreemptionFailedCount()).thenReturn(23)
         whenever(broker.getAveragePreemptionDelay()).thenReturn(1.25)
         whenever(broker.getCheckpointLossTotal()).thenReturn(24)
-        whenever(broker.getCostSlaTradeoffScore(any(), any())).thenReturn(25.0)
+    }
+
+    private fun stubTenantMetrics(broker: RealtimeBroker) {
         whenever(broker.getTenantQuotaRejectedCount()).thenReturn(26)
         whenever(broker.getTenantBudgetRejectedCount()).thenReturn(27)
         whenever(broker.getTenantFairnessIndex(any())).thenReturn(0.75)
         whenever(broker.getFairnessViolationCount()).thenReturn(28)
         whenever(broker.getDominantResourceFairnessIndex()).thenReturn(0.8)
         whenever(broker.getRetrySuccessByTenant(any())).thenReturn(0.9)
+    }
+
+    private fun stubTopologyMetrics(broker: RealtimeBroker) {
+        whenever(broker.getTopologyMetrics(any())).thenReturn(RealtimeTopologyMetrics(6, 2, 1.5, 2.5, 0.5))
         whenever(broker.getHostFailureCount()).thenReturn(7)
         whenever(broker.getRackFailureCount()).thenReturn(29)
         whenever(broker.getRegionFailureCount()).thenReturn(30)
-        return broker
     }
 
     private fun vm(

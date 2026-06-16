@@ -207,6 +207,51 @@ class MainCliOverrideTest {
     }
 
     @Test
+    fun `resolver uses default profile and lets cli override profile defaults`() {
+        val configFile =
+            Files.createTempFile("cli-default-profile-", ".toml").toFile().apply {
+                writeText(
+                    """
+                    defaultProfile = "realtime_profile"
+
+                    [presets.realtime_fast]
+                    algorithms = ["MIN_LOAD"]
+
+                    [profiles.realtime_profile]
+                    mode = "realtime-multi"
+                    preset = "realtime_fast"
+                    tasks = [12, 24]
+                    runs = 2
+
+                    [profiles.realtime_profile.realtime]
+                    cloudletCount = 42
+                    cloudletCounts = [12, 24]
+                    """.trimIndent(),
+                )
+            }
+
+        val resolved =
+            try {
+                resolveRun(
+                    CliParser.RunCommand(
+                        configFile = configFile.absolutePath,
+                        algorithms = listOf("RANDOM"),
+                        taskCounts = listOf(7, 9),
+                        runs = 3,
+                    ),
+                )
+            } finally {
+                configFile.delete()
+            }
+
+        assertEquals("realtime_profile", resolved.profileName)
+        assertEquals("realtime-multi", resolved.mode)
+        assertEquals(listOf("RANDOM"), resolved.selectedAlgorithmNames)
+        assertEquals(listOf(7, 9), resolved.taskCounts)
+        assertEquals(3, resolved.experimentConfig.realtime.runs)
+    }
+
+    @Test
     fun `resolver keeps default multi task counts when no config provides tasks`() {
         val resolved =
             resolveRun(
