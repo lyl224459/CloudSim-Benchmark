@@ -3,9 +3,11 @@
   "allowedLicenses": [
     { "moduleLicense": "Apache-2.0" },
     { "moduleLicense": "EPL-1.0" },
+    { "moduleLicense": "EPL-2.0" },
     { "moduleLicense": "GPL-3.0" },
     { "moduleLicense": "GPLv3" },
     { "moduleLicense": "LGPL-2.1" },
+    { "moduleLicense": "LGPL-2.1-only" },
     { "moduleLicense": "MIT" }
   ],
   "aliases": {
