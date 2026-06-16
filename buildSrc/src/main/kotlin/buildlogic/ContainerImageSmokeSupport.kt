@@ -36,8 +36,35 @@ internal object ContainerImageSmokeSupport {
             dockerExecutable,
             "run",
             "--rm",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev",
+            "--mount",
+            runsTmpfsMount(),
             imageName,
             "--help",
+        )
+
+    fun inspectCommand(
+        dockerExecutable: String,
+        imageName: String,
+    ): List<String> =
+        listOf(
+            dockerExecutable,
+            "run",
+            "--rm",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,nosuid,nodev",
+            "--mount",
+            runsTmpfsMount(),
+            "--entrypoint",
+            "sh",
+            imageName,
+            "-c",
+            "test \"$(id -u)\" = 10001 && touch /app/runs/smoke && " +
+                "test ! -e /app/.git && test ! -e /app/.gradle && " +
+                "test ! -e /app/src && test ! -e /app/buildSrc && test ! -e /app/gradlew",
         )
 
     fun missingDockerMessage(
@@ -49,4 +76,7 @@ internal object ContainerImageSmokeSupport {
         } else {
             "Docker executable '$dockerExecutable' was not found; skipping local containerImageSmoke."
         }
+
+    private fun runsTmpfsMount(): String =
+        "type=tmpfs,destination=/app/runs,tmpfs-mode=1777"
 }

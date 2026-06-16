@@ -39,7 +39,7 @@ internal class BatchAlgorithmExecutor(
         simulation.start()
 
         val finishedCloudlets = broker.getCloudletFinishedList<Cloudlet>()
-        val metrics = calculateMetrics(finishedCloudlets, vmList)
+        val metrics = BatchExecutionMetricsCalculator.calculate(finishedCloudlets, vmList)
         val allocation = mapCloudletsToVmIndexes(cloudletList, finishedCloudlets, vmList)
         val objective = SchedulerObjectiveFunction(cloudletList, vmList, config.objectiveWeights)
         return AlgorithmResult(
@@ -52,7 +52,28 @@ internal class BatchAlgorithmExecutor(
         ).also(::logResult)
     }
 
-    private fun calculateMetrics(
+    private fun logAlgorithmHeader(algorithmName: String) {
+        Logger.info("\n${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
+        Logger.info("运行算法: {}", algorithmName)
+        Logger.info("${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
+    }
+
+    private fun logResult(result: AlgorithmResult) {
+        Logger.info("\n结果:")
+        Logger.info("  最大完成时间 (Makespan): {}", decimalFormat.format(result.makespan))
+        Logger.info("  负载均衡度 (LB): {}", decimalFormat.format(result.loadBalance))
+        Logger.info("  总成本 (Cost): {}", decimalFormat.format(result.cost))
+        Logger.info("  总时间 (TotalTime): {}", decimalFormat.format(result.totalTime))
+        Logger.info("  适应度 (Fitness): {}", decimalFormat.format(result.fitness))
+    }
+
+    private companion object {
+        const val SECTION_SEPARATOR_WIDTH = 60
+    }
+}
+
+internal object BatchExecutionMetricsCalculator {
+    fun calculate(
         cloudlets: List<Cloudlet>,
         vms: List<Vm>,
     ): BatchExecutionMetrics {
@@ -78,29 +99,10 @@ internal class BatchAlgorithmExecutor(
             DatacenterConfig.H_MIPS.toDouble() -> DatacenterConfig.H_PRICE
             else -> DatacenterConfig.L_PRICE
         }
-
-    private fun logAlgorithmHeader(algorithmName: String) {
-        Logger.info("\n${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
-        Logger.info("运行算法: {}", algorithmName)
-        Logger.info("${"=".repeat(SECTION_SEPARATOR_WIDTH)}")
-    }
-
-    private fun logResult(result: AlgorithmResult) {
-        Logger.info("\n结果:")
-        Logger.info("  最大完成时间 (Makespan): {}", decimalFormat.format(result.makespan))
-        Logger.info("  负载均衡度 (LB): {}", decimalFormat.format(result.loadBalance))
-        Logger.info("  总成本 (Cost): {}", decimalFormat.format(result.cost))
-        Logger.info("  总时间 (TotalTime): {}", decimalFormat.format(result.totalTime))
-        Logger.info("  适应度 (Fitness): {}", decimalFormat.format(result.fitness))
-    }
-
-    private data class BatchExecutionMetrics(
-        val makespan: Double,
-        val loadBalance: Double,
-        val cost: Double,
-    )
-
-    private companion object {
-        const val SECTION_SEPARATOR_WIDTH = 60
-    }
 }
+
+internal data class BatchExecutionMetrics(
+    val makespan: Double,
+    val loadBalance: Double,
+    val cost: Double,
+)

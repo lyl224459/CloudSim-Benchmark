@@ -11,14 +11,16 @@ on:
         required: true
         default: '1.0.0'
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
   build-and-release:
     name: Build, Package and Release
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     
     steps:
     - name: Checkout code
@@ -52,8 +54,8 @@ jobs:
           VERSION="${{ github.ref_name }}"
         fi
         VERSION=${VERSION#v}
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
-        echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
     - name: Audit build warnings
       shell: pwsh
@@ -76,12 +78,45 @@ jobs:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
-    - name: Build, package and smoke release assets
+    - name: Generate supply chain reports
       run: |
-        .\gradlew.bat packageReleaseAssets verifyReleasePackage --no-daemon --stacktrace --configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
+        .\gradlew.bat generateSupplyChainReports checkLicense --no-daemon --stacktrace --no-configuration-cache -PreleaseVersion=${{ steps.ver.outputs.version }}
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
+
+    - name: Build, package and smoke release assets
+      run: |
+        .\gradlew.bat packageReleaseAssets verifyReleaseManifest verifyReleasePackage --no-daemon --stacktrace --no-configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
+        .\gradlew.bat prepareContainerImageContext verifyContainerBuildContext --no-daemon --stacktrace --configuration-cache -PreleaseVersion=${{ steps.ver.outputs.version }}
+      env:
+        GRADLE_OPTS: "-Dfile.encoding=UTF-8"
+        CI: "true"
+
+    - name: Upload minimal container context
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-container-context
+        path: build/container-context/
+        if-no-files-found: error
+
+    - name: Upload container SBOM
+      uses: actions/upload-artifact@v7
+      with:
+        name: release-container-sbom
+        path: build/release-artifacts/cloudsim-benchmark-${{ steps.ver.outputs.version }}-sbom.json
+        if-no-files-found: error
+
+    - name: Attest release assets
+      uses: actions/attest@v4
+      with:
+        subject-path: build/release-artifacts/*
+
+    - name: Attest executable JAR with SBOM
+      uses: actions/attest@v4
+      with:
+        subject-path: build/release-artifacts/cloudsim-benchmark-${{ steps.ver.outputs.version }}.jar
+        sbom-path: build/release-artifacts/cloudsim-benchmark-${{ steps.ver.outputs.version }}-sbom.json
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v3
@@ -110,6 +145,8 @@ jobs:
           build/release-artifacts/*.zip
           build/release-artifacts/*.tar.gz
           build/release-artifacts/*.txt
+          build/release-artifacts/*.json
+          build/release-artifacts/*.html
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -117,11 +154,23 @@ jobs:
     name: Build and Push Docker Image
     needs: build-and-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
+    - name: Download minimal container context
+      uses: actions/download-artifact@v8
       with:
-        submodules: recursive
+        name: release-container-context
+        path: build/container-context
+
+    - name: Download container SBOM
+      uses: actions/download-artifact@v8
+      with:
+        name: release-container-sbom
+        path: build/supply-chain
 
     - name: Log in to GHCR
       uses: docker/login-action@v4
@@ -137,18 +186,34 @@ jobs:
       id: meta
       uses: docker/metadata-action@v6
       with:
-        images: ghcr.io/${{ github.repository }}
+        images: ghcr.io/lyl224459/cloudsim-benchmark
         tags: |
           type=semver,pattern={{version}}
           type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
     - name: Build and push Docker image
+      id: push
       uses: docker/build-push-action@v7
       with:
-        context: .
-        file: Containerfile
+        context: build/container-context
+        file: build/container-context/Containerfile
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha,scope=release-image
         cache-to: type=gha,mode=max,scope=release-image
+
+    - name: Attest container image provenance
+      uses: actions/attest@v4
+      with:
+        subject-name: ghcr.io/lyl224459/cloudsim-benchmark
+        subject-digest: ${{ steps.push.outputs.digest }}
+        push-to-registry: true
+
+    - name: Attest container image SBOM
+      uses: actions/attest@v4
+      with:
+        subject-name: ghcr.io/lyl224459/cloudsim-benchmark
+        subject-digest: ${{ steps.push.outputs.digest }}
+        sbom-path: build/supply-chain/cloudsim-benchmark-${{ needs.build-and-release.outputs.version }}-sbom.json
+        push-to-registry: true

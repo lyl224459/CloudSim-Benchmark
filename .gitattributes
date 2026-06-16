@@ -1,0 +1,16 @@
+* text=auto
+
+.gitattributes text eol=lf
+*.kt text eol=lf
+*.kts text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=lf
+*.sh text eol=lf
+*.toml text eol=lf
+*.xml text eol=lf
+Containerfile text eol=lf
+run text eol=lf
+
+*.cmd text eol=crlf
+*.bat text eol=crlf

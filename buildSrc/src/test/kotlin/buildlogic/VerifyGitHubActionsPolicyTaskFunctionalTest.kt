@@ -41,6 +41,22 @@ class VerifyGitHubActionsPolicyTaskFunctionalTest {
         assertContains(fixture.resolve("build/actions-policy.txt").readText(), "FAIL")
     }
 
+    @Test
+    fun `release workflow requires approved attest action`() {
+        val fixture = fixture("release-attest")
+        fixture.resolve(".github/workflows/release.yml").apply {
+            parentFile.mkdirs()
+            writeText("steps:\n- uses: actions/checkout@v6\n")
+        }
+        fixture.writeBuild(policyTask())
+
+        assertContains(fixture.runAndFail("verifyActions").output, "actions/attest@missing")
+
+        fixture.resolve(".github/workflows/release.yml")
+            .writeText("steps:\n- uses: actions/checkout@v6\n- uses: actions/attest@v4\n")
+        assertEquals(TaskOutcome.SUCCESS, fixture.run("verifyActions").task(":verifyActions")?.outcome)
+    }
+
     private fun policyTask(): String =
         """
         import buildlogic.VerifyGitHubActionsPolicyTask

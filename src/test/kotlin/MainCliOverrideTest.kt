@@ -1,4 +1,8 @@
 import cli.CliParser
+import cli.RunResolver
+import cli.normalizeMode
+import cli.supportedModes
+import config.BatchAlgorithmType
 import config.RealtimeAlgorithmType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -262,5 +266,95 @@ class MainCliOverrideTest {
 
         assertTrue(error.message?.contains("未知的实时调度算法") == true)
         assertTrue(error.message?.contains(RealtimeAlgorithmType.MIN_LOAD.name) == true)
+    }
+
+    @Test
+    fun `parser covers list config help flags and aliases`() {
+        assertEquals(CliParser.HelpCommand, CliParser(emptyArray()).parse())
+        assertEquals(CliParser.HelpCommand, CliParser(arrayOf("--help")).parse())
+        assertEquals(
+            CliParser.ListAlgorithmsCommand("batch"),
+            CliParser(arrayOf("list", "algorithms", "-m", "b")).parse(),
+        )
+        assertEquals(
+            CliParser.ListProfilesCommand("experiment.toml"),
+            CliParser(arrayOf("list", "profiles", "--config=experiment.toml")).parse(),
+        )
+        assertEquals(
+            CliParser.ListPresetsCommand("experiment.toml"),
+            CliParser(arrayOf("list", "presets", "-c", "experiment.toml")).parse(),
+        )
+        assertEquals(
+            CliParser.ConfigValidateCommand("experiment.toml"),
+            CliParser(arrayOf("config", "validate", "--config", "experiment.toml")).parse(),
+        )
+        assertEquals(
+            CliParser.ConfigPrintCommand("experiment.toml", "quoted profile"),
+            CliParser(arrayOf("config", "print", "--config=experiment.toml", "--profile=quoted profile")).parse(),
+        )
+        assertEquals("batch-multi", normalizeMode("batch_multi"))
+        assertEquals(setOf("batch", "realtime", "batch-multi", "realtime-multi"), supportedModes())
+    }
+
+    @Test
+    fun `parser rejects invalid subcommands values and flag assignments`() {
+        listOf(
+            arrayOf("unknown"),
+            arrayOf("list"),
+            arrayOf("list", "unknown"),
+            arrayOf("list", "algorithms", "--mode", "batch-multi"),
+            arrayOf("config"),
+            arrayOf("config", "unknown"),
+            arrayOf("run", "--verbose=yes"),
+            arrayOf("run", "--runs", "zero"),
+            arrayOf("run", "--tasks", "1,-2"),
+            arrayOf("run", "--seed", "not-long"),
+        ).forEach { arguments ->
+            assertThrows<IllegalArgumentException> {
+                CliParser(arguments).parse()
+            }
+        }
+    }
+
+    @Test
+    fun `resolver public compatibility entries cover defaults names and typed algorithms`() {
+        val defaults = RunResolver.loadBaseConfigs(null)
+        val merged = RunResolver.mergeAlgorithmLibrary(defaults)
+        val resolved =
+            resolveRun(
+                CliParser.RunCommand(
+                    mode = "batch",
+                    algorithms = listOf("RANDOM"),
+                    outputDir = "custom output",
+                ),
+            )
+
+        assertEquals(BatchAlgorithmType.RANDOM, RunResolver.parseBatchAlgorithms(listOf("RANDOM")).single())
+        assertEquals(RealtimeAlgorithmType.MIN_LOAD, RunResolver.parseRealtimeAlgorithms(listOf("MIN_LOAD")).single())
+        assertEquals("batch_20260615_RANDOM", RunResolver.renderExperimentName(resolved, "20260615"))
+        assertEquals(
+            "batch-multi_20260615_RANDOM_none_50-100",
+            RunResolver.renderExperimentName(
+                resolved.copy(
+                    mode = "batch-multi",
+                    taskCounts = listOf(50, 100),
+                    output =
+                        resolved.output.copy(
+                            nameFormat = "{mode}_{timestamp}_{algorithms}_{preset}_{tasks}",
+                        ),
+                ),
+                "20260615",
+            ),
+        )
+        assertEquals(
+            "custom_20260615",
+            RunResolver.renderExperimentName(
+                resolved.copy(mode = "custom", output = resolved.output.copy(nameFormat = "///")),
+                "20260615",
+            ),
+        )
+        assertEquals("custom output", resolved.output.resultsDir)
+        assertEquals(100, defaults.experimentConfig.batch.cloudletCount)
+        assertTrue(merged.experimentConfig.algorithmConfigs.isNotEmpty())
     }
 }

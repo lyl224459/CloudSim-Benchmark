@@ -5,6 +5,9 @@ on:
     - cron: '0 2 * * 1'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   latest-release:
     name: Latest CloudSim Plus (${{ matrix.os }})
@@ -37,6 +40,7 @@ jobs:
 
     - name: Test latest release (Windows)
       if: runner.os == 'Windows'
+      shell: pwsh
       run: |
         .\gradlew.bat verifyCloudSimPlusSourceBuild fullCheck benchmarkPerformanceSmoke --no-daemon --stacktrace --configuration-cache -Pcloudsimplus.autoUpdate=true
       env:

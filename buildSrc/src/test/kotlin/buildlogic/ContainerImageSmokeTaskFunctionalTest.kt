@@ -53,7 +53,9 @@ class ContainerImageSmokeTaskFunctionalTest {
         assertEquals(2, commands.count { it.contains("--version") })
         assertContains(commands.joinToString("\n"), "build -t fixture-image")
         assertContains(commands.joinToString("\n"), "buildx build --load")
-        assertContains(commands.joinToString("\n"), "run --rm fixture-image --help")
+        assertContains(commands.joinToString("\n"), "run --rm --read-only")
+        assertContains(commands.joinToString("\n"), "type=tmpfs,destination=/app/runs,tmpfs-mode=1777")
+        assertContains(commands.joinToString("\n"), "fixture-image --help")
     }
 
     @Test

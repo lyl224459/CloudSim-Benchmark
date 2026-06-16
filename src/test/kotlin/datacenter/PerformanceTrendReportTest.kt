@@ -3,6 +3,7 @@ package datacenter
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import kotlin.test.assertFailsWith
 
 class PerformanceTrendReportTest {
     @Test
@@ -35,10 +36,40 @@ class PerformanceTrendReportTest {
         assertThat(report).contains("GC profiler")
     }
 
+    @Test
+    fun `render handles empty input missing baseline allocation and zero baseline`() {
+        val empty = PerformanceTrendReportGenerator.render("[]", generatedAt = Instant.EPOCH)
+        val current = jmhSample(score = 12.0, allocation = null, vmNameField = "\"jvm\":\"Fallback JVM\"")
+        val missingBaseline =
+            jmhSample(score = 8.0, allocation = 10.0, benchmark = "other.Benchmark")
+        val zeroBaseline = jmhSample(score = 0.0, allocation = 1.0)
+
+        assertThat(empty).contains("- JVM: ``")
+        assertThat(PerformanceTrendReportGenerator.render(current, missingBaseline)).contains("n/a")
+        assertThat(PerformanceTrendReportGenerator.render(current, zeroBaseline)).contains("n/a")
+        assertThat(PerformanceTrendReportGenerator.render(current)).contains("n/a").contains("Fallback JVM")
+    }
+
+    @Test
+    fun `parse rejects malformed or incomplete JMH results`() {
+        assertFailsWith<IllegalArgumentException> {
+            PerformanceTrendReportGenerator.parse("{}")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PerformanceTrendReportGenerator.parse("""[{"benchmark":"x"}]""")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PerformanceTrendReportGenerator.parse(
+                """[{"benchmark":"x","mode":"avgt","primaryMetric":{"score":"bad","scoreUnit":"ms/op"}}]""",
+            )
+        }
+    }
+
     private fun jmhSample(
         score: Double,
-        allocation: Double,
-        benchmark: String,
+        allocation: Double? = 256.0,
+        benchmark: String = "datacenter.benchmark.CloudSimPerformanceBenchmarks.batchMetaheuristicSchedule",
+        vmNameField: String = "\"vmName\":\"OpenJDK 64-Bit Server VM\"",
     ): String =
         """
         [
@@ -49,20 +80,22 @@ class PerformanceTrendReportTest {
               "algorithm": "PSO",
               "cloudletCount": "100"
             },
-            "vmName": "OpenJDK 64-Bit Server VM",
+            $vmNameField,
             "jdkVersion": "23",
             "jvmArgs": ["-Xms1g", "-Xmx1g", "-XX:+UseG1GC"],
             "primaryMetric": {
               "score": $score,
               "scoreUnit": "ms/op"
             },
-            "secondaryMetrics": {
-              "gc.alloc.rate.norm": {
-                "score": $allocation,
-                "scoreUnit": "B/op"
-              }
-            }
+            "secondaryMetrics": ${secondaryMetrics(allocation)}
           }
         ]
         """.trimIndent()
+
+    private fun secondaryMetrics(allocation: Double?): String =
+        if (allocation == null) {
+            "{}"
+        } else {
+            """{"gc.alloc.rate.norm":{"score":$allocation,"scoreUnit":"B/op"}}"""
+        }
 }

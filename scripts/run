@@ -163,19 +163,11 @@ run_program() {
         echo ""
         
         # 确保目录存在
-        mkdir -p benchmark_workspace
         mkdir -p runs
         
-        # 构建 Podman 命令
-        # 将四个目录挂载到容器内的 /app/benchmark_workspace 下
-        # 设置工作目录为该新建的根目录
         echo "[容器] 正在启动..."
         podman run --rm \
-            -v "$(pwd)/runs:/app/benchmark_workspace/runs" \
-            -v "$(pwd)/configs:/app/benchmark_workspace/configs" \
-            -v "$(pwd)/src:/app/benchmark_workspace/src" \
-            -v "$(pwd)/data:/app/benchmark_workspace/data" \
-            --workdir /app/benchmark_workspace \
+            -v "$(pwd)/runs:/app/runs" \
             cloudsim-benchmark:latest "$@"
             
         local exit_code=$?

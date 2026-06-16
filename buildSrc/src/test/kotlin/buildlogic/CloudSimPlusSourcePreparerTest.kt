@@ -39,6 +39,17 @@ class CloudSimPlusSourcePreparerTest {
     }
 
     @Test
+    fun `latest release skips fetch when checkout already has exact tag`() {
+        val source = sourceCheckout("8.5.8")
+        val operations = FakeGitOperations(COMMIT, exactTag = "v8.5.8")
+
+        preparer(operations).prepare(source, tempDir.resolve("metadata.txt"), false, true, "", null)
+
+        assertTrue(operations.commands.none { "fetch" in it })
+        assertTrue(operations.commands.any { it.containsAll(listOf("checkout", "v8.5.8")) })
+    }
+
+    @Test
     fun `offline mode rejects missing checkout and lock drift`() {
         val operations = FakeGitOperations(COMMIT, exactTag = "v8.5.7")
         assertFailsWith<org.gradle.api.GradleException> {
@@ -58,11 +69,73 @@ class CloudSimPlusSourcePreparerTest {
         }
     }
 
+    @Test
+    fun `submodule initialization can restore a missing checkout`() {
+        val source = tempDir.resolve("submodule-source")
+        val operations =
+            FakeGitOperations(COMMIT, exactTag = "v8.5.8") { args ->
+                if (args.containsAll(listOf("submodule", "update"))) {
+                    createCheckout(source, "8.5.8")
+                }
+                null
+            }
+
+        preparer(operations).prepare(source, tempDir.resolve("metadata.txt"), false, true, "", null)
+
+        assertTrue(operations.commands.any { it.containsAll(listOf("submodule", "update")) })
+        assertTrue(operations.commands.none { "clone" in it })
+    }
+
+    @Test
+    fun `broken checkout is replaced by a shallow clone`() {
+        val source =
+            tempDir.resolve("broken-source").apply {
+                mkdirs()
+                resolve(".git").mkdir()
+                resolve("broken.txt").writeText("broken")
+            }
+        val operations =
+            FakeGitOperations(COMMIT, exactTag = "v8.5.8", usableCheckout = false) { args ->
+                if ("clone" in args) {
+                    createCheckout(source, "8.5.8")
+                }
+                null
+            }
+
+        preparer(operations).prepare(source, tempDir.resolve("metadata.txt"), false, true, "v8.5.8", null)
+
+        assertTrue(operations.commands.any { it.containsAll(listOf("clone", "--depth", "1", "--branch", "v8.5.8")) })
+        assertTrue(!source.resolve("broken.txt").exists())
+    }
+
+    @Test
+    fun `nonempty directory without git checkout is rejected`() {
+        val source =
+            tempDir.resolve("non-checkout").apply {
+                mkdirs()
+                resolve("unexpected.txt").writeText("content")
+            }
+
+        val error =
+            assertFailsWith<org.gradle.api.GradleException> {
+                preparer(FakeGitOperations(COMMIT, exactTag = "v8.5.8"))
+                    .prepare(source, tempDir.resolve("metadata.txt"), false, true, "", null)
+            }
+
+        assertTrue(error.message.orEmpty().contains("is not a git checkout"))
+    }
+
     private fun preparer(operations: FakeGitOperations) =
         CloudSimPlusSourcePreparer("https://example.invalid/cloudsimplus.git", tempDir, operations) { }
 
     private fun sourceCheckout(version: String): File =
-        tempDir.resolve("source-$version").apply {
+        createCheckout(tempDir.resolve("source-$version"), version)
+
+    private fun createCheckout(
+        source: File,
+        version: String,
+    ): File =
+        source.apply {
             mkdirs()
             resolve(".git").mkdir()
             resolve("pom.xml").writeText("<project><artifactId>cloudsimplus</artifactId><version>$version</version></project>")
@@ -71,6 +144,8 @@ class CloudSimPlusSourcePreparerTest {
     private class FakeGitOperations(
         private val commit: String,
         private val exactTag: String,
+        private val usableCheckout: Boolean = true,
+        private val onCommand: (List<String>) -> String? = { null },
     ) : CloudSimPlusGitOperations {
         val commands = mutableListOf<List<String>>()
 
@@ -80,8 +155,9 @@ class CloudSimPlusSourcePreparerTest {
             ignoreExit: Boolean,
         ): String {
             commands += args
+            onCommand(args)?.let { return it }
             return when {
-                args.contains("--is-inside-work-tree") -> "true"
+                args.contains("--is-inside-work-tree") -> usableCheckout.toString()
                 args.contains("rev-parse") && args.contains("HEAD") -> commit
                 args.contains("describe") -> exactTag
                 args.contains("ls-remote") -> "$commit\trefs/tags/v8.5.8"

@@ -5,6 +5,7 @@ import buildlogic.CloudSimPlusBuildService
 import buildlogic.CloudSimPlusGitStateFiles
 import buildlogic.CloudSimPlusLockSupport
 import buildlogic.ContainerImageSmokeTask
+import buildlogic.PrepareContainerImageContextTask
 import buildlogic.PrepareMutableCloudSimPlusSourceTask
 import buildlogic.ReleaseManifest
 import buildlogic.ReleaseManifestSupport
@@ -12,12 +13,19 @@ import buildlogic.SanitizeCloudSimPlusJarManifestTask
 import buildlogic.UpdateCloudSimPlusLockTask
 import buildlogic.UpdateJUnitTestInventoryTask
 import buildlogic.VerifyCloudSimPlusSourceBuildTask
+import buildlogic.VerifyContainerImageContextTask
 import buildlogic.VerifyGitHubActionsPolicyTask
 import buildlogic.VerifyJUnitTestInventoryTask
 import buildlogic.VerifyJUnitTestSignaturesTask
+import buildlogic.VerifyLicensePolicyTask
 import buildlogic.VerifyLockedCloudSimPlusSourceTask
 import buildlogic.VerifyNoDetektBaselineTask
+import com.github.jk1.license.filter.DependencyFilter
+import com.github.jk1.license.filter.SpdxLicenseBundleNormalizer
+import com.github.jk1.license.render.InventoryHtmlReportRenderer
+import com.github.jk1.license.render.ReportRenderer
 import io.gitlab.arturbosch.detekt.Detekt
+import org.cyclonedx.model.Component
 import org.gradle.api.provider.ProviderFactory
 import org.gradle.api.tasks.bundling.Compression
 import org.gradle.api.tasks.bundling.Tar
@@ -33,12 +41,37 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("me.champeau.jmh") version "0.7.3"
+    id("org.cyclonedx.bom") version "3.2.4"
+    id("com.github.jk1.dependency-license-report") version "3.1.4"
 }
 
 group = "com.lyl224459"
 version = "1.0.0"
 
 description = "CloudSim-Benchmark: 云任务调度算法对比实验平台"
+
+tasks.cyclonedxDirectBom {
+    includeConfigs = listOf("runtimeClasspath")
+    projectType = Component.Type.APPLICATION
+    componentName = "cloudsim-benchmark"
+    jsonOutput.set(layout.buildDirectory.file("reports/supply-chain/cloudsim-benchmark-sbom.json"))
+    xmlOutput.unsetConvention()
+}
+
+licenseReport {
+    configurations = arrayOf("runtimeClasspath")
+    filters = arrayOf<DependencyFilter>(SpdxLicenseBundleNormalizer())
+    allowedLicensesFile = layout.projectDirectory.file("gradle/allowed-licenses.json")
+    outputDir =
+        layout.buildDirectory
+            .dir("reports/supply-chain/licenses")
+            .get()
+            .asFile.path
+    renderers =
+        arrayOf<ReportRenderer>(
+            InventoryHtmlReportRenderer("third-party-licenses.html", "CloudSim-Benchmark Runtime Dependencies"),
+        )
+}
 
 // 动态检测CPU核心数并优化构建提示
 val cpuCores = Runtime.getRuntime().availableProcessors()
@@ -432,7 +465,7 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = "0.50".toBigDecimal()
+                minimum = "0.55".toBigDecimal()
             }
         }
         rule {
@@ -460,6 +493,35 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
                 minimum = "0.55".toBigDecimal()
+            }
+        }
+        listOf(
+            "cli.CliParser" to "0.60",
+            "cli.RunResolver" to "0.60",
+            "broker.RealtimeAutoscalingController" to "0.70",
+            "datacenter.RealtimePerformanceBenchmarkRunner" to "0.55",
+            "datacenter.RealtimePerformanceBenchmarkRunnerKt" to "0.50",
+            "datacenter.BatchAlgorithmExecutor" to "0.60",
+            "datacenter.PerformanceTrendReportGenerator" to "0.70",
+            "broker.RealtimeVmSelectionFacade" to "0.65",
+        ).forEach { (className, minimumBranchCoverage) ->
+            rule {
+                element = "CLASS"
+                includes = listOf(className)
+                limit {
+                    counter = "BRANCH"
+                    value = "COVEREDRATIO"
+                    minimum = minimumBranchCoverage.toBigDecimal()
+                }
+            }
+        }
+        rule {
+            element = "CLASS"
+            includes = listOf("util.ExperimentOutputContext*")
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.60".toBigDecimal()
             }
         }
     }
@@ -879,6 +941,8 @@ val releaseJarName = "cloudsim-benchmark-$releaseVersion.jar"
 val windowsPackageName = "cloudsim-benchmark-$releaseVersion-windows.zip"
 val unixPackageName = "cloudsim-benchmark-$releaseVersion-unix.tar.gz"
 val sourcePackageName = "cloudsim-benchmark-$releaseVersion-source.zip"
+val supplyChainSbomName = "cloudsim-benchmark-$releaseVersion-sbom.json"
+val supplyChainLicenseName = "cloudsim-benchmark-$releaseVersion-licenses.html"
 val releaseManifestName = "release-manifest.txt"
 val isWindowsHost = System.getProperty("os.name").lowercase().contains("windows")
 
@@ -1004,6 +1068,49 @@ val packageSourceRelease by tasks.registering(Zip::class) {
     }
 }
 
+tasks.named("cyclonedxDirectBom") {
+    dependsOn(sanitizeCloudSimPlusJarManifest)
+}
+
+tasks.named("generateLicenseReport") {
+    dependsOn(sanitizeCloudSimPlusJarManifest)
+}
+
+val verifyRuntimeLicensePolicy by tasks.registering(VerifyLicensePolicyTask::class) {
+    group = "verification"
+    description = "验证 runtime SBOM 中所有依赖许可证均在精确允许列表中"
+
+    dependsOn("cyclonedxDirectBom")
+    sbomFile.set(layout.buildDirectory.file("reports/supply-chain/cloudsim-benchmark-sbom.json"))
+    policyFile.set(layout.projectDirectory.file("gradle/allowed-licenses.json"))
+    reportFile.set(layout.buildDirectory.file("reports/supply-chain/license-policy.txt"))
+}
+
+tasks.named("checkLicense") {
+    dependsOn(sanitizeCloudSimPlusJarManifest, verifyRuntimeLicensePolicy)
+}
+
+val copySupplyChainReports by tasks.registering(Copy::class) {
+    group = "distribution"
+    description = "复制 runtime SBOM 和许可证报告到发布产物目录"
+
+    dependsOn("cyclonedxDirectBom", "generateLicenseReport")
+    from(layout.buildDirectory.file("reports/supply-chain/cloudsim-benchmark-sbom.json")) {
+        rename { supplyChainSbomName }
+    }
+    from(layout.buildDirectory.file("reports/supply-chain/licenses/third-party-licenses.html")) {
+        rename { supplyChainLicenseName }
+    }
+    into(releaseArtifactsDir)
+}
+
+val generateSupplyChainReports by tasks.registering {
+    group = "verification"
+    description = "生成 runtime classpath SBOM 和许可证报告"
+
+    dependsOn(copySupplyChainReports, verifyRuntimeLicensePolicy)
+}
+
 val generateReleaseManifest by tasks.registering {
     group = "distribution"
     description = "生成发布产物清单"
@@ -1015,11 +1122,20 @@ val generateReleaseManifest by tasks.registering {
             windowsPackageName,
             unixPackageName,
             sourcePackageName,
+            supplyChainSbomName,
+            supplyChainLicenseName,
             releaseManifestName,
         )
     val metadataFile = cloudSimPlusVersionFile
 
-    dependsOn(copyReleaseJar, packageWindowsRelease, packageUnixRelease, packageSourceRelease, verifyCloudSimPlusLock)
+    dependsOn(
+        copyReleaseJar,
+        packageWindowsRelease,
+        packageUnixRelease,
+        packageSourceRelease,
+        copySupplyChainReports,
+        verifyCloudSimPlusLock,
+    )
     inputs.file(metadataFile)
     outputs.file(manifestFile)
 
@@ -1040,7 +1156,14 @@ val packageReleaseAssets by tasks.registering {
     group = "distribution"
     description = "生成所有发布产物和清单"
 
-    dependsOn(copyReleaseJar, packageWindowsRelease, packageUnixRelease, packageSourceRelease, generateReleaseManifest)
+    dependsOn(
+        copyReleaseJar,
+        packageWindowsRelease,
+        packageUnixRelease,
+        packageSourceRelease,
+        copySupplyChainReports,
+        generateReleaseManifest,
+    )
 }
 
 val verifyReleaseManifest by tasks.registering {
@@ -1049,7 +1172,16 @@ val verifyReleaseManifest by tasks.registering {
 
     val artifactsDir = releaseArtifactsDir
     val manifestFile = artifactsDir.map { it.file(releaseManifestName) }
-    val expectedAssets = listOf(releaseJarName, windowsPackageName, unixPackageName, sourcePackageName, releaseManifestName)
+    val expectedAssets =
+        listOf(
+            releaseJarName,
+            windowsPackageName,
+            unixPackageName,
+            sourcePackageName,
+            supplyChainSbomName,
+            supplyChainLicenseName,
+            releaseManifestName,
+        )
     val expectedMetadata = cloudSimPlusLockedMetadata
     val enforceLock = cloudSimPlusEnforceLock
 
@@ -1082,6 +1214,7 @@ val verifyWindowsReleasePackage by tasks.registering(Exec::class) {
 
     onlyIf { runOnWindows }
     dependsOn(copyReleaseJar, packageWindowsRelease)
+    mustRunAfter(copySupplyChainReports)
     inputs.file(packageFile)
 
     doFirst {
@@ -1113,6 +1246,7 @@ val verifyUnixReleasePackage by tasks.registering(Exec::class) {
 
     onlyIf { runOnUnix }
     dependsOn(copyReleaseJar, packageUnixRelease)
+    mustRunAfter(copySupplyChainReports)
     inputs.file(packageFile)
 
     doFirst {
@@ -1132,7 +1266,7 @@ val verifyReleasePackage by tasks.registering {
     group = "verification"
     description = "验证当前平台发布包可解压并运行"
 
-    dependsOn(verifyReleaseManifest, fatJarHelpSmoke)
+    dependsOn(fatJarHelpSmoke)
     if (isWindowsHost) {
         dependsOn(verifyWindowsReleasePackage)
     } else {
@@ -1140,18 +1274,42 @@ val verifyReleasePackage by tasks.registering {
     }
 }
 
+val prepareContainerImageContext by tasks.registering(PrepareContainerImageContextTask::class) {
+    group = "distribution"
+    description = "准备仅包含运行时文件的最小容器构建上下文"
+
+    val fatJarTask = tasks.named<Jar>("fatJar")
+    dependsOn(verifyLockedCloudSimPlusSource, fatJarTask)
+    executableJar.set(fatJarTask.flatMap { it.archiveFile })
+    configsDirectory.set(layout.projectDirectory.dir("configs"))
+    dataDirectory.set(layout.projectDirectory.dir("data"))
+    runtimeContainerFile.set(layout.projectDirectory.file("Containerfile"))
+    cloudSimPlusMetadataFile.set(cloudSimPlusLockedVersionFile)
+    outputDirectory.set(layout.buildDirectory.dir("container-context"))
+}
+
+val verifyContainerBuildContext by tasks.registering(VerifyContainerImageContextTask::class) {
+    group = "verification"
+    description = "验证容器上下文尺寸、provenance 和无源码约束"
+
+    dependsOn(prepareContainerImageContext)
+    contextDirectory.set(prepareContainerImageContext.flatMap { it.outputDirectory })
+    cloudSimPlusMetadataFile.set(cloudSimPlusLockedVersionFile)
+    maximumBytes.set(50L * 1024L * 1024L)
+}
+
 val containerImageSmoke by tasks.registering(ContainerImageSmokeTask::class) {
     group = "verification"
     description = "构建容器镜像并运行 --help smoke"
 
-    dependsOn("fatJar")
+    dependsOn("verifyContainerBuildContext")
     imageName.set("cloudsim-benchmark:smoke")
     dockerExecutable.set("docker")
     ci.set(isCiBuildProvider)
     useBuildx.set(isGitHubActionsProvider)
     useGitHubActionsCache.set(isGitHubActionsProvider)
-    contextDirectory.set(layout.projectDirectory)
-    containerFile.set(layout.projectDirectory.file("Containerfile"))
+    contextDirectory.set(layout.buildDirectory.dir("container-context"))
+    containerFile.set(layout.buildDirectory.file("container-context/Containerfile"))
 }
 
 val cliEndToEndSmoke by tasks.registering(CliEndToEndSmokeTask::class) {

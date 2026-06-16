@@ -6,9 +6,15 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
 import java.nio.file.Files
+import java.time.LocalDateTime
 
 class ExperimentOutputContextTest {
+    @TempDir
+    lateinit var fixtureDir: File
+
     @Test
     fun `concurrent trial writes keep a single header and complete rows`(): Unit =
         runBlocking {
@@ -66,4 +72,30 @@ class ExperimentOutputContextTest {
                 tempDir.deleteRecursively()
             }
         }
+
+    @Test
+    fun `experiment directory numbering and explicit names are deterministic`() {
+        val modeDir = fixtureDir.resolve("batch").also(File::mkdirs)
+        modeDir.resolve("exp1_old").mkdir()
+        modeDir.resolve("exp7_old").mkdir()
+        modeDir.resolve("other").mkdir()
+
+        val generated =
+            ExperimentOutputContext.createExperimentDirectory(
+                baseResultsDir = fixtureDir,
+                mode = "BATCH",
+                experimentName = null,
+                now = LocalDateTime.of(2026, 6, 15, 10, 11, 12),
+            )
+        val named =
+            ExperimentOutputContext.createExperimentDirectory(
+                baseResultsDir = fixtureDir,
+                mode = "realtime",
+                experimentName = "fixed",
+                now = LocalDateTime.of(2026, 6, 15, 10, 11, 12),
+            )
+
+        assertThat(generated.name).isEqualTo("exp8_20260615_101112")
+        assertThat(named.name).isEqualTo("fixed")
+    }
 }

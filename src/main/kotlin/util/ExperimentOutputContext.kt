@@ -142,11 +142,18 @@ data class ExperimentOutputContext(
             baseResultsDir: File,
             mode: String,
             experimentName: String? = null,
+        ): File = createExperimentDirectory(baseResultsDir, mode, experimentName, LocalDateTime.now())
+
+        internal fun createExperimentDirectory(
+            baseResultsDir: File,
+            mode: String,
+            experimentName: String?,
+            now: LocalDateTime,
         ): File {
             val modeDir = File(baseResultsDir, mode.lowercase()).also(File::mkdirs)
             val resolvedName =
                 experimentName
-                    ?: "exp${findNextExperimentNumber(modeDir)}_${LocalDateTime.now().format(experimentNameFormatter)}"
+                    ?: "exp${findNextExperimentNumber(modeDir)}_${now.format(experimentNameFormatter)}"
             return File(modeDir, resolvedName).also(File::mkdirs)
         }
 
