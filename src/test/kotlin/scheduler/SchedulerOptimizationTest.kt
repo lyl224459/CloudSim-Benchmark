@@ -1,5 +1,6 @@
 package scheduler
 
+import config.BatchAlgorithmType
 import config.ObjectiveWeightsConfig
 import datacenter.SchedulerObjectiveFunction
 import org.assertj.core.api.Assertions.assertThat
@@ -67,6 +68,68 @@ class SchedulerOptimizationTest {
             .isEqualTo("MIN_LOAD")
         assertThat(AlgorithmRegistry.resolve(AlgorithmMode.REALTIME, "PSO").name)
             .isEqualTo("PSO_REALTIME")
+    }
+
+    @Test
+    fun `algorithm definitions expose metadata and reject non canonical names`() {
+        val random = AlgorithmRegistry.resolveBatch("RAND")
+        val pso = AlgorithmRegistry.resolveBatch("PSO")
+        val improvedRl = AlgorithmRegistry.resolveBatch("improved rl")
+
+        assertThat(AlgorithmRegistry.all()).hasSize(11)
+        assertThat(AlgorithmRegistry.forMode(AlgorithmMode.BATCH)).hasSize(7)
+        assertThat(random.displayName).isEqualTo("Random")
+        assertThat(random.defaultEnabled).isTrue()
+        assertThat(random.supportsPopulation).isFalse()
+        assertThat(random.supportsMaxIter).isFalse()
+        assertThat(pso.supportsPopulation).isTrue()
+        assertThat(pso.supportsMaxIter).isTrue()
+        assertThat(improvedRl.matches("Improved-RL")).isTrue()
+        assertThat(improvedRl.matches("MINLOAD")).isFalse()
+
+        assertThatThrownBy {
+            BatchAlgorithmDefinition(
+                metadata = AlgorithmMetadata(name = "bad-name", displayName = "Bad"),
+                legacyBatchType = BatchAlgorithmType.RANDOM,
+                factory = { _, _, _, _, _ -> throw AssertionError("factory should not be called") },
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("canonical name")
+    }
+
+    @Test
+    fun `algorithm registry factories create every scheduler capability`() {
+        val cloudlets = createCloudlets(1)
+        val vms = createVms(1)
+        val settings = ResolvedAlgorithmSettings(population = 2, maxIter = 1)
+
+        AlgorithmRegistry
+            .forMode(AlgorithmMode.BATCH)
+            .map { it as BatchAlgorithmDefinition }
+            .forEach { definition ->
+                assertThat(
+                    definition.createBatchScheduler(
+                        cloudlets = cloudlets,
+                        vms = vms,
+                        objectiveWeights = ObjectiveWeightsConfig(),
+                        settings = settings,
+                        seed = 11L,
+                    ),
+                ).isNotNull()
+            }
+        AlgorithmRegistry
+            .forMode(AlgorithmMode.REALTIME)
+            .map { it as RealtimeAlgorithmDefinition }
+            .forEach { definition ->
+                assertThat(
+                    definition.createRealtimeScheduler(
+                        vms = vms,
+                        objectiveWeights = ObjectiveWeightsConfig(),
+                        settings = settings,
+                        seed = 11L,
+                    ),
+                ).isNotNull()
+            }
     }
 
     @Test
