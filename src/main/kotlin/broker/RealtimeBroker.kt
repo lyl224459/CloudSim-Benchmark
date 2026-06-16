@@ -19,7 +19,7 @@ import scheduler.RealtimeTopologyMetrics
  * 通过 CloudSim 事件在任务到达时提交 cloudlet，并在到达时调用调度器。
  * Public CloudSim facade keeps the existing metric getter surface for compatibility.
  */
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions") // CloudSim broker facade intentionally exposes the stable public metrics API.
 class RealtimeBroker(
     private val cloudSim: CloudSimPlus,
     scheduler: RealtimeScheduler,

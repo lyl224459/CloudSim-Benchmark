@@ -28,7 +28,7 @@ private const val ZERO_REWARD = 0.0
  * 3. 目标对齐奖励：奖励函数与全局优化目标（负载、Makespan）直接挂钩。
  * 4. 训练优化：增加训练轮数，采用 epsilon 衰减策略。
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList") // Public scheduler constructor keeps existing improved-RL tuning parameters stable.
 class ImprovedRLScheduler(
     cloudletList: List<Cloudlet>,
     vmList: List<Vm>,
