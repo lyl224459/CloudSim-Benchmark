@@ -46,7 +46,7 @@ internal class RealtimeBrokerTaskReadView(
     }
 }
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions") // Scalar view deliberately groups broker counters behind one read facade.
 internal class RealtimeBrokerScalarMetricsView(
     private val metrics: RealtimeBrokerMetrics,
     private val vmLifecycleManager: RealtimeVmLifecycleManager,

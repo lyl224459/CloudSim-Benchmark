@@ -504,6 +504,10 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             "datacenter.BatchAlgorithmExecutor" to "0.60",
             "datacenter.PerformanceTrendReportGenerator" to "0.70",
             "broker.RealtimeVmSelectionFacade" to "0.65",
+            "scheduler.AlgorithmRegistry" to "0.65",
+            "scheduler.TopologyCandidateAnnotator" to "0.65",
+            "datacenter.RealtimeMetricsCollector" to "0.65",
+            "datacenter.RealtimeMetricDocumentationGenerator" to "0.70",
         ).forEach { (className, minimumBranchCoverage) ->
             rule {
                 element = "CLASS"

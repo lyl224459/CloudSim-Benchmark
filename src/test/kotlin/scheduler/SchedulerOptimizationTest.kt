@@ -70,11 +70,38 @@ class SchedulerOptimizationTest {
     }
 
     @Test
+    fun `algorithm registry expands defaults and removes duplicate aliases`() {
+        val batchDefaults = AlgorithmRegistry.resolveAll(AlgorithmMode.BATCH, listOf("ALL"))
+        val realtimeDefaults = AlgorithmRegistry.resolveAll(AlgorithmMode.REALTIME, listOf("ALL"))
+        val realtimeAliases = AlgorithmRegistry.resolveAll(AlgorithmMode.REALTIME, listOf("RAND", "RANDOM"))
+
+        assertThat(batchDefaults.map { it.name })
+            .containsExactly("RANDOM", "PSO", "WOA", "GWO", "HHO", "RL", "IMPROVED_RL")
+        assertThat(realtimeDefaults.map { it.name })
+            .containsExactly("MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME")
+        assertThat(realtimeAliases.map { it.name }).containsExactly("RANDOM")
+    }
+
+    @Test
     fun `algorithm registry rejects ALL mixed with other names`() {
         assertThatThrownBy {
             AlgorithmRegistry.resolveAll(AlgorithmMode.BATCH, listOf("ALL", "PSO"))
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("ALL")
+    }
+
+    @Test
+    fun `algorithm registry reports compatibility and unknown candidates by mode`() {
+        assertThat(AlgorithmRegistry.isCompatible(AlgorithmMode.BATCH, "PSO")).isTrue()
+        assertThat(AlgorithmRegistry.isCompatible(AlgorithmMode.BATCH, "MIN_LOAD")).isFalse()
+        assertThat(AlgorithmRegistry.isCompatible(AlgorithmMode.REALTIME, "MINLOAD")).isTrue()
+        assertThat(AlgorithmRegistry.isCompatible(AlgorithmMode.REALTIME, "HHO")).isFalse()
+
+        assertThatThrownBy {
+            AlgorithmRegistry.resolve(AlgorithmMode.BATCH, "NOPE")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("未知的批处理算法")
+            .hasMessageContaining("RANDOM")
     }
 
     @Test
@@ -147,6 +174,19 @@ class SchedulerOptimizationTest {
             AlgorithmRegistry.resolveBatch("MINLOAD")
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("批处理")
+
+        val settings = ResolvedAlgorithmSettings(population = 3, maxIter = 2)
+        val realtime = ResolvedAlgorithm(AlgorithmRegistry.resolveRealtime("MIN_LOAD"), settings)
+        val batch = ResolvedAlgorithm(AlgorithmRegistry.resolveBatch("RANDOM"), settings)
+
+        assertThatThrownBy {
+            realtime.createBatchScheduler(createCloudlets(1), createVms(1), ObjectiveWeightsConfig(), 1L)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("不是批处理算法")
+        assertThatThrownBy {
+            batch.createRealtimeScheduler(createVms(1), ObjectiveWeightsConfig(), 1L)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("不是实时调度算法")
     }
 
     @Test

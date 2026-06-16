@@ -11,7 +11,7 @@ import kotlin.math.min
 /**
  * Google Trace 数据集云任务生成器。
  */
-@Suppress("UnusedParameter")
+@Suppress("UnusedParameter") // GoogleTraceConfig is accepted for source compatibility with older constructors.
 class GoogleTraceCloudletGenerator(
     private val traceFilePath: String = DEFAULT_GOOGLE_TRACE_FILE_PATH,
     private val maxTasks: Int = DEFAULT_GOOGLE_TRACE_MAX_TASKS,
@@ -45,14 +45,14 @@ class GoogleTraceCloudletGenerator(
         createCloudletSpecs(userId, count, random)
             .map { it.cloudlet }
 
-    @Suppress("UnusedParameter")
+    @Suppress("UnusedParameter") // Random is part of the generator contract; trace order remains deterministic.
     fun createCloudletBatch(
         userId: Int,
         count: Int,
         random: Random,
     ): RealtimeCloudletBatch = RealtimeCloudletBatch(createCloudletSpecs(userId, count, random))
 
-    @Suppress("UnusedParameter")
+    @Suppress("UnusedParameter") // Random is part of the generator contract; trace order remains deterministic.
     fun createCloudletSpecs(
         userId: Int,
         count: Int,
