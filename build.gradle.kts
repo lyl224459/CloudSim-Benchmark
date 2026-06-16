@@ -34,8 +34,8 @@ import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
-    kotlin("jvm") version "2.3.21"
-    kotlin("plugin.serialization") version "2.3.21"
+    kotlin("jvm") version "2.4.0"
+    kotlin("plugin.serialization") version "2.4.0"
     application
     jacoco
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
@@ -373,13 +373,13 @@ dependencies {
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
     // 日志实现：slf4j + logback
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    implementation("ch.qos.logback:logback-classic:1.4.14")
+    implementation("org.slf4j:slf4j-api:2.0.18")
+    implementation("ch.qos.logback:logback-classic:1.5.34")
 
     // TOML配置文件解析库
     implementation("com.akuleshov7:ktoml-core:0.7.1")
     implementation("com.akuleshov7:ktoml-file:0.7.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 
     // Kotlin协程
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
@@ -387,16 +387,16 @@ dependencies {
     testImplementation(kotlin("test"))
 
     // JUnit 5 测试框架
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.1")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
 
     // Mockito for mocking
-    testImplementation("org.mockito:mockito-core:5.7.0")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.1.0")
+    testImplementation("org.mockito:mockito-core:5.23.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:6.3.0")
 
     // AssertJ for fluent assertions
-    testImplementation("org.assertj:assertj-core:3.24.2")
+    testImplementation("org.assertj:assertj-core:3.27.7")
 }
 
 tasks.named<Test>("test") {
