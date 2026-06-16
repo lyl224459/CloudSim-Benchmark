@@ -1,6 +1,7 @@
 package datacenter
 
 import broker.RealtimeBroker
+import config.DatacenterConfig
 import config.ObjectiveWeightsConfig
 import config.RealtimeSchedulingConfig
 import org.assertj.core.api.Assertions.assertThat
@@ -11,6 +12,7 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import scheduler.RealtimeTaskRecord
 import scheduler.RealtimeTopologyMetrics
 
 class RealtimeMetricsCollectorTest {
@@ -77,6 +79,88 @@ class RealtimeMetricsCollectorTest {
         assertThat(result.cost).isEqualTo(0.5)
         assertThat(result.fitness.isFinite()).isTrue()
         assertProjectedBrokerMetrics(result)
+    }
+
+    @Test
+    fun `collector applies deadline sla penalty percentiles and vm cost tiers`() {
+        val vmList =
+            listOf(
+                vm(10, DatacenterConfig.L_MIPS.toDouble()),
+                vm(11, DatacenterConfig.M_MIPS.toDouble()),
+                vm(12, DatacenterConfig.H_MIPS.toDouble()),
+                vm(13, 1234.0),
+            )
+        val cloudlets = costTierCloudlets(vmList)
+        val broker = brokerWithMetrics()
+        stubCostTierArrivalsAndDeadlines(broker, cloudlets)
+
+        val result =
+            collector.collect(
+                RealtimeMetricCollectionRequest(
+                    algorithmName = "TIERS",
+                    cloudletList = cloudlets,
+                    finishedCloudlets = cloudlets,
+                    vmList = vmList,
+                    broker = broker,
+                ),
+            )
+
+        assertThat(result.completedCount).isEqualTo(4)
+        assertThat(result.failedCount).isZero()
+        assertThat(result.averageWaitingTime).isEqualTo(1.75)
+        assertThat(result.p95ResponseTime).isEqualTo(10.0)
+        assertThat(result.p99ResponseTime).isEqualTo(10.0)
+        assertThat(result.cost).isEqualTo(4.5)
+        assertThat(result.slaViolationRate).isEqualTo(0.25)
+        assertThat(result.slaPenalty).isEqualTo(13.5)
+    }
+
+    private fun costTierCloudlets(vmList: List<Vm>): List<Cloudlet> =
+        listOf(
+            cloudlet(CloudletSpec(id = 10, status = Cloudlet.Status.SUCCESS, vm = vmList[0], finish = 5.0, cpu = 1.0)),
+            cloudlet(
+                CloudletSpec(
+                    id = 11,
+                    status = Cloudlet.Status.SUCCESS,
+                    vm = vmList[1],
+                    finish = 11.0,
+                    start = 9.0,
+                    cpu = 2.0,
+                ),
+            ),
+            cloudlet(
+                CloudletSpec(
+                    id = 12,
+                    status = Cloudlet.Status.SUCCESS,
+                    vm = vmList[2],
+                    finish = 20.0,
+                    start = 12.0,
+                    cpu = 3.0,
+                ),
+            ),
+            cloudlet(
+                CloudletSpec(
+                    id = 13,
+                    status = Cloudlet.Status.SUCCESS,
+                    vm = vmList[3],
+                    finish = 8.0,
+                    start = 1.0,
+                    cpu = 4.0,
+                ),
+            ),
+        )
+
+    private fun stubCostTierArrivalsAndDeadlines(
+        broker: RealtimeBroker,
+        cloudlets: List<Cloudlet>,
+    ) {
+        whenever(broker.getArrivalTime(cloudlets[0])).thenReturn(2.0)
+        whenever(broker.getArrivalTime(cloudlets[1])).thenReturn(5.0)
+        whenever(broker.getArrivalTime(cloudlets[2])).thenReturn(10.0)
+        whenever(broker.getArrivalTime(cloudlets[3])).thenReturn(0.0)
+        whenever(broker.getTaskMetadata(cloudlets[1])).thenReturn(RealtimeTaskRecord(11, 5.0, deadline = 15.0))
+        whenever(broker.getTaskMetadata(cloudlets[2])).thenReturn(RealtimeTaskRecord(12, 10.0, deadline = 18.0))
+        whenever(broker.getTaskMetadata(cloudlets[3])).thenReturn(RealtimeTaskRecord(13, 0.0, deadline = 5.0))
     }
 
     private fun assertProjectedBrokerMetrics(result: RealtimeAlgorithmResult) {
