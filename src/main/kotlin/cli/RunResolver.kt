@@ -65,7 +65,14 @@ object RunResolver {
         }
 
     fun mergeAlgorithmLibrary(configs: LoadedRunConfigs): LoadedRunConfigs {
-        val libraryFile = File("configs/algorithms.toml")
+        val libraryFile = defaultAlgorithmLibraryFile()
+        return mergeAlgorithmLibrary(configs, libraryFile)
+    }
+
+    internal fun mergeAlgorithmLibrary(
+        configs: LoadedRunConfigs,
+        libraryFile: File,
+    ): LoadedRunConfigs {
         if (!libraryFile.exists() || libraryFile.length() == 0L) return configs
 
         return try {
@@ -91,6 +98,8 @@ object RunResolver {
             configs
         }
     }
+
+    private fun defaultAlgorithmLibraryFile(): File = File("configs/algorithms.toml")
 
     fun renderExperimentName(
         resolved: ResolvedExperimentConfig,

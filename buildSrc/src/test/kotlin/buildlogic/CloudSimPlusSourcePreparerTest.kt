@@ -50,6 +50,24 @@ class CloudSimPlusSourcePreparerTest {
     }
 
     @Test
+    fun `latest release falls back to local tags when remote tags are unavailable`() {
+        val source = sourceCheckout("8.5.8")
+        val operations =
+            FakeGitOperations(COMMIT, exactTag = "v8.5.7") { args ->
+                if (args.contains("ls-remote")) {
+                    "not-a-release\trefs/tags/nightly"
+                } else {
+                    null
+                }
+            }
+
+        preparer(operations).prepare(source, tempDir.resolve("metadata.txt"), false, true, "", null)
+
+        assertTrue(operations.commands.any { it.containsAll(listOf("fetch", "origin", "tag", "v8.5.8")) })
+        assertTrue(operations.commands.any { it.containsAll(listOf("checkout", "v8.5.8")) })
+    }
+
+    @Test
     fun `offline mode rejects missing checkout and lock drift`() {
         val operations = FakeGitOperations(COMMIT, exactTag = "v8.5.7")
         assertFailsWith<org.gradle.api.GradleException> {

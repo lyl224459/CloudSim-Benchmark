@@ -81,7 +81,7 @@ class RealtimeCloudResourceComponentsTest {
                 config =
                     annotationConfig(
                         physicalTopologyEnabled = true,
-                        hostCpuCapacity = 2.0,
+                        hostCapacity = HostCapacity(cpu = 2.0),
                     ),
                 locationOf = { index -> location(index) },
             )
@@ -106,7 +106,7 @@ class RealtimeCloudResourceComponentsTest {
                         createVm(id = 0, ram = 1024, bw = 1000, storage = 1000),
                         createVm(id = 1, ram = 1024, bw = 1000, storage = 1000),
                     ),
-                workload = workload(requestedCpu = 1.5),
+                workload = workload(demand = RealtimeResourceDemand(cpu = 1.5)),
                 records = listOf(active, active.copy(cloudletId = 2, lifecycle = RealtimeTaskLifecycle.COMPLETED)),
             )
 
@@ -116,6 +116,87 @@ class RealtimeCloudResourceComponentsTest {
             RealtimePlacementDecision.Rejected(VmIndex(0), host0, "physical_cpu_capacity"),
         )
         assertThat(accepted.hostState.allocatedCpu).isEqualTo(1.5)
+    }
+
+    @Test
+    fun `data locality policy changes only remote placement score penalty`() {
+        val remote = location(0, region = 1)
+        val ignorePlacement =
+            remotePlacementForPolicy(DataLocalityPolicy.IGNORE, remote)
+        val preferLocalPlacement =
+            remotePlacementForPolicy(DataLocalityPolicy.PREFER_LOCAL, remote)
+
+        assertThat(ignorePlacement.dataLocal).isFalse()
+        assertThat(ignorePlacement.networkTransferGb).isEqualTo(4.0)
+        assertThat(preferLocalPlacement.networkTransferDelay).isEqualTo(ignorePlacement.networkTransferDelay)
+        assertThat(preferLocalPlacement.score - ignorePlacement.score).isEqualTo(4.0)
+    }
+
+    @Test
+    fun `topology annotator rejects ram bandwidth and io capacity pressure`() {
+        val scenarios =
+            listOf(
+                capacityScenario(
+                    hostCapacity = HostCapacity(ram = 1.0),
+                    workload = workload(demand = RealtimeResourceDemand(ram = 2.0)),
+                ) to
+                    "physical_ram_capacity",
+                capacityScenario(
+                    hostCapacity = HostCapacity(bw = 1.0),
+                    workload = workload(demand = RealtimeResourceDemand(bw = 2.0)),
+                ) to
+                    "physical_bw_capacity",
+                capacityScenario(
+                    hostCapacity = HostCapacity(io = 1.0),
+                    workload = workload(demand = RealtimeResourceDemand(io = 2.0)),
+                ) to
+                    "physical_io_capacity",
+            )
+
+        val reasons =
+            scenarios.map { (scenario, _) ->
+                val placement =
+                    scenario.annotator
+                        .annotate(
+                            states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                            vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                            workload = scenario.workload,
+                            records = emptyList(),
+                        ).single()
+                        .placement as RealtimePlacementDecision.Rejected
+                placement.reason
+            }
+
+        assertThat(reasons).containsExactlyElementsOf(scenarios.map { it.second })
+    }
+
+    @Test
+    fun `image pull delay falls back when image size or vm bandwidth is zero`() {
+        val annotator =
+            annotator(
+                config = annotationConfig(imageCacheEnabled = true),
+            )
+        val candidates =
+            annotator.annotate(
+                states =
+                    listOf(
+                        nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0),
+                        nodeState(vmIndex = 1, acceptingWork = true, availableTime = 0.0),
+                    ),
+                vmList =
+                    listOf(
+                        createVm(id = 0, ram = 1024, bw = 0, storage = 1000),
+                        createVm(id = 1, ram = 1024, bw = 1000, storage = 1000),
+                    ),
+                workload = workload(imageId = "cold-image", imageSizeGb = 0.0),
+                records = emptyList(),
+            )
+
+        val zeroBandwidthPlacement = requireNotNull(candidates.first { it.vmIndex == 0 }.acceptedPlacement)
+        val normalBandwidthPlacement = requireNotNull(candidates.first { it.vmIndex == 1 }.acceptedPlacement)
+        assertThat(zeroBandwidthPlacement.imageCacheHit).isFalse()
+        assertThat(zeroBandwidthPlacement.imagePullDelay).isEqualTo(1.0)
+        assertThat(normalBandwidthPlacement.imagePullDelay).isEqualTo(0.001)
     }
 
     @Test
@@ -294,7 +375,8 @@ class RealtimeCloudResourceComponentsTest {
         physicalTopologyEnabled: Boolean = false,
         dataLocalityEnabled: Boolean = false,
         imageCacheEnabled: Boolean = false,
-        hostCpuCapacity: Double = 100.0,
+        hostCapacity: HostCapacity = HostCapacity(),
+        dataLocalityPolicy: DataLocalityPolicy = DataLocalityPolicy.BALANCED,
     ): TopologyCandidateAnnotationConfig =
         TopologyCandidateAnnotationConfig(
             enabled = physicalTopologyEnabled || dataLocalityEnabled || imageCacheEnabled,
@@ -302,33 +384,35 @@ class RealtimeCloudResourceComponentsTest {
             dataLocalityEnabled = dataLocalityEnabled,
             imageCacheEnabled = imageCacheEnabled,
             localRegion = RegionId(0),
-            hostCpuCapacity = hostCpuCapacity,
-            hostRamCapacity = 100.0,
-            hostBwCapacity = 100.0,
-            hostIoCapacity = 100.0,
+            hostCpuCapacity = hostCapacity.cpu,
+            hostRamCapacity = hostCapacity.ram,
+            hostBwCapacity = hostCapacity.bw,
+            hostIoCapacity = hostCapacity.io,
             crossRackBandwidth = 4.0,
             crossRegionBandwidth = 2.0,
-            dataLocalityPolicy = DataLocalityPolicy.BALANCED,
+            dataLocalityPolicy = dataLocalityPolicy,
         )
 
     private fun workload(
-        requestedCpu: Double = 1.0,
+        demand: RealtimeResourceDemand = RealtimeResourceDemand(cpu = 1.0),
         dataRegion: RegionId = RegionId(0),
+        inputDataSizeGb: Double = 4.0,
         imageId: String? = null,
+        imageSizeGb: Double = 2.0,
     ): RealtimeWorkloadDescriptor =
         RealtimeWorkloadDescriptor(
             cloudletId = CloudletId(99),
             tenantId = TenantId(0),
             priority = 0,
             deadline = null,
-            requestedCpu = requestedCpu,
-            requestedRam = 0.0,
-            requestedBw = 0.0,
-            requestedIo = 0.0,
+            requestedCpu = demand.cpu,
+            requestedRam = demand.ram,
+            requestedBw = demand.bw,
+            requestedIo = demand.io,
             dataRegion = dataRegion,
-            inputDataSizeGb = 4.0,
+            inputDataSizeGb = inputDataSizeGb,
             imageId = imageId,
-            imageSizeGb = 2.0,
+            imageSizeGb = imageSizeGb,
         )
 
     private fun location(
@@ -361,4 +445,58 @@ class RealtimeCloudResourceComponentsTest {
             .setBw(bw)
             .setSize(storage)
             .setCloudletScheduler(CloudletSchedulerSpaceShared())
+
+    private fun remotePlacementForPolicy(
+        policy: DataLocalityPolicy,
+        remote: RealtimeTopologyLocation,
+    ): RealtimePlacementDecision.Accepted {
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        dataLocalityEnabled = true,
+                        dataLocalityPolicy = policy,
+                    ),
+                locationOf = { remote },
+                latencyFor = { 0.0 },
+            )
+        return requireNotNull(
+            annotator
+                .annotate(
+                    states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                    vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                    workload = workload(dataRegion = RegionId(0)),
+                    records = emptyList(),
+                ).single()
+                .acceptedPlacement,
+        )
+    }
+
+    private fun capacityScenario(
+        hostCapacity: HostCapacity,
+        workload: RealtimeWorkloadDescriptor,
+    ): CapacityScenario =
+        CapacityScenario(
+            annotator =
+                annotator(
+                    config =
+                        annotationConfig(
+                            physicalTopologyEnabled = true,
+                            hostCapacity = hostCapacity,
+                        ),
+                ),
+            workload = workload,
+        )
+
+    private data class HostCapacity(
+        val cpu: Double = 100.0,
+        val ram: Double = 100.0,
+        val bw: Double = 100.0,
+        val io: Double = 100.0,
+    )
+
+    private data class CapacityScenario(
+        val annotator: TopologyCandidateAnnotator,
+        val workload: RealtimeWorkloadDescriptor,
+    )
 }

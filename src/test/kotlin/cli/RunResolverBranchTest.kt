@@ -7,14 +7,82 @@ import config.ExperimentMode
 import config.SystemConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
 
 class RunResolverBranchTest {
+    @TempDir
+    lateinit var tempDir: File
+
     @Test
     fun `load base configs treats blank config path as default config`() {
         val configs = RunResolver.loadBaseConfigs("   ")
 
         assertThat(configs.systemConfig).isEqualTo(SystemConfig.createDefault())
         assertThat(configs.experimentConfig).isEqualTo(ExperimentConfig.createDefault())
+    }
+
+    @Test
+    fun `load base configs reads non blank config path`() {
+        val configs = RunResolver.loadBaseConfigs("configs/examples/batch_test.toml")
+
+        assertThat(configs.experimentConfig.defaultProfile).isEqualTo("batch_test")
+        assertThat(configs.experimentConfig.profiles).containsKey("batch_test")
+        assertThat(configs.systemConfig.output.resultsDir).isEqualTo("runs")
+    }
+
+    @Test
+    fun `merge algorithm library skips invalid non empty library`() {
+        val invalidLibrary =
+            tempDir.resolve("algorithms.toml").apply {
+                writeText(
+                    """
+                    [algorithms.RANDOM]
+                    enabled = "not-a-boolean"
+                    """.trimIndent(),
+                )
+            }
+        val configs =
+            LoadedRunConfigs(
+                systemConfig = SystemConfig.createDefault(),
+                experimentConfig = ExperimentConfig.createDefault(),
+            )
+
+        val merged = RunResolver.mergeAlgorithmLibrary(configs, invalidLibrary)
+
+        assertThat(merged).isSameAs(configs)
+    }
+
+    @Test
+    fun `merge algorithm library keeps user algorithm overrides above library defaults`() {
+        val library =
+            tempDir.resolve("algorithms.toml").apply {
+                writeText(
+                    """
+                    [algorithms.PSO]
+                    enabled = false
+                    population = 99
+                    maxIter = 88
+
+                    [presets.library_batch]
+                    algorithms = ["PSO"]
+                    """.trimIndent(),
+                )
+            }
+        val userPso = AlgorithmConfig(enabled = true, population = 7, maxIter = 8)
+        val configs =
+            LoadedRunConfigs(
+                systemConfig = SystemConfig.createDefault(),
+                experimentConfig =
+                    ExperimentConfig.createDefault().copy(
+                        algorithmConfigs = mapOf("PSO" to userPso),
+                    ),
+            )
+
+        val merged = RunResolver.mergeAlgorithmLibrary(configs, library)
+
+        assertThat(merged.experimentConfig.algorithmConfigs["PSO"]).isSameAs(userPso)
+        assertThat(merged.experimentConfig.presets).containsKey("library_batch")
     }
 
     @Test
