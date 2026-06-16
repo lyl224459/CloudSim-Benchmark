@@ -54,7 +54,7 @@ class ContainerImageSmokeTaskFunctionalTest {
         assertContains(commands.joinToString("\n"), "build -t fixture-image")
         assertContains(commands.joinToString("\n"), "buildx build --load")
         assertContains(commands.joinToString("\n"), "run --rm --read-only")
-        assertContains(commands.joinToString("\n"), "/app/runs:rw,nosuid,nodev")
+        assertContains(commands.joinToString("\n"), "type=tmpfs,destination=/app/runs,tmpfs-mode=1777")
         assertContains(commands.joinToString("\n"), "fixture-image --help")
     }
 

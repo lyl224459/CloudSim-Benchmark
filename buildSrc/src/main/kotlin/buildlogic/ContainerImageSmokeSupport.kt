@@ -39,8 +39,8 @@ internal object ContainerImageSmokeSupport {
             "--read-only",
             "--tmpfs",
             "/tmp:rw,nosuid,nodev",
-            "--tmpfs",
-            "/app/runs:rw,nosuid,nodev",
+            "--mount",
+            runsTmpfsMount(),
             imageName,
             "--help",
         )
@@ -56,8 +56,8 @@ internal object ContainerImageSmokeSupport {
             "--read-only",
             "--tmpfs",
             "/tmp:rw,nosuid,nodev",
-            "--tmpfs",
-            "/app/runs:rw,nosuid,nodev",
+            "--mount",
+            runsTmpfsMount(),
             "--entrypoint",
             "sh",
             imageName,
@@ -76,4 +76,7 @@ internal object ContainerImageSmokeSupport {
         } else {
             "Docker executable '$dockerExecutable' was not found; skipping local containerImageSmoke."
         }
+
+    private fun runsTmpfsMount(): String =
+        "type=tmpfs,destination=/app/runs,tmpfs-mode=1777"
 }
