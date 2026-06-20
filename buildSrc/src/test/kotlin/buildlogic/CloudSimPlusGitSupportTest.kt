@@ -37,6 +37,24 @@ class CloudSimPlusGitSupportTest {
     }
 
     @Test
+    fun `git state files include detached heads without resolving refs`() {
+        val root = tempDir.resolve("detached-root").also(File::mkdirs)
+        val rootGit = root.resolve(".git").also(File::mkdirs)
+        rootGit.resolve("HEAD").writeText("c".repeat(40))
+        rootGit.resolve("index").writeText("index")
+        val source = root.resolve("source").also(File::mkdirs)
+        val sourceGit = source.resolve(".git").also(File::mkdirs)
+        sourceGit.resolve("HEAD").writeText("d".repeat(40))
+
+        val files = CloudSimPlusGitStateFiles.resolve(root, source).map { it.canonicalFile }
+
+        assertTrue(rootGit.resolve("HEAD").canonicalFile in files)
+        assertTrue(rootGit.resolve("index").canonicalFile in files)
+        assertTrue(sourceGit.resolve("HEAD").canonicalFile in files)
+        assertTrue(files.none { it.path.contains("refs") })
+    }
+
+    @Test
     fun `git client falls back when configured proxy command fails`() {
         val log = tempDir.resolve("fallback.log")
         val git = proxyFallbackGit(log)
