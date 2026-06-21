@@ -48,7 +48,7 @@ jobs:
           git -C "${wiki_dir}" checkout -B master
         fi
 
-        rsync -a --delete build/wiki/ "${wiki_dir}/"
+        rsync -a --delete --exclude ".git/" build/wiki/ "${wiki_dir}/"
 
         git -C "${wiki_dir}" config user.name "github-actions[bot]"
         git -C "${wiki_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
