@@ -206,6 +206,7 @@ jobs:
         subject-name: ghcr.io/lyl224459/cloudsim-benchmark
         subject-digest: ${{ steps.push.outputs.digest }}
         push-to-registry: true
+        create-storage-record: false
 
     - name: Attest container image SBOM
       uses: actions/attest@v4
@@ -214,3 +215,4 @@ jobs:
         subject-digest: ${{ steps.push.outputs.digest }}
         sbom-path: build/supply-chain/cloudsim-benchmark-${{ needs.build-and-release.outputs.version }}-sbom.json
         push-to-registry: true
+        create-storage-record: false
