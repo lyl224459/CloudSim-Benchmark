@@ -20,35 +20,19 @@ import scheduler.RealtimeSchedulingContext
 class RealtimeBrokerCloudSemanticsTest {
     @Test
     fun `decision delay postpones submission and is counted`() {
-        val simulation = CloudSimPlus()
-        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
-        val vm = createVm()
-        val broker =
-            RealtimeBroker(
-                simulation,
-                RealtimeMinLoadScheduler(listOf(vm)),
-                listOf(vm),
-                RealtimeSchedulingConfig(decisionDelay = 2.0),
-            )
-        broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(createCloudlet()))
+        val fixture = brokerFixture(RealtimeSchedulingConfig(decisionDelay = 2.0))
+        fixture.broker.submitCloudletListRealtime(listOf(createCloudlet()))
 
-        simulation.start()
+        fixture.simulation.start()
 
-        assertThat(broker.getSubmittedCount()).isEqualTo(1)
-        assertThat(broker.getAverageDecisionDelay()).isEqualTo(2.0)
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getAverageDecisionDelay()).isEqualTo(2.0)
     }
 
     @Test
     fun `failed attempts retry until retry limit then become permanent failures`() {
-        val simulation = CloudSimPlus()
-        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
-        val vm = createVm()
-        val broker =
-            RealtimeBroker(
-                simulation,
-                RealtimeMinLoadScheduler(listOf(vm)),
-                listOf(vm),
+        val fixture =
+            brokerFixture(
                 RealtimeSchedulingConfig(
                     failureRate = 1.0,
                     retryLimit = 2,
@@ -56,82 +40,54 @@ class RealtimeBrokerCloudSemanticsTest {
                     retryBackoffMultiplier = 1.0,
                 ),
             )
-        broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(createCloudlet()))
+        fixture.broker.submitCloudletListRealtime(listOf(createCloudlet()))
 
-        simulation.start()
+        fixture.simulation.start()
 
-        assertThat(broker.getSubmittedCount()).isEqualTo(0)
-        assertThat(broker.getRetryCount()).isEqualTo(2)
-        assertThat(broker.getPermanentFailedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(0)
+        assertThat(fixture.broker.getRetryCount()).isEqualTo(2)
+        assertThat(fixture.broker.getPermanentFailedCount()).isEqualTo(1)
     }
 
     @Test
     fun `rejected tasks do not retry`() {
-        val simulation = CloudSimPlus()
-        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
-        val vm = createVm()
-        val broker =
-            RealtimeBroker(
-                simulation,
-                RealtimeMinLoadScheduler(listOf(vm)),
-                listOf(vm),
-                RealtimeSchedulingConfig(maxQueueSize = 1, failureRate = 1.0, retryLimit = 2),
-            )
-        broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(createCloudlet(0), createCloudlet(1)))
+        val fixture = brokerFixture(RealtimeSchedulingConfig(maxQueueSize = 1, failureRate = 1.0, retryLimit = 2))
+        fixture.broker.submitCloudletListRealtime(listOf(createCloudlet(0), createCloudlet(1)))
 
-        simulation.start()
+        fixture.simulation.start()
 
-        assertThat(broker.getRejectedCount()).isGreaterThanOrEqualTo(1)
-        assertThat(broker.getRetryCount()).isLessThanOrEqualTo(2)
+        assertThat(fixture.broker.getRejectedCount()).isGreaterThanOrEqualTo(1)
+        assertThat(fixture.broker.getRetryCount()).isLessThanOrEqualTo(2)
     }
 
     @Test
     fun `vm queue capacity rejects excess tasks without retry`() {
-        val simulation = CloudSimPlus()
-        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
-        val vm = createVm()
-        val broker =
-            RealtimeBroker(
-                simulation,
-                RealtimeMinLoadScheduler(listOf(vm)),
-                listOf(vm),
+        val fixture =
+            brokerFixture(
                 RealtimeSchedulingConfig(vmQueueCapacity = 1, decisionDelay = 10.0, failureRate = 0.0, retryLimit = 3),
             )
-        broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(
+        fixture.broker.submitCloudletListRealtime(
             listOf(
                 createCloudlet(0, length = 20_000),
                 createCloudlet(1, length = 20_000),
             ),
         )
 
-        simulation.start()
+        fixture.simulation.start()
 
-        assertThat(broker.getCapacityRejectedCount()).isEqualTo(1)
-        assertThat(broker.getRetryCount()).isEqualTo(0)
+        assertThat(fixture.broker.getCapacityRejectedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getRetryCount()).isEqualTo(0)
     }
 
     @Test
     fun `deadline factor counts completed sla violations`() {
-        val simulation = CloudSimPlus()
-        DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
-        val vm = createVm()
+        val fixture = brokerFixture(RealtimeSchedulingConfig(deadlineFactor = 0.1))
         val cloudlet = createCloudlet(length = 20_000)
-        val broker =
-            RealtimeBroker(
-                simulation,
-                RealtimeMinLoadScheduler(listOf(vm)),
-                listOf(vm),
-                RealtimeSchedulingConfig(deadlineFactor = 0.1),
-            )
-        broker.submitVmList(listOf(vm))
-        broker.submitCloudletListRealtime(listOf(cloudlet))
+        fixture.broker.submitCloudletListRealtime(listOf(cloudlet))
 
-        simulation.start()
+        fixture.simulation.start()
 
-        assertThat(broker.getSlaViolationCount(listOf(cloudlet))).isEqualTo(1)
+        assertThat(fixture.broker.getSlaViolationCount(listOf(cloudlet))).isEqualTo(1)
     }
 
     @Test
@@ -675,6 +631,23 @@ private fun createVm(): Vm =
         .setRam(1024)
         .setBw(1000)
         .setSize(10000)
+
+private fun brokerFixture(
+    config: RealtimeSchedulingConfig = RealtimeSchedulingConfig(),
+    schedulerFactory: (Vm) -> RealtimeSchedulerBase = { vm -> RealtimeMinLoadScheduler(listOf(vm)) },
+): BrokerFixture {
+    val simulation = CloudSimPlus()
+    DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+    val vm = createVm()
+    val broker = RealtimeBroker(simulation, schedulerFactory(vm), listOf(vm), config)
+    broker.submitVmList(listOf(vm))
+    return BrokerFixture(simulation, broker)
+}
+
+private data class BrokerFixture(
+    val simulation: CloudSimPlus,
+    val broker: RealtimeBroker,
+)
 
 private fun createCloudlet(
     id: Int = 0,
