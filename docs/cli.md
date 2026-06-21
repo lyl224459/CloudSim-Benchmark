@@ -216,4 +216,4 @@ Unix/macOS：
 scripts/run run --mode batch --algorithms RANDOM
 ```
 
-`run.cmd` 会在 JAR 缺失时执行 `fatJar`。发布包根目录优先使用 `cloudsim-benchmark-all.jar`，源码目录优先使用 `build/libs/cloudsim-benchmark-1.0.0-all.jar`。
+`run.cmd` 会在 JAR 缺失时执行 `fatJar`。发布包根目录优先使用 `cloudsim-benchmark-all.jar`，源码目录会自动选择 `build/libs/cloudsim-benchmark-*-all.jar`。

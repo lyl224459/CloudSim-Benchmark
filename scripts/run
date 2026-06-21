@@ -41,17 +41,30 @@ OS=$(detect_os)
 # 设置平台特定的变量
 if [ "$OS" = "windows" ]; then
     GRADLE_CMD="./gradlew.bat"
-    JAR_PATH="build\\libs\\cloudsim-benchmark-1.0.0-all.jar"
     JAVA_CMD="java.exe"
 else
     GRADLE_CMD="./gradlew"
-    JAR_PATH="build/libs/cloudsim-benchmark-1.0.0-all.jar"
     JAVA_CMD="java"
 fi
 
-if [ -f "cloudsim-benchmark-all.jar" ]; then
-    JAR_PATH="cloudsim-benchmark-all.jar"
-fi
+resolve_jar_path() {
+    if [ -f "cloudsim-benchmark-all.jar" ]; then
+        JAR_PATH="cloudsim-benchmark-all.jar"
+        return
+    fi
+
+    local candidate=""
+    if [ -d "build/libs" ]; then
+        candidate="$(find build/libs -maxdepth 1 -type f -name 'cloudsim-benchmark-*-all.jar' | sort | tail -n 1)"
+    fi
+    if [ -n "$candidate" ]; then
+        JAR_PATH="$candidate"
+    else
+        JAR_PATH="build/libs/cloudsim-benchmark-*-all.jar"
+    fi
+}
+
+resolve_jar_path
 
 # 设置编码
 export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dlogback.configurationFile=cloudsim-benchmark-logback.xml"
@@ -146,6 +159,7 @@ check_jar() {
     if [ ! -f "$JAR_PATH" ]; then
         echo "[警告] 找不到 JAR 文件，正在自动构建..."
         build_project
+        resolve_jar_path
     fi
 }
 

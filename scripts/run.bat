@@ -8,12 +8,7 @@ cd /d "%PROJECT_DIR%"
 chcp 65001 >nul 2>&1
 set "JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dlogback.configurationFile=cloudsim-benchmark-logback.xml"
 set "PACKAGED_JAR=cloudsim-benchmark-all.jar"
-set "BUILD_JAR=build\libs\cloudsim-benchmark-1.0.0-all.jar"
-if exist "%PACKAGED_JAR%" (
-    set "JAR_FILE=%PACKAGED_JAR%"
-) else (
-    set "JAR_FILE=%BUILD_JAR%"
-)
+call :resolve_jar_file
 set "PROXY_GRADLE_ARGS="
 
 set "SYSTEM_PROXY="
@@ -50,6 +45,7 @@ if not exist "%JAR_FILE%" (
     echo [Build] Running Gradle fatJar...
     call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon
     if errorlevel 1 exit /b 1
+    call :resolve_jar_file
     echo [Build] Done.
 )
 
@@ -87,4 +83,16 @@ exit /b 0
 exit /b 1
 
 :end
+exit /b 0
+
+:resolve_jar_file
+set "BUILD_JAR="
+for %%j in (build\libs\cloudsim-benchmark-*-all.jar) do if exist "%%~fj" set "BUILD_JAR=%%~fj"
+if exist "%PACKAGED_JAR%" (
+    set "JAR_FILE=%PACKAGED_JAR%"
+) else if defined BUILD_JAR (
+    set "JAR_FILE=%BUILD_JAR%"
+) else (
+    set "JAR_FILE=build\libs\cloudsim-benchmark-*-all.jar"
+)
 exit /b 0

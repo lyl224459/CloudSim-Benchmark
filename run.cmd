@@ -3,12 +3,7 @@ setlocal EnableDelayedExpansion
 
 chcp 65001 >nul
 set "PACKAGED_JAR=cloudsim-benchmark-all.jar"
-set "BUILD_JAR=build\libs\cloudsim-benchmark-1.0.0-all.jar"
-if exist "%PACKAGED_JAR%" (
-    set "JAR_FILE=%PACKAGED_JAR%"
-) else (
-    set "JAR_FILE=%BUILD_JAR%"
-)
+call :resolve_jar_file
 set "PROXY_GRADLE_ARGS="
 
 call :configure_system_proxy
@@ -32,6 +27,7 @@ if not exist "%JAR_FILE%" (
     echo [WARN] Jar not found, building first...
     call :build_project
     if errorlevel 1 exit /b %errorlevel%
+    call :resolve_jar_file
 )
 
 java -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dlogback.configurationFile=cloudsim-benchmark-logback.xml --enable-native-access=ALL-UNNAMED --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED -jar "%JAR_FILE%" %*
@@ -62,3 +58,15 @@ exit /b 0
 echo [Build] Running Gradle fatJar...
 call gradlew.bat %PROXY_GRADLE_ARGS% fatJar --no-daemon
 exit /b %errorlevel%
+
+:resolve_jar_file
+set "BUILD_JAR="
+for %%j in (build\libs\cloudsim-benchmark-*-all.jar) do if exist "%%~fj" set "BUILD_JAR=%%~fj"
+if exist "%PACKAGED_JAR%" (
+    set "JAR_FILE=%PACKAGED_JAR%"
+) else if defined BUILD_JAR (
+    set "JAR_FILE=%BUILD_JAR%"
+) else (
+    set "JAR_FILE=build\libs\cloudsim-benchmark-*-all.jar"
+)
+exit /b 0
