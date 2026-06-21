@@ -1,0 +1,234 @@
+# Troubleshooting
+
+本文档集中记录本地开发、构建、配置、容器和 CI 常见问题。
+
+## JDK Or Gradle
+
+### Symptom
+
+```text
+Unsupported class file major version
+Inconsistent JVM-target compatibility
+Kotlin does not yet support target
+```
+
+### Action
+
+- 确认运行 JDK 是 25+：
+
+```powershell
+java -version
+.\gradlew.bat --version
+```
+
+- 使用仓库 Gradle wrapper，不要使用系统 Gradle。
+- 如果 IDE 使用不同 JDK，调整 IDE Gradle JVM。
+
+## CloudSim Plus Submodule Missing
+
+### Symptom
+
+```text
+third_party/cloudsimplus missing
+submodule checkout is missing
+```
+
+### Action
+
+```powershell
+git submodule update --init --recursive
+.\gradlew.bat verifyCloudSimPlusLock --configuration-cache
+```
+
+默认 locked mode 不会自动 fetch/checkout；它只验证已有 submodule。
+
+## CloudSim Plus Lock Drift
+
+### Symptom
+
+```text
+lock drift
+checkout commit does not match gradle/cloudsimplus.lock
+POM version drift
+```
+
+### Action
+
+普通开发：
+
+```powershell
+git submodule update --init --recursive
+.\gradlew.bat verifyCloudSimPlusLock
+```
+
+维护者更新 CloudSim Plus：
+
+```powershell
+.\gradlew.bat fullCheck -Pcloudsimplus.ref=v8.5.7
+.\gradlew.bat updateCloudSimPlusLock -Pcloudsimplus.ref=v8.5.7
+```
+
+同时提交 `gradle/cloudsimplus.lock` 和 submodule gitlink。
+
+## Proxy Or Network
+
+PowerShell dotted property 需要加引号：
+
+```powershell
+.\gradlew.bat verifyCloudSimPlusLock '-Dorg.gradle.project.cloudsimplus.gitProxy=http://host:port'
+```
+
+Windows `run.cmd` 会读取系统代理并传给 Gradle/Java。
+
+离线模式：
+
+```powershell
+.\gradlew.bat verifyCloudSimPlusLock -Pcloudsimplus.offline=true
+```
+
+## Warning Audit Fails
+
+运行：
+
+```powershell
+pwsh -File scripts/run-build-warning-audit.ps1
+```
+
+查看：
+
+```text
+build/reports/build-warnings/audit.md
+build/reports/build-warnings/*.log
+```
+
+允许项是精确白名单。新增 deprecation、native access、Unsafe、JVM target fallback 或 Maven/Jansi/Guava warning 都应先定位来源，不要全局隐藏。
+
+## Detekt Baseline Reappears
+
+项目要求 detekt baseline 不存在。
+
+检查：
+
+```powershell
+.\gradlew.bat verifyNoDetektBaseline detekt --no-daemon --stacktrace
+```
+
+不要重新生成 baseline。应修复 detekt issue，或对确实需要保留的兼容 facade 添加局部 suppress 和理由。
+
+## JUnit Inventory Fails
+
+如果新增、删除或重命名测试：
+
+```powershell
+.\gradlew.bat updateJUnitTestInventory verifyJUnitTestInventory verifyJUnitTestSignatures --no-daemon --stacktrace
+```
+
+如果不是有意变化，检查是否有测试方法因返回非 `Unit` 而未被 JUnit 发现。
+
+## README TOML Drift Fails
+
+README 中的 `toml` code fence 会被当作独立配置解析。修复方式：
+
+- 让示例成为完整 standalone config；
+- 或改用 `text` code fence；
+- 或把长配置放到 `docs/configuration.md` 并引用 `configs/` 文件。
+
+## Docker Or Container Smoke
+
+本地没有 Docker：
+
+```text
+containerImageSmoke prints diagnostic and skips
+```
+
+CI 没有 Docker：
+
+```text
+containerImageSmoke fails
+```
+
+生成上下文：
+
+```powershell
+.\gradlew.bat prepareContainerImageContext verifyContainerBuildContext
+```
+
+常见失败：
+
+- 上下文超过 50 MiB；
+- provenance checksum 不一致；
+- `.git`、Gradle、源码进入上下文；
+- 镜像不是 UID 10001；
+- `/app/runs` 不可写。
+
+## License Policy Fails
+
+运行：
+
+```powershell
+.\gradlew.bat generateSupplyChainReports checkLicense --no-daemon --stacktrace --no-configuration-cache
+```
+
+处理：
+
+- 确认新增 runtime 依赖许可证。
+- 如许可证可接受，更新 `gradle/allowed-licenses.json`。
+- 如许可证不可接受，替换依赖或排除 runtime 引入。
+
+## Dependency Verification Fails
+
+依赖升级后需要更新 verification metadata：
+
+```powershell
+.\gradlew.bat testClasses buildSrc:testClasses compileJmhKotlin generateSupplyChainReports `
+  --write-verification-metadata sha256 `
+  --no-daemon --stacktrace --no-configuration-cache
+```
+
+只提交相关 checksum diff。
+
+## Git Global Ignore Permission Noise
+
+### Symptom
+
+```text
+warning: unable to access 'C:\Users\admin/.config/git/ignore': Permission denied
+```
+
+### Action
+
+这是本机 Git 配置问题，不是项目问题。检查：
+
+```powershell
+git config --global core.excludesfile
+```
+
+修复文件权限，或把 `core.excludesfile` 改到可读路径。
+
+## Experiment Produces No CSV
+
+检查：
+
+- `csv.enabled` 是否为 false。
+- 是否使用了 `--dry-run`。
+- `ExperimentOutputContext.experimentDir` 是否为 null。
+- 输出目录是否可写。
+
+## Realtime Metrics Look Empty
+
+常见原因：
+
+- 所有 trial 失败，metric 单元格为空。
+- 对应 feature 未启用，例如 tenant/topology/autoscaling。
+- Google trace 缺少 user/resource/topology metadata。
+- 任务被拒绝但不是失败，需要看 rejection 指标。
+
+## Performance Results Are Noisy
+
+Hosted runner 不适合硬门禁。建议：
+
+- 多跑几次；
+- 使用固定硬件；
+- 关闭后台负载；
+- 比较 JMH JSON delta 而不是单次 wall-clock；
+- 不跨 JDK/CloudSim Plus lock/GC 参数比较。

@@ -2,6 +2,8 @@
 
 本清单用于稳定发布当前重构，避免继续混入新功能。
 
+发布包结构、manifest、SBOM、许可证和 attestation 细节见 [release-package.md](release-package.md)。CI workflow 说明见 [ci-workflows.md](ci-workflows.md)。
+
 ## Release gates
 
 - `.\gradlew.bat ktlintCheck detekt --no-daemon --stacktrace`

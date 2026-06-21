@@ -1,0 +1,122 @@
+# Container Guide
+
+容器构建采用“Gradle 构建，Docker 只组装运行镜像”的模型。Docker build 不编译源码，也不需要 `.git`、Gradle cache 或 CloudSim Plus checkout。
+
+## Build Context Flow
+
+```text
+fatJar
+  -> prepareContainerImageContext
+  -> build/container-context
+  -> verifyContainerBuildContext
+  -> docker build -f build/container-context/Containerfile build/container-context
+```
+
+`build/container-context` 只允许包含运行时需要的文件：
+
+- `app.jar`
+- `configs/`
+- `data/`
+- runtime `Containerfile`
+- provenance 文件
+
+禁止包含：
+
+- `.git`
+- `.gradle`
+- Gradle wrapper
+- Kotlin/Java source
+- build logs
+- `runs/`
+- IDE 文件
+
+## Commands
+
+生成上下文：
+
+```powershell
+.\gradlew.bat prepareContainerImageContext verifyContainerBuildContext --configuration-cache
+```
+
+构建镜像：
+
+```powershell
+docker build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
+```
+
+运行 help：
+
+```powershell
+docker run --rm cloudsim-benchmark --help
+```
+
+运行实验并挂载结果目录：
+
+```powershell
+docker run --rm `
+  --read-only `
+  --tmpfs /tmp `
+  -v "${PWD}\runs:/app/runs" `
+  cloudsim-benchmark run --mode batch --algorithms RANDOM --runs 1
+```
+
+## Runtime User
+
+镜像默认使用固定 UID/GID：
+
+```text
+10001:10001
+```
+
+唯一需要持久写入的目录：
+
+```text
+/app/runs
+```
+
+CI smoke 会验证：
+
+- `--help` 可以执行；
+- 运行 UID 是 `10001`；
+- `/app/runs` 可写；
+- root filesystem 可只读；
+- 镜像中没有 Git、Gradle 或源码。
+
+## Provenance
+
+container context provenance 记录：
+
+- CloudSim Plus ref、commit、version；
+- fatJar SHA-256；
+- 上下文文件清单；
+- 资产和 checksum。
+
+`verifyContainerBuildContext` 会校验 provenance 与实际文件一致，并限制上下文大小不超过 50 MiB。
+
+## Local vs CI Behavior
+
+| Environment | Docker Missing |
+| :--- | :--- |
+| Local | `containerImageSmoke` 打印诊断并跳过。 |
+| CI | `containerImageSmoke` 失败，阻断 PR。 |
+
+CI 使用 BuildKit/buildx 缓存。普通开发机可以直接使用本地 Docker。
+
+## Release Container
+
+Release workflow 使用同一最小上下文构建 GHCR 镜像：
+
+```text
+ghcr.io/lyl224459/cloudsim-benchmark
+```
+
+Release 会为镜像 digest 生成 provenance 和 SBOM attestation。
+
+## Troubleshooting
+
+| Symptom | Cause | Action |
+| :--- | :--- | :--- |
+| Context too large | 多余文件进入 `build/container-context` | 检查 `verifyContainerBuildContext` 报告和 `.dockerignore`。 |
+| Permission denied writing results | 未挂载 `/app/runs` 或目录权限不足 | 挂载宿主 `runs` 并确保当前用户可写。 |
+| Docker build cannot find JAR | 未运行 `prepareContainerImageContext` | 先运行 Gradle context 任务。 |
+| CI passes build but smoke fails | 镜像入口或用户权限问题 | 查看 container smoke 日志中的 UID、文件检查和 help 输出。 |
