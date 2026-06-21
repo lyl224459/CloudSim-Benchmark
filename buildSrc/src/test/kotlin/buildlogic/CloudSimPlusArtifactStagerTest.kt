@@ -69,6 +69,17 @@ class CloudSimPlusArtifactStagerTest {
         assertTrue(pomFailure.message.orEmpty().contains("POM version mismatch"))
     }
 
+    @Test
+    fun `rejects missing pom after matching runtime jar is found`() {
+        val source = tempDir.resolve("missing-pom")
+        source.resolve("target").mkdirs()
+        source.resolve("target/cloudsimplus-8.5.7.jar").writeText("jar")
+
+        val failure = assertFailsWith<GradleException> { stage(source) }
+
+        assertTrue(failure.message.orEmpty().contains("POM not found"))
+    }
+
     private fun stage(source: File): List<File> =
         CloudSimPlusArtifactStager.stage(
             sourceDir = source,

@@ -8,6 +8,8 @@ import java.util.jar.JarFile
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -46,10 +48,40 @@ class CloudSimPlusJarSanitizerTest {
     fun `sanitize jar returns false and leaves jar stable when class path is absent`() {
         val jar = tempDir.resolve("cloudsimplus-8.5.7.jar")
         createJar(jar)
+        val originalBytes = jar.readBytes()
 
         assertFalse(CloudSimPlusJarSanitizer.sanitizeJar(jar))
         assertFalse(jar.resolveSibling("${jar.name}.tmp").exists())
+        assertContentEquals(originalBytes, jar.readBytes())
         assertJarClassPath(jar, null)
+    }
+
+    @Test
+    fun `sanitize jar returns false for missing manifest and keeps content stable`() {
+        val jar = tempDir.resolve("no-manifest.jar")
+        JarOutputStream(jar.outputStream()).use { output ->
+            output.putNextEntry(JarEntry("example.txt"))
+            output.write("content".toByteArray())
+            output.closeEntry()
+        }
+        val originalBytes = jar.readBytes()
+
+        assertFalse(CloudSimPlusJarSanitizer.sanitizeJar(jar))
+
+        assertContentEquals(originalBytes, jar.readBytes())
+        assertFalse(jar.resolveSibling("${jar.name}.tmp").exists())
+    }
+
+    @Test
+    fun `sanitize jar reports bad jar input`() {
+        val jar = tempDir.resolve("broken.jar")
+        jar.writeText("not a jar")
+
+        assertFailsWith<java.util.zip.ZipException> {
+            CloudSimPlusJarSanitizer.sanitizeJar(jar)
+        }
+
+        assertFalse(jar.resolveSibling("${jar.name}.tmp").exists())
     }
 
     private fun createJar(

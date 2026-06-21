@@ -55,6 +55,19 @@ class CloudSimPlusGitSupportTest {
     }
 
     @Test
+    fun `git state files ignore blank and missing gitdir markers`() {
+        val root = tempDir.resolve("invalid-root").also(File::mkdirs)
+        val blank = root.resolve("blank").also(File::mkdirs)
+        val missing = root.resolve("missing").also(File::mkdirs)
+        blank.resolve(".git").writeText("gitdir:   ")
+        missing.resolve(".git").writeText("gitdir: ../.git/modules/missing")
+
+        val files = CloudSimPlusGitStateFiles.resolve(blank, missing)
+
+        assertTrue(files.isEmpty())
+    }
+
+    @Test
     fun `git client falls back when configured proxy command fails`() {
         val log = tempDir.resolve("fallback.log")
         val git = proxyFallbackGit(log)
