@@ -69,14 +69,23 @@ build/reports/supply-chain/
 
 ### `containerImageSmoke`
 
-Ubuntu 执行，要求 Docker 可用。验证：
+Ubuntu 执行，要求 Podman 可用。验证：
 
 - 最小 container context；
-- Docker image build；
+- Podman image build；
 - `--help`；
 - UID 10001；
 - `/app/runs` 可写；
 - 镜像无 Git/Gradle/source。
+
+### `secrets.yml`
+
+Gitleaks 敏感信息检查在 pull request、`main` push、每周定时和手动触发时运行。workflow 使用 full-history checkout：
+
+- `actions/checkout@v6`；
+- `fetch-depth: 0`；
+- `gitleaks/gitleaks-action@v3`；
+- `.gitleaks.toml` 基于默认规则，不使用宽泛 allowlist。
 
 ### Performance Artifact Job
 
@@ -217,4 +226,4 @@ packages: write for image job
 - 依赖更新失败时不要混入业务修复。
 - CloudSim Plus latest 失败不代表 main 失败，单独分析。
 - Performance history 失败先看 artifact，确认是否真实回归。
-- Container smoke 本地可跳过 Docker 缺失，CI 缺 Docker 必须失败。
+- Container smoke 本地可跳过 Podman 缺失，CI 缺 Podman 必须失败。

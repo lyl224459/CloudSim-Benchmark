@@ -121,7 +121,7 @@ Realtime metric 测试锁定：
 TestKit 用于验证真实 Gradle task action。要求：
 
 - 使用临时 fixture。
-- 使用 fake Git/Maven/Docker，不依赖真实网络或本机工具状态。
+- 使用 fake Git/Maven/Podman，不依赖真实网络或本机工具状态。
 - 覆盖 success、failure diagnostics、inputs/outputs、up-to-date、configuration cache。
 - 子 Gradle 构建的 JaCoCo exec 会合并进 buildSrc 报告。
 

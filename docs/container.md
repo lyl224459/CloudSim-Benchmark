@@ -1,6 +1,6 @@
 # Container Guide
 
-容器构建采用“Gradle 构建，Docker 只组装运行镜像”的模型。Docker build 不编译源码，也不需要 `.git`、Gradle cache 或 CloudSim Plus checkout。
+容器构建采用“Gradle 构建，Podman 只组装运行镜像”的模型。Podman build 不编译源码，也不需要 `.git`、Gradle cache 或 CloudSim Plus checkout。
 
 ## Build Context Flow
 
@@ -9,7 +9,7 @@ fatJar
   -> prepareContainerImageContext
   -> build/container-context
   -> verifyContainerBuildContext
-  -> docker build -f build/container-context/Containerfile build/container-context
+  -> podman build -f build/container-context/Containerfile build/container-context
 ```
 
 `build/container-context` 只允许包含运行时需要的文件：
@@ -41,19 +41,19 @@ fatJar
 构建镜像：
 
 ```powershell
-docker build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
+podman build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
 ```
 
 运行 help：
 
 ```powershell
-docker run --rm cloudsim-benchmark --help
+podman run --rm cloudsim-benchmark --help
 ```
 
 运行实验并挂载结果目录：
 
 ```powershell
-docker run --rm `
+podman run --rm `
   --read-only `
   --tmpfs /tmp `
   -v "${PWD}\runs:/app/runs" `
@@ -95,16 +95,16 @@ container context provenance 记录：
 
 ## Local vs CI Behavior
 
-| Environment | Docker Missing |
+| Environment | Podman Missing |
 | :--- | :--- |
 | Local | `containerImageSmoke` 打印诊断并跳过。 |
 | CI | `containerImageSmoke` 失败，阻断 PR。 |
 
-CI 使用 BuildKit/buildx 缓存。普通开发机可以直接使用本地 Docker。
+CI 使用 Podman 构建最小上下文镜像。普通开发机可以直接使用本地 Podman。
 
 ## Release Container
 
-Release workflow 使用同一最小上下文构建 GHCR 镜像：
+Release workflow 使用 Podman 从同一最小上下文构建并推送 GHCR 镜像：
 
 ```text
 ghcr.io/lyl224459/cloudsim-benchmark
@@ -118,5 +118,5 @@ Release 会为镜像 digest 生成 provenance 和 SBOM attestation。
 | :--- | :--- | :--- |
 | Context too large | 多余文件进入 `build/container-context` | 检查 `verifyContainerBuildContext` 报告和 `.dockerignore`。 |
 | Permission denied writing results | 未挂载 `/app/runs` 或目录权限不足 | 挂载宿主 `runs` 并确保当前用户可写。 |
-| Docker build cannot find JAR | 未运行 `prepareContainerImageContext` | 先运行 Gradle context 任务。 |
+| Podman build cannot find JAR | 未运行 `prepareContainerImageContext` | 先运行 Gradle context 任务。 |
 | CI passes build but smoke fails | 镜像入口或用户权限问题 | 查看 container smoke 日志中的 UID、文件检查和 help 输出。 |

@@ -1308,10 +1308,8 @@ val containerImageSmoke by tasks.registering(ContainerImageSmokeTask::class) {
 
     dependsOn("verifyContainerBuildContext")
     imageName.set("cloudsim-benchmark:smoke")
-    dockerExecutable.set("docker")
+    containerExecutable.set("podman")
     ci.set(isCiBuildProvider)
-    useBuildx.set(isGitHubActionsProvider)
-    useGitHubActionsCache.set(isGitHubActionsProvider)
     contextDirectory.set(layout.buildDirectory.dir("container-context"))
     containerFile.set(layout.buildDirectory.file("container-context/Containerfile"))
 }
@@ -1599,18 +1597,43 @@ tasks.register("memoryReport") {
 
 tasks.register<Exec>("podmanBuild") {
     group = "distribution"
-    description = "使用 Podman 构建项目的容器镜像"
-    dependsOn("fatJar") // 确保先构建出最新的 JAR
-
-    commandLine("podman", "build", "-t", "cloudsim-benchmark:latest", "-f", "Containerfile", ".")
+    description = "使用 Podman 从最小容器上下文构建项目镜像"
+    dependsOn("verifyContainerBuildContext")
 
     doFirst {
-        logger.lifecycle("🚀 正在构建 Podman 镜像: cloudsim-benchmark:latest...")
+        val contextDir =
+            layout.buildDirectory
+                .dir("container-context")
+                .get()
+                .asFile
+        logger.lifecycle("🚀 正在从最小上下文构建 Podman 镜像: ${contextDir.absolutePath}")
+        workingDir = contextDir
+        commandLine(
+            "podman",
+            "build",
+            "-t",
+            "cloudsim-benchmark:latest",
+            "-f",
+            contextDir.resolve("Containerfile").absolutePath,
+            contextDir.absolutePath,
+        )
     }
 }
 
 tasks.register<Exec>("podmanRunHelp") {
     group = "distribution"
-    description = "在容器中运行帮助命令"
-    commandLine("podman", "run", "--rm", "cloudsim-benchmark:latest", "--help")
+    description = "在 Podman 容器中运行帮助命令"
+    dependsOn("podmanBuild")
+    commandLine(
+        "podman",
+        "run",
+        "--rm",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,nosuid,nodev",
+        "--mount",
+        "type=tmpfs,destination=/app/runs,tmpfs-mode=1777",
+        "cloudsim-benchmark:latest",
+        "--help",
+    )
 }

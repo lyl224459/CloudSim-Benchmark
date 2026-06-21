@@ -18,7 +18,7 @@ CloudSim-Benchmark 是一个基于 CloudSim Plus 和 Kotlin 的云任务调度�
 
 ## Quick Start
 
-要求：JDK 25+、Git submodule、PowerShell 或 Bash。Docker 只在容器 smoke 或镜像构建时需要。
+要求：JDK 25+、Git submodule、PowerShell 或 Bash。Podman 只在容器 smoke 或镜像构建时需要。
 
 ```powershell
 git submodule update --init --recursive
@@ -89,7 +89,7 @@ cloudletCount = 20
 | [docs/supply-chain.md](docs/supply-chain.md) | dependency verification、OSV、许可证、SBOM、attestation 和 Dependabot。 |
 | [docs/performance.md](docs/performance.md) | smoke、JMH 趋势、baseline delta 和性能结果使用边界。 |
 | [docs/testing.md](docs/testing.md) | JUnit inventory、JaCoCo、TestKit、文档漂移和测试新增规则。 |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | JDK、CloudSim Plus、代理、Docker、warning audit 和本地 Git 噪音排错。 |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | JDK、CloudSim Plus、代理、Podman、warning audit 和本地 Git 噪音排错。 |
 | [docs/glossary.md](docs/glossary.md) | 项目术语和指标名解释。 |
 | [docs/wiki-sync.md](docs/wiki-sync.md) | GitHub Wiki 生成、链接重写和 CI 自动同步。 |
 | [docs/realtime-metrics.md](docs/realtime-metrics.md) | 实时调度 CSV 指标、单位、趋势和字段定义。 |
@@ -106,11 +106,12 @@ cloudletCount = 20
 
 ## Container
 
-容器镜像只组装运行时上下文，不在 Docker 构建中编译源码：
+容器镜像只组装运行时上下文，不在 Podman 构建中编译源码：
 
 ```powershell
 .\gradlew.bat prepareContainerImageContext verifyContainerBuildContext
-docker build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
+podman build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
+podman run --rm -v "${PWD}\runs:/app/runs" cloudsim-benchmark --help
 ```
 
 镜像默认使用 UID/GID `10001` 的非 root 用户，唯一持久写目录为 `/app/runs`。

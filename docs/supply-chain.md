@@ -8,8 +8,9 @@ Release asset 结构和 attestation 操作见 [release-package.md](release-packa
 | Control | Purpose |
 | :--- | :--- |
 | Gradle dependency verification | 锁定外部依赖 checksum。 |
-| Dependabot | 每周检查 Gradle、GitHub Actions、Docker 更新。 |
+| Dependabot | 每周检查 Gradle、GitHub Actions 和容器相关更新。 |
 | OSV | PR 漏洞扫描和每周全量扫描。 |
+| Gitleaks | PR、`main` push 和每周敏感信息扫描。 |
 | License policy | 阻断未知或新增 runtime 许可证。 |
 | CycloneDX SBOM | 生成 runtime dependency SBOM。 |
 | Release manifest | 校验 release assets 与 CloudSim Plus metadata。 |
@@ -50,7 +51,7 @@ Gradle 更新按类别分组：
 - Mockito；
 - AssertJ。
 
-GitHub Actions 和 Docker 更新单独处理。bulk PR 不直接合并，应拆成小 PR。
+GitHub Actions 和容器相关更新单独处理。bulk PR 不直接合并，应拆成小 PR。
 
 每个依赖 PR 必跑：
 
@@ -114,13 +115,29 @@ Workflow：
 - 每周全量扫描上传报告和 SARIF。
 - 存量问题不应和无关业务 PR 混在一起修。
 
+## Secret Scanning
+
+Workflow：
+
+```text
+.github/workflows/secrets.yml
+```
+
+策略：
+
+- 使用 `actions/checkout@v6` 和 `fetch-depth: 0` 扫描完整历史。
+- 使用 `gitleaks/gitleaks-action@v3` 与 `.gitleaks.toml` 默认规则。
+- 初始不维护宽泛 allowlist；真实 secret 需要先轮换并移除，示例假值只允许精确路径或 regex 例外。
+- `verifyGitHubActionsPolicy` 会检查 workflow 存在、Gitleaks 主版本和 full-history checkout。
+
 ## GitHub Actions Policy
 
 `verifyGitHubActionsPolicy` 扫描 workflow：
 
 - 禁止已知 Node 20 action 主版本；
 - 要求使用批准的 Node 24 兼容 action；
-- release workflow 允许并要求 `actions/attest@v4`。
+- release workflow 允许并要求 `actions/attest@v4`；
+- 禁止重新引入 Docker build/push action，镜像发布主路径使用 Podman。
 
 actionlint 在 Ubuntu job 中校验 workflow YAML、表达式、权限和 action inputs。
 
@@ -147,7 +164,7 @@ Release workflow 使用 GitHub 原生 attestation：
 
 - release assets provenance；
 - fatJar + SBOM attestation；
-- GHCR image digest provenance；
+- Podman 推送的 GHCR image digest provenance；
 - GHCR image SBOM attestation。
 
 需要权限：

@@ -4,36 +4,18 @@ import java.io.File
 
 internal object ContainerImageSmokeSupport {
     fun buildCommand(
-        dockerExecutable: String,
+        containerExecutable: String,
         imageName: String,
         containerFile: File,
-        useBuildx: Boolean = false,
-        useGitHubActionsCache: Boolean = false,
     ): List<String> =
-        buildList {
-            add(dockerExecutable)
-            if (useBuildx) {
-                addAll(listOf("buildx", "build", "--load"))
-                if (useGitHubActionsCache) {
-                    addAll(
-                        listOf(
-                            "--cache-from=type=gha,scope=container-smoke",
-                            "--cache-to=type=gha,mode=max,scope=container-smoke",
-                        ),
-                    )
-                }
-            } else {
-                add("build")
-            }
-            addAll(listOf("-t", imageName, "-f", containerFile.absolutePath, "."))
-        }
+        listOf(containerExecutable, "build", "-t", imageName, "-f", containerFile.absolutePath, ".")
 
     fun runCommand(
-        dockerExecutable: String,
+        containerExecutable: String,
         imageName: String,
     ): List<String> =
         listOf(
-            dockerExecutable,
+            containerExecutable,
             "run",
             "--rm",
             "--read-only",
@@ -46,11 +28,11 @@ internal object ContainerImageSmokeSupport {
         )
 
     fun inspectCommand(
-        dockerExecutable: String,
+        containerExecutable: String,
         imageName: String,
     ): List<String> =
         listOf(
-            dockerExecutable,
+            containerExecutable,
             "run",
             "--rm",
             "--read-only",
@@ -67,14 +49,14 @@ internal object ContainerImageSmokeSupport {
                 "test ! -e /app/src && test ! -e /app/buildSrc && test ! -e /app/gradlew",
         )
 
-    fun missingDockerMessage(
-        dockerExecutable: String,
+    fun missingContainerRuntimeMessage(
+        containerExecutable: String,
         ci: Boolean,
     ): String =
         if (ci) {
-            "Docker executable '$dockerExecutable' is required for containerImageSmoke in CI."
+            "Container runtime '$containerExecutable' is required for containerImageSmoke in CI."
         } else {
-            "Docker executable '$dockerExecutable' was not found; skipping local containerImageSmoke."
+            "Container runtime '$containerExecutable' was not found; skipping local containerImageSmoke."
         }
 
     private fun runsTmpfsMount(): String =

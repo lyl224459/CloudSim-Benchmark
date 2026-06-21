@@ -17,8 +17,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
 
+    - name: Install actionlint
+      run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.7
+
     - name: Run actionlint
-      run: docker run --rm -v "${{ github.workspace }}:/repo" -w /repo rhysd/actionlint:1.7.7
+      run: "$HOME/go/bin/actionlint"
 
   supply-chain-policy:
     name: Supply chain policy
@@ -247,8 +250,11 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-m2-cloudsimplus-
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v4
+    - name: Install Podman
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y podman
+        podman --version
 
     - name: Build and smoke container image
       run: |

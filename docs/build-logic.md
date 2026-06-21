@@ -140,9 +140,9 @@ Wiki 生成不接入 Gradle task；它由 `scripts/build-wiki.py` 和 `.github/w
 
 | Task | Purpose |
 | :--- | :--- |
-| `prepareContainerImageContext` | 生成最小运行时 Docker context。 |
+| `prepareContainerImageContext` | 生成最小运行时 Podman/OCI context。 |
 | `verifyContainerBuildContext` | 校验 context 大小、禁止文件、checksum。 |
-| `containerImageSmoke` | 构建并运行容器 smoke。 |
+| `containerImageSmoke` | 使用 Podman 构建并运行容器 smoke。 |
 | `cliEndToEndSmoke` | CLI end-to-end smoke。 |
 
 ## Configuration Cache

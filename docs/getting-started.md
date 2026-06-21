@@ -7,7 +7,7 @@
 - JDK 25 或更高版本。
 - Git submodule 支持。
 - PowerShell 7+ 或 Bash。
-- Docker 可选，仅用于 `containerImageSmoke` 或手动镜像验证。
+- Podman 可选，仅用于 `containerImageSmoke` 或手动镜像验证。
 
 ## Checkout
 
@@ -120,9 +120,9 @@ Windows `run.cmd` 会读取系统代理并传给 Gradle 和 Java。受限网络�
 再构建镜像：
 
 ```powershell
-docker build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
+podman build -t cloudsim-benchmark -f build/container-context/Containerfile build/container-context
 ```
 
-CI 中 `containerImageSmoke` 要求 Docker 可用；本地没有 Docker 时会打印诊断并跳过。
+CI 中 `containerImageSmoke` 要求 Podman 可用；本地没有 Podman 时会打印诊断并跳过。
 
 容器运行、挂载和非 root 用户说明见 [container.md](container.md)。常见构建问题见 [troubleshooting.md](troubleshooting.md)。

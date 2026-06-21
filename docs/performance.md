@@ -120,4 +120,4 @@ Hosted runner 数据的限制：
 | JMH 结果缺失 | `jmh` task 未执行或失败 | 查看 `build/reports/jmh/` 和 Gradle 日志。 |
 | trend report 无 delta | 未传 `performanceBaseline` 或文件为空 | 提供历史 `jmh-results.json`。 |
 | CI performance job 失败 | artifact 或 JMH 环境问题 | 下载日志和 JSON，先确认是否真实 build regression。 |
-| 本地耗时明显高 | 机器负载、杀毒、Docker、后台任务 | 关闭干扰或使用固定 runner。 |
+| 本地耗时明显高 | 机器负载、杀毒、Podman、后台任务 | 关闭干扰或使用固定 runner。 |

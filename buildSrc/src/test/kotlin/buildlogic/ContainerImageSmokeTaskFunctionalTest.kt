@@ -15,7 +15,7 @@ class ContainerImageSmokeTaskFunctionalTest {
     fun `container smoke skips locally and configuration cache is reusable`() {
         val fixture = fixture("container-local")
         fixture.resolve("Containerfile").writeText("FROM scratch")
-        fixture.writeBuild(containerTask("definitely-missing-docker", ci = false))
+        fixture.writeBuild(containerTask("definitely-missing-podman", ci = false))
 
         val action = fixture.run("containerSmoke")
         val firstCache = fixture.run("containerSmoke", "--configuration-cache")
@@ -28,31 +28,27 @@ class ContainerImageSmokeTaskFunctionalTest {
     }
 
     @Test
-    fun `container smoke fails in CI when docker is missing`() {
+    fun `container smoke fails in CI when podman is missing`() {
         val fixture = fixture("container-ci")
         fixture.resolve("Containerfile").writeText("FROM scratch")
-        fixture.writeBuild(containerTask("definitely-missing-docker", ci = true))
+        fixture.writeBuild(containerTask("definitely-missing-podman", ci = true))
 
         assertContains(fixture.runAndFail("containerSmoke").output, "required for containerImageSmoke in CI")
     }
 
     @Test
-    fun `container smoke executes ordinary docker and buildx commands`() {
+    fun `container smoke executes podman build run and inspect commands`() {
         val fixture = fixture("container-commands")
-        val commandLog = fixture.resolve("docker-commands.txt")
-        val docker = fakeDocker(fixture, commandLog, "docker-ok", "")
+        val commandLog = fixture.resolve("podman-commands.txt")
+        val podman = fakePodman(fixture, commandLog, "podman-ok", "")
         fixture.resolve("Containerfile").writeText("FROM scratch")
-        fixture.writeBuild(
-            containerTask(docker.absolutePath, ci = true, taskName = "ordinary") +
-                containerTask(docker.absolutePath, ci = true, taskName = "buildx", buildx = true),
-        )
+        fixture.writeBuild(containerTask(podman.absolutePath, ci = true, taskName = "ordinary"))
 
-        fixture.run("ordinary", "buildx")
+        fixture.run("ordinary")
 
         val commands = commandLog.readLines()
-        assertEquals(2, commands.count { it.contains("--version") })
+        assertEquals(1, commands.count { it.contains("--version") })
         assertContains(commands.joinToString("\n"), "build -t fixture-image")
-        assertContains(commands.joinToString("\n"), "buildx build --load")
         assertContains(commands.joinToString("\n"), "run --rm --read-only")
         assertContains(commands.joinToString("\n"), "type=tmpfs,destination=/app/runs,tmpfs-mode=1777")
         assertContains(commands.joinToString("\n"), "fixture-image --help")
@@ -61,40 +57,37 @@ class ContainerImageSmokeTaskFunctionalTest {
     @Test
     fun `container smoke propagates build and run failures`() {
         val buildFixture = fixture("container-build-fail")
-        val buildDocker = fakeDocker(buildFixture, buildFixture.resolve("commands.txt"), "docker", "build")
+        val buildPodman = fakePodman(buildFixture, buildFixture.resolve("commands.txt"), "podman", "build")
         buildFixture.resolve("Containerfile").writeText("FROM scratch")
-        buildFixture.writeBuild(containerTask(buildDocker.absolutePath, ci = true))
+        buildFixture.writeBuild(containerTask(buildPodman.absolutePath, ci = true))
 
         val runFixture = fixture("container-run-fail")
-        val runDocker = fakeDocker(runFixture, runFixture.resolve("commands.txt"), "docker", "run")
+        val runPodman = fakePodman(runFixture, runFixture.resolve("commands.txt"), "podman", "run")
         runFixture.resolve("Containerfile").writeText("FROM scratch")
-        runFixture.writeBuild(containerTask(runDocker.absolutePath, ci = true))
+        runFixture.writeBuild(containerTask(runPodman.absolutePath, ci = true))
 
         assertContains(buildFixture.runAndFail("containerSmoke").output, "non-zero exit value")
         assertContains(runFixture.runAndFail("containerSmoke").output, "non-zero exit value")
     }
 
     private fun containerTask(
-        docker: String,
+        podman: String,
         ci: Boolean,
         taskName: String = "containerSmoke",
-        buildx: Boolean = false,
     ): String =
         """
         import buildlogic.ContainerImageSmokeTask
 
         tasks.register('$taskName', ContainerImageSmokeTask) {
             imageName.set('fixture-image')
-            dockerExecutable.set('${docker.gradlePath()}')
+            containerExecutable.set('${podman.gradlePath()}')
             ci.set($ci)
-            useBuildx.set($buildx)
-            useGitHubActionsCache.set($buildx)
             contextDirectory.set(layout.projectDirectory)
             containerFile.set(layout.projectDirectory.file('Containerfile'))
         }
         """
 
-    private fun fakeDocker(
+    private fun fakePodman(
         fixture: GradleTaskFixture,
         log: File,
         name: String,

@@ -133,15 +133,15 @@ README 中的 `toml` code fence 会被当作独立配置解析。修复方式：
 - 或改用 `text` code fence；
 - 或把长配置放到 `docs/configuration.md` 并引用 `configs/` 文件。
 
-## Docker Or Container Smoke
+## Podman Or Container Smoke
 
-本地没有 Docker：
+本地没有 Podman：
 
 ```text
 containerImageSmoke prints diagnostic and skips
 ```
 
-CI 没有 Docker：
+CI 没有 Podman：
 
 ```text
 containerImageSmoke fails
@@ -158,6 +158,7 @@ containerImageSmoke fails
 - 上下文超过 50 MiB；
 - provenance checksum 不一致；
 - `.git`、Gradle、源码进入上下文；
+- Podman 无法写入 `/app/runs` 挂载目录。
 - 镜像不是 UID 10001；
 - `/app/runs` 不可写。
 

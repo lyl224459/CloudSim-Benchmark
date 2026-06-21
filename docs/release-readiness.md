@@ -27,7 +27,7 @@
 - `run.cmd`、`scripts/run`、`scripts/run.bat` 需同时支持源码构建 JAR 和发布包根目录的 `cloudsim-benchmark-all.jar`。
 - Windows release zip 需包含 `cloudsim-benchmark-all.jar`、`run.cmd`、`configs/`、`data/`、`README.md`、`LICENSE` 和 `cloudsim-benchmark-logback.xml`。
 - Unix release tar.gz 需包含 `cloudsim-benchmark-all.jar`、`scripts/run`、`configs/`、`data/`、`README.md`、`LICENSE` 和 `cloudsim-benchmark-logback.xml`。
-- Ubuntu CI 需运行 `containerImageSmoke` 验证最小容器上下文构建出的镜像可以执行 `--help`，以 UID `10001` 运行，在只读根文件系统下仅写入 `/app/runs`，且镜像内不包含 Git、Gradle 或源码；CI 缺少 Docker 必须失败，本地缺少 Docker 时允许跳过并打印诊断。
+- Ubuntu CI 需运行 `containerImageSmoke` 验证 Podman 从最小容器上下文构建出的镜像可以执行 `--help`，以 UID `10001` 运行，在只读根文件系统下仅写入 `/app/runs`，且镜像内不包含 Git、Gradle 或源码；CI 缺少 Podman 必须失败，本地缺少 Podman 时允许跳过并打印诊断。
 
 ## Current quality baseline
 
@@ -41,7 +41,8 @@
 - GitHub workflow JavaScript Action 必须使用 `verifyGitHubActionsPolicy` 批准的 Node.js 24 主版本；Ubuntu CI 额外使用 actionlint 校验 workflow YAML、表达式、权限和 action inputs。
 - `verifyContainerBuildContext` 必须确认 `build/container-context` 小于 50 MiB、provenance 与 CloudSim Plus lock/fatJar checksum 一致，且上下文不包含 Git、Gradle 或源码；`VerifyContainerImageContextTask` 类级覆盖率门禁为 line >= 80%、branch >= 70%。
 - `generateSupplyChainReports` 必须生成 runtime CycloneDX SBOM 和许可证报告，`checkLicense` 必须按 `gradle/allowed-licenses.json` 阻断未知或新增 runtime 许可证；CloudSim Plus GPLv3 是已接受的 runtime 许可证。Dependabot 与 OSV workflow 负责持续依赖更新和漏洞扫描。
-- Release workflow 必须使用 GitHub `actions/attest@v4` 为全部 release assets、fatJar/SBOM 和 `ghcr.io/lyl224459/cloudsim-benchmark` 镜像生成 provenance/attestation。
+- Release workflow 必须使用 Podman 构建并推送 `ghcr.io/lyl224459/cloudsim-benchmark` 镜像，并使用 GitHub `actions/attest@v4` 为全部 release assets、fatJar/SBOM 和镜像生成 provenance/attestation。
+- `secrets.yml` 必须运行 `gitleaks/gitleaks-action@v3`，使用 full-history checkout；`verifyGitHubActionsPolicy` 会阻断缺失、降级或重新引入 Docker build/push actions。
 - CloudSim Plus Maven 依赖缓存与 raw/sanitized staging repo 必须分离；两个 staging repo 各只允许包含锁定版本的 JAR/POM。
 - `verifyJUnitTestSignatures` 与 `verifyJUnitTestInventory` 必须通过；有意调整测试入口时使用 `updateJUnitTestInventory` 更新精确清单。
 - `buildSrc` JaCoCo 生成 XML/HTML 报告并执行保守覆盖率门禁。

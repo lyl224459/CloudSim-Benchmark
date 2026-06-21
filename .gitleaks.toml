@@ -1,0 +1,4 @@
+title = "CloudSim-Benchmark Gitleaks Configuration"
+
+[extend]
+useDefault = true

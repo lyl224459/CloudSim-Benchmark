@@ -12,7 +12,7 @@ import org.gradle.process.ExecOperations
 import org.gradle.work.DisableCachingByDefault
 import javax.inject.Inject
 
-@DisableCachingByDefault(because = "Runs an external Docker smoke check")
+@DisableCachingByDefault(because = "Runs an external container smoke check")
 abstract class ContainerImageSmokeTask
     @Inject
     constructor(
@@ -22,16 +22,10 @@ abstract class ContainerImageSmokeTask
         abstract val imageName: Property<String>
 
         @get:Input
-        abstract val dockerExecutable: Property<String>
+        abstract val containerExecutable: Property<String>
 
         @get:Input
         abstract val ci: Property<Boolean>
-
-        @get:Input
-        abstract val useBuildx: Property<Boolean>
-
-        @get:Input
-        abstract val useGitHubActionsCache: Property<Boolean>
 
         @get:Internal
         abstract val contextDirectory: DirectoryProperty
@@ -40,15 +34,16 @@ abstract class ContainerImageSmokeTask
         abstract val containerFile: RegularFileProperty
 
         init {
+            doNotTrackState("Runs an external container runtime and intentionally performs a smoke check every time")
             outputs.upToDateWhen { false }
         }
 
         @TaskAction
         fun smoke() {
-            val docker = dockerExecutable.get()
+            val containerRuntime = containerExecutable.get()
             val ciBuild = ci.get()
-            if (!isDockerAvailable(docker)) {
-                val message = ContainerImageSmokeSupport.missingDockerMessage(docker, ciBuild)
+            if (!isContainerRuntimeAvailable(containerRuntime)) {
+                val message = ContainerImageSmokeSupport.missingContainerRuntimeMessage(containerRuntime, ciBuild)
                 if (ciBuild) {
                     throw GradleException(message)
                 }
@@ -60,18 +55,16 @@ abstract class ContainerImageSmokeTask
                 workingDir = contextDirectory.get().asFile
                 commandLine(
                     ContainerImageSmokeSupport.buildCommand(
-                        dockerExecutable = docker,
+                        containerExecutable = containerRuntime,
                         imageName = imageName.get(),
                         containerFile = containerFile.get().asFile,
-                        useBuildx = useBuildx.get(),
-                        useGitHubActionsCache = useGitHubActionsCache.get(),
                     ),
                 )
             }
             execOperations.exec {
                 commandLine(
                     ContainerImageSmokeSupport.runCommand(
-                        dockerExecutable = docker,
+                        containerExecutable = containerRuntime,
                         imageName = imageName.get(),
                     ),
                 )
@@ -79,17 +72,17 @@ abstract class ContainerImageSmokeTask
             execOperations.exec {
                 commandLine(
                     ContainerImageSmokeSupport.inspectCommand(
-                        dockerExecutable = docker,
+                        containerExecutable = containerRuntime,
                         imageName = imageName.get(),
                     ),
                 )
             }
         }
 
-        private fun isDockerAvailable(docker: String): Boolean =
+        private fun isContainerRuntimeAvailable(containerRuntime: String): Boolean =
             runCatching {
                 execOperations.exec {
-                    commandLine(docker, "--version")
+                    commandLine(containerRuntime, "--version")
                     isIgnoreExitValue = true
                 }.exitValue == 0
             }.getOrDefault(false)

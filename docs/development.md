@@ -269,7 +269,7 @@ Dependabot 或手工依赖升级按类别拆 PR：
 - Mockito；
 - AssertJ；
 - GitHub Actions；
-- Docker actions/base image。
+- 容器 runtime/base image。
 
 每个 PR 只改对应依赖和 `gradle/verification-metadata.xml`。必须运行：
 
@@ -318,6 +318,7 @@ Detekt baseline 已清零。新增 `@Suppress` 必须带理由：
 - OSV scan；
 - runtime CycloneDX SBOM；
 - license policy；
+- Gitleaks secret scan；
 - release manifest；
 - GitHub Actions Node 24 policy；
 - actionlint；
@@ -343,7 +344,7 @@ Hosted runner 数据只用于观察。性能门禁应放在固定硬件 runner�
 1. Gradle 构建 fatJar。
 2. `prepareContainerImageContext` 生成最小上下文。
 3. `verifyContainerBuildContext` 验证大小、provenance、checksum 和禁止文件。
-4. Docker 只组装 JRE 运行镜像。
+4. Podman 只组装 JRE 运行镜像。
 
 镜像必须：
 
