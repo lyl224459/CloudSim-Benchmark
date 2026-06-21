@@ -91,6 +91,7 @@ cloudletCount = 20
 | [docs/testing.md](docs/testing.md) | JUnit inventory、JaCoCo、TestKit、文档漂移和测试新增规则。 |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | JDK、CloudSim Plus、代理、Docker、warning audit 和本地 Git 噪音排错。 |
 | [docs/glossary.md](docs/glossary.md) | 项目术语和指标名解释。 |
+| [docs/wiki-sync.md](docs/wiki-sync.md) | GitHub Wiki 生成、链接重写和 CI 自动同步。 |
 | [docs/realtime-metrics.md](docs/realtime-metrics.md) | 实时调度 CSV 指标、单位、趋势和字段定义。 |
 | [docs/release-readiness.md](docs/release-readiness.md) | 发布前门禁、手动检查和当前质量基线。 |
 

@@ -10,6 +10,7 @@
 | CloudSim Plus Latest Compatibility | `.github/workflows/cloudsimplus-latest.yml` | weekly, manual | 测试上游最新 CloudSim Plus release。 |
 | Supply Chain - OSV | `.github/workflows/osv.yml` | PR, weekly, manual | 漏洞扫描。 |
 | Weekly Performance History | `.github/workflows/performance-history.yml` | weekly, manual | 记录 hosted runner JMH 趋势。 |
+| Wiki Sync | `.github/workflows/wiki-sync.yml` | docs push to `main`, manual | 生成并同步 GitHub Wiki。 |
 | Release - Build and Publish | `.github/workflows/release.yml` | tag, manual | 构建 release assets、容器和 attestation。 |
 
 ## Main CI Jobs
@@ -132,6 +133,27 @@ performance-history
 - 与上一份 baseline 的 delta。
 
 该 workflow `continue-on-error: true`，避免 hosted runner 抖动阻断普通开发。
+
+## Wiki Sync Workflow
+
+目的：把仓库 README 和 `docs/` 自动发布到 GitHub Wiki。
+
+运行：
+
+```text
+python scripts/build-wiki.py
+clone CloudSim-Benchmark.wiki.git
+rsync build/wiki/ to wiki repo
+commit and push changed pages
+```
+
+要求：
+
+- 仓库启用 GitHub Wiki。
+- workflow 使用 `contents: write`。
+- Wiki 页面不要手工编辑；手工修改会被下一次同步覆盖。
+
+详细说明见 [wiki-sync.md](wiki-sync.md)。
 
 ## Release Workflow
 

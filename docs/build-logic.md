@@ -101,6 +101,8 @@ build/reports/build-warnings/audit.md
 | `validateExampleConfigs` | 验证示例配置。 |
 | `fullCheck` | 聚合主要本地门禁。 |
 
+Wiki 生成不接入 Gradle task；它由 `scripts/build-wiki.py` 和 `.github/workflows/wiki-sync.yml` 处理，避免让普通 `check` 依赖 GitHub Wiki 发布逻辑。
+
 ## Performance Tasks
 
 | Task | Purpose |

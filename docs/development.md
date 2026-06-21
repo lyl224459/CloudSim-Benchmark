@@ -68,6 +68,7 @@ git submodule update --init --recursive
 | Metrics/export | `.\gradlew.bat test --tests "datacenter.*Metric*" --no-daemon --stacktrace` |
 | buildSrc | `.\gradlew.bat buildSrc:check buildSrc:jacocoTestReport --no-daemon --stacktrace` |
 | Docs | `.\gradlew.bat test --tests "config.DocumentationDriftTest" --no-daemon --stacktrace` |
+| Wiki | `python scripts/build-wiki.py` |
 
 ## Standard Gates
 
@@ -360,6 +361,7 @@ Hosted runner 数据只用于观察。性能门禁应放在固定硬件 runner�
 - CI workflow： [ci-workflows.md](ci-workflows.md)
 - build logic： [build-logic.md](build-logic.md)
 - release package： [release-package.md](release-package.md)
+- wiki sync： [wiki-sync.md](wiki-sync.md)
 - 术语表： [glossary.md](glossary.md)
 - 常见问题： [troubleshooting.md](troubleshooting.md)
 

@@ -1,0 +1,64 @@
+name: Wiki Sync
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "scripts/build-wiki.py"
+      - ".github/workflows/wiki-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-wiki:
+    name: Sync GitHub Wiki
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Build wiki pages
+      run: python scripts/build-wiki.py
+
+    - name: Publish wiki
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        REPOSITORY: ${{ github.repository }}
+        SOURCE_SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        wiki_url="https://x-access-token:${GITHUB_TOKEN}@github.com/${REPOSITORY}.wiki.git"
+        wiki_dir="${RUNNER_TEMP}/cloudsim-benchmark-wiki"
+
+        rm -rf "${wiki_dir}"
+        if git clone "${wiki_url}" "${wiki_dir}"; then
+          echo "Cloned existing wiki repository."
+        else
+          echo "Wiki repository is empty or not initialized; creating local wiki repository."
+          mkdir -p "${wiki_dir}"
+          git -C "${wiki_dir}" init
+          git -C "${wiki_dir}" remote add origin "${wiki_url}"
+          git -C "${wiki_dir}" checkout -B master
+        fi
+
+        rsync -a --delete build/wiki/ "${wiki_dir}/"
+
+        git -C "${wiki_dir}" config user.name "github-actions[bot]"
+        git -C "${wiki_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git -C "${wiki_dir}" add -A
+
+        if git -C "${wiki_dir}" diff --cached --quiet; then
+          echo "Wiki is already up to date."
+          exit 0
+        fi
+
+        git -C "${wiki_dir}" commit -m "docs: sync wiki from ${SOURCE_SHA::7}"
+        branch="$(git -C "${wiki_dir}" symbolic-ref --short HEAD 2>/dev/null || echo master)"
+        git -C "${wiki_dir}" push origin "HEAD:${branch}"
