@@ -80,15 +80,15 @@ jobs:
 
     - name: Generate supply chain reports
       run: |
-        .\gradlew.bat generateSupplyChainReports checkLicense --no-daemon --stacktrace --no-configuration-cache -PreleaseVersion=${{ steps.ver.outputs.version }}
+        .\gradlew.bat generateSupplyChainReports checkLicense --no-daemon --stacktrace --no-configuration-cache "-PreleaseVersion=${{ steps.ver.outputs.version }}"
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
 
     - name: Build, package and smoke release assets
       run: |
-        .\gradlew.bat packageReleaseAssets verifyReleaseManifest verifyReleasePackage --no-daemon --stacktrace --no-configuration-cache -Pcompress=true -PreleaseVersion=${{ steps.ver.outputs.version }}
-        .\gradlew.bat prepareContainerImageContext verifyContainerBuildContext --no-daemon --stacktrace --configuration-cache -PreleaseVersion=${{ steps.ver.outputs.version }}
+        .\gradlew.bat packageReleaseAssets verifyReleaseManifest verifyReleasePackage --no-daemon --stacktrace --no-configuration-cache -Pcompress=true "-PreleaseVersion=${{ steps.ver.outputs.version }}"
+        .\gradlew.bat prepareContainerImageContext verifyContainerBuildContext --no-daemon --stacktrace --configuration-cache "-PreleaseVersion=${{ steps.ver.outputs.version }}"
       env:
         GRADLE_OPTS: "-Dfile.encoding=UTF-8"
         CI: "true"
