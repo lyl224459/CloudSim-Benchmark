@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 import datacenter.RealtimeTraceMetadataProvider
 import org.cloudsimplus.cloudlets.Cloudlet

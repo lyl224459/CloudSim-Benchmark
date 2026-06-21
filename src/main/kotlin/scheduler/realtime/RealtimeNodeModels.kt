@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 data class RealtimeNodeState(
     val vmIndex: Int,

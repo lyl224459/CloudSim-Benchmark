@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 @JvmInline
 value class CloudletId(

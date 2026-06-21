@@ -110,8 +110,16 @@ CLI
 入口文件：
 
 - `src/main/kotlin/scheduler/AlgorithmRegistry.kt`
-- `src/main/kotlin/scheduler/Scheduler.kt`
-- `src/main/kotlin/scheduler/RealtimeScheduler.kt`
+- `src/main/kotlin/scheduler/batch/Scheduler.kt`
+- `src/main/kotlin/scheduler/realtime/RealtimeScheduler.kt`
+
+源码布局：
+
+| Path | Purpose |
+| :--- | :--- |
+| `src/main/kotlin/scheduler/` | `AlgorithmRegistry`、assignment codec、metaheuristic runtime model 等跨模式共享类型。 |
+| `src/main/kotlin/scheduler/batch/` | 批处理 `Scheduler` 基类和 `RANDOM`、`PSO`、`WOA`、`GWO`、`HHO`、`RL`、`IMPROVED_RL`。 |
+| `src/main/kotlin/scheduler/realtime/` | `RealtimeScheduler`、实时算法、候选 VM、资源模型、拓扑模型和 VM lifecycle。 |
 
 核心类型：
 
@@ -156,7 +164,7 @@ Registry responsibilities：
 
 新增 batch 算法时必须同步：
 
-1. 新增 `Scheduler` subclass，`allocate()` 返回 cloudlet -> VM index 的 `IntArray`。
+1. 在 `src/main/kotlin/scheduler/batch/` 新增 `Scheduler` subclass，`allocate()` 返回 cloudlet -> VM index 的 `IntArray`。
 2. 在 `AlgorithmRegistry` 注册 `BatchAlgorithmDefinition`。
 3. 如需 legacy enum，更新 `BatchAlgorithmType`。
 4. 如支持参数，设置 `supportsPopulation` / `supportsMaxIter`。
@@ -166,7 +174,7 @@ Registry responsibilities：
 
 新增 realtime 算法时必须同步：
 
-1. 实现 `RealtimeScheduler.scheduleOnArrival(context)`。
+1. 在 `src/main/kotlin/scheduler/realtime/` 实现 `RealtimeScheduler.scheduleOnArrival(context)`。
 2. 如复用候选过滤，继承 `RealtimeSchedulerBase`。
 3. 在 `AlgorithmRegistry` 注册 `RealtimeAlgorithmDefinition`。
 4. 补 accepted candidates、fallback、非连续 VM id、空候选和 invalid optimized index 测试。

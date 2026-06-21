@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 import config.RealtimeQueuePolicy
 import config.RealtimeTopologyPolicy

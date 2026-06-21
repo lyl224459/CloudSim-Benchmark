@@ -22,7 +22,7 @@ flowchart LR
 | :--- | :--- |
 | `cli` | 命令解析、配置解析入口、dry-run 输出和运行分发。 |
 | `config` | TOML DTO、domain config、validator、loader 和 profile/preset 合并。 |
-| `scheduler` | 批处理与实时调度器、算法注册、目标函数和资源候选逻辑。 |
+| `scheduler` | 算法注册、批处理调度器、实时调度器和实时资源/拓扑候选逻辑。 |
 | `broker` | 实时 broker、任务状态、准入、重试、抢占、拓扑和生命周期视图。 |
 | `datacenter` | CloudSim 对接、runner、指标聚合、CSV/export、性能趋势和发布结果。 |
 | `datacenter.generator` | synthetic 和 Google trace 任务生成。 |
@@ -34,6 +34,8 @@ flowchart LR
 
 目标函数在初始化阶段缓存 cloudlet length、VM MIPS、成本和归一化边界；单 VM、同质 VM 或空分母场景返回有限 fitness。
 
+批处理算法源码位于 `src/main/kotlin/scheduler/batch/`。根目录 `src/main/kotlin/scheduler/` 只保留跨 batch/realtime 共用的 registry、assignment codec 和 optimizer runtime model。
+
 ## Realtime Path
 
 实时 runner 使用 realtime scheduler 与 `RealtimeBroker`。Broker 外观保留 CloudSim 事件入口，内部服务处理：
@@ -44,6 +46,8 @@ flowchart LR
 - active VM accounting、tenant/topology metrics 和 read views。
 
 实时 PSO/WOA 只在 accepted candidates 上优化，最终结果会映射回真实 VM 下标并再次校验。
+
+实时调度源码位于 `src/main/kotlin/scheduler/realtime/`，包括 realtime scheduler、候选 VM 状态、资源模型、拓扑模型和 VM lifecycle 组件。
 
 ## Metrics
 

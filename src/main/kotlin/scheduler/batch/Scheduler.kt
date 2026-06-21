@@ -1,8 +1,9 @@
-package scheduler
+package scheduler.batch
 
 import datacenter.ObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
+import scheduler.SchedulerAllocationValidator
 import util.Logger
 
 /**

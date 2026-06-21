@@ -13,6 +13,12 @@
 
 batch 算法和 realtime 算法不能跨 mode 使用。
 
+源码位置：
+
+- batch 调度器位于 `src/main/kotlin/scheduler/batch/`。
+- realtime 调度器和实时资源/拓扑候选模型位于 `src/main/kotlin/scheduler/realtime/`。
+- `src/main/kotlin/scheduler/AlgorithmRegistry.kt` 仍是统一注册入口，负责名称、别名、mode capability 和 `ALL` 展开。
+
 ## Batch Algorithms
 
 | Name | Aliases | Type | Parameters | Notes |

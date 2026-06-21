@@ -6,6 +6,7 @@ import org.cloudsimplus.cloudlets.CloudletSimple
 import org.cloudsimplus.utilizationmodels.UtilizationModelFull
 import org.cloudsimplus.vms.VmSimple
 import org.junit.jupiter.api.Test
+import scheduler.realtime.RealtimePlacementDecision
 
 class RealtimeTopologyModelTest {
     @Test

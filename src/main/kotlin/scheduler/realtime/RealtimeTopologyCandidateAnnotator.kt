@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 import config.DataLocalityPolicy
 import org.cloudsimplus.vms.Vm

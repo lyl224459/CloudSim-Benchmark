@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 internal fun RealtimeNodeState.withPlacement(placement: RealtimePlacementDecision): RealtimeNodeState {
     val accepted = placement as? RealtimePlacementDecision.Accepted

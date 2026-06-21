@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm

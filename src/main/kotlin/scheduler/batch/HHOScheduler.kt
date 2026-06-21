@@ -1,9 +1,10 @@
-package scheduler
+package scheduler.batch
 
 import datacenter.ObjectiveFunction
 import datacenter.SchedulerObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
+import scheduler.AssignmentVectorCodec
 import util.Logger
 import java.util.Random
 import kotlin.math.min

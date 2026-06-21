@@ -155,7 +155,7 @@ Checklist：
 
 Checklist：
 
-1. 新增 `Scheduler` subclass。
+1. 在 `src/main/kotlin/scheduler/batch/` 新增 `Scheduler` subclass。
 2. `allocate()` 返回 VM 下标数组，不返回 VM id。
 3. 在 `AlgorithmRegistry` 注册 `BatchAlgorithmDefinition`。
 4. 如支持优化参数，设置 `supportsPopulation` / `supportsMaxIter`。
@@ -169,7 +169,7 @@ Checklist：
 
 Checklist：
 
-1. 实现 `RealtimeScheduler`，优先继承 `RealtimeSchedulerBase`。
+1. 在 `src/main/kotlin/scheduler/realtime/` 实现 `RealtimeScheduler`，优先继承 `RealtimeSchedulerBase`。
 2. 只从 accepted candidates 中选择 VM。
 3. 优化器返回候选列表下标时，必须映射回真实 VM 下标。
 4. 候选为空或结果异常时走 fallback。

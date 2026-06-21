@@ -1,0 +1,59 @@
+package scheduler
+
+typealias Scheduler = scheduler.batch.Scheduler
+typealias RandomScheduler = scheduler.batch.RandomScheduler
+typealias PSOScheduler = scheduler.batch.PSOScheduler
+typealias WOAScheduler = scheduler.batch.WOAScheduler
+typealias GWOScheduler = scheduler.batch.GWOScheduler
+typealias HHOScheduler = scheduler.batch.HHOScheduler
+typealias RLScheduler = scheduler.batch.RLScheduler
+typealias ImprovedRLScheduler = scheduler.batch.ImprovedRLScheduler
+
+typealias RealtimeScheduler = scheduler.realtime.RealtimeScheduler
+typealias RealtimeSchedulerBase = scheduler.realtime.RealtimeSchedulerBase
+typealias RealtimeRandomScheduler = scheduler.realtime.RealtimeRandomScheduler
+typealias RealtimeMinLoadScheduler = scheduler.realtime.RealtimeMinLoadScheduler
+typealias RealtimePSOScheduler = scheduler.realtime.RealtimePSOScheduler
+typealias RealtimeWOAScheduler = scheduler.realtime.RealtimeWOAScheduler
+
+typealias RealtimeNodeState = scheduler.realtime.RealtimeNodeState
+typealias RealtimeHostState = scheduler.realtime.RealtimeHostState
+typealias NodeCandidate = scheduler.realtime.NodeCandidate
+typealias CandidateFilter = scheduler.realtime.CandidateFilter
+typealias CandidateScorer = scheduler.realtime.CandidateScorer
+typealias VmCandidateScorer = scheduler.realtime.VmCandidateScorer
+typealias RealtimeSchedulingContext = scheduler.realtime.RealtimeSchedulingContext
+typealias RealtimeNodeStateTracker = scheduler.realtime.RealtimeNodeStateTracker
+
+typealias RealtimeResourceDemand = scheduler.realtime.RealtimeResourceDemand
+typealias RealtimePhysicalHostMetrics = scheduler.realtime.RealtimePhysicalHostMetrics
+typealias RealtimeResourceModel = scheduler.realtime.RealtimeResourceModel
+typealias ResourceSnapshotRequest = scheduler.realtime.ResourceSnapshotRequest
+typealias ResourceSnapshotBuilder = scheduler.realtime.ResourceSnapshotBuilder
+
+typealias CloudletId = scheduler.realtime.CloudletId
+typealias VmIndex = scheduler.realtime.VmIndex
+typealias TenantId = scheduler.realtime.TenantId
+typealias RegionId = scheduler.realtime.RegionId
+typealias RackId = scheduler.realtime.RackId
+typealias HostId = scheduler.realtime.HostId
+typealias FailureDomainId = scheduler.realtime.FailureDomainId
+typealias DatacenterId = scheduler.realtime.DatacenterId
+typealias RealtimeTaskLifecycle = scheduler.realtime.RealtimeTaskLifecycle
+typealias RealtimeTaskState = scheduler.realtime.RealtimeTaskState
+typealias RealtimeTaskRecord = scheduler.realtime.RealtimeTaskRecord
+typealias RealtimeWorkloadDescriptor = scheduler.realtime.RealtimeWorkloadDescriptor
+typealias RealtimeTenantFairnessSnapshot = scheduler.realtime.RealtimeTenantFairnessSnapshot
+typealias RealtimeTaskMetadata = scheduler.realtime.RealtimeTaskRecord
+typealias RealtimePreemptionCandidate = scheduler.realtime.RealtimePreemptionCandidate
+
+typealias RealtimeTopologyLocation = scheduler.realtime.RealtimeTopologyLocation
+typealias RealtimeTopologyMetrics = scheduler.realtime.RealtimeTopologyMetrics
+typealias RealtimeTopologyModel = scheduler.realtime.RealtimeTopologyModel
+typealias RealtimeVmLifecycle = scheduler.realtime.RealtimeVmLifecycle
+typealias RealtimeVmLifecycleSnapshot = scheduler.realtime.RealtimeVmLifecycleSnapshot
+typealias RealtimeVmLifecycleManager = scheduler.realtime.RealtimeVmLifecycleManager
+
+internal typealias PSO = scheduler.batch.PSO
+internal typealias TopologyCandidateAnnotationConfig = scheduler.realtime.TopologyCandidateAnnotationConfig
+internal typealias TopologyCandidateAnnotator = scheduler.realtime.TopologyCandidateAnnotator

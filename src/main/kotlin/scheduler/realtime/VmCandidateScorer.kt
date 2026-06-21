@@ -1,4 +1,4 @@
-package scheduler
+package scheduler.realtime
 
 class VmCandidateScorer(
     private val filters: List<CandidateFilter> = defaultFilters(),

@@ -1,8 +1,11 @@
-package scheduler
+package scheduler.batch
 
 import datacenter.SchedulerObjectiveFunction
 import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.vms.Vm
+import scheduler.AssignmentSearchSpace
+import scheduler.AssignmentVectorCodec
+import scheduler.OptimizerRuntime
 import util.Logger
 import java.util.Random
 
