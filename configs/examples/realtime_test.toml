@@ -1,36 +1,66 @@
+# 实时单规模示例：比较实时基准和实时优化算法。
+# 可运行：.\run.cmd run --config configs/examples/realtime_test.toml --profile realtime_test
+
+# 默认 profile。
 defaultProfile = "realtime_test"
 
+# 输出设置。
 [output]
+# 基础结果目录。
 resultsDir = "runs"
 
 [output.csv]
+# 启用 CSV 输出。
 enabled = true
+# CSV 分隔符。
 delimiter = ","
 
+# 日志设置。
 [logging]
+# 常规日志级别。
 level = "INFO"
+# 写文件日志。
 file = true
+# 输出控制台日志。
 console = true
 
+# 实验运行设置。
 [experiment]
+# 自动创建输出目录。
 autoCreateDirs = true
+# 实时实验目录命名模板。
 nameFormat = "realtime_{timestamp}_{algorithms}"
+# 最大并发数。
 maxConcurrent = 4
 
+# JVM 建议参数。
 [jvm]
+# 最大堆建议。
 maxHeapSize = "2g"
+# GC 建议。
 gcAlgorithm = "ZGC"
 
+# 随机种子。
 [random]
+# 固定 seed，便于复现实验。
 seed = 42
 
+# realtime 示例 profile。
 [profiles.realtime_test]
+# realtime 表示动态到达任务的实时调度。
 mode = "realtime"
+# 实时算法列表。
 algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+# 每个算法运行次数。
 runs = 3
+# profile 输出目录。
 outputDir = "runs/realtime_test"
 
+# realtime 参数。
 [profiles.realtime_test.realtime]
+# 实时任务总数。
 cloudletCount = 200
+# 仿真持续时间，单位为模拟时间。
 simulationDuration = 500.0
+# 平均任务到达率。
 arrivalRate = 5.0

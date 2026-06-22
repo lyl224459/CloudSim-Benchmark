@@ -1,37 +1,68 @@
+# 实时多规模示例：在多个任务规模上比较实时调度算法。
+# 可运行：.\run.cmd run --config configs/examples/realtime_multi_test.toml --profile realtime_multi_test
+
+# 默认 profile。
 defaultProfile = "realtime_multi_test"
 
+# 输出设置。
 [output]
+# 基础结果目录。
 resultsDir = "runs"
 
 [output.csv]
+# 启用 CSV 输出。
 enabled = true
+# CSV 分隔符。
 delimiter = ","
 
+# 日志设置。
 [logging]
+# 常规日志级别。
 level = "INFO"
+# 写文件日志。
 file = true
+# 输出控制台日志。
 console = true
 
+# 实验运行设置。
 [experiment]
+# 自动创建输出目录。
 autoCreateDirs = true
+# realtime multi 实验目录命名模板。
 nameFormat = "realtime_multi_{timestamp}_{algorithms}"
+# 最大并发数。
 maxConcurrent = 4
 
+# JVM 建议参数。
 [jvm]
+# 多规模实时实验建议更大堆。
 maxHeapSize = "4g"
+# GC 建议。
 gcAlgorithm = "ZGC"
 
+# 随机种子。
 [random]
+# 固定 seed，便于复现实验。
 seed = 42
 
+# realtime-multi 示例 profile。
 [profiles.realtime_multi_test]
+# realtime-multi 表示按 cloudletCounts 多任务规模运行实时实验。
 mode = "realtime-multi"
+# 实时算法列表。
 algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+# 每个任务规模、每个算法运行次数。
 runs = 3
+# profile 输出目录。
 outputDir = "runs/realtime_multi_test"
 
+# realtime multi 参数。
 [profiles.realtime_multi_test.realtime]
+# 多规模任务数列表；multi 模式优先使用该列表。
 cloudletCounts = [50, 100, 200]
+# 兼容单规模字段；在 realtime-multi 中主要作为 fallback/参考。
 cloudletCount = 200
+# 仿真持续时间，单位为模拟时间。
 simulationDuration = 500.0
+# 平均任务到达率。
 arrivalRate = 5.0

@@ -1,27 +1,51 @@
+# 性能实验配置：用于更长时间的算法性能对比。
+# 相比 quick_test，本文件任务数、runs 和迭代次数更高，运行耗时更长。
+
+# 默认运行批处理性能 profile。
 defaultProfile = "perf_batch"
 
+# 输出设置。
 [output]
+# 性能实验结果目录。
 resultsDir = "runs/performance_test"
 
+# 实验命名设置。
 [experiment]
+# 性能实验目录命名模板。
 nameFormat = "perf_{mode}_{timestamp}_{algorithms}"
 
+# 批处理性能 profile。
 [profiles.perf_batch]
+# 单规模 batch 对比。
 mode = "batch"
+# 批处理算法全集的一组代表性算法。
 algorithms = ["RANDOM", "PSO", "WOA", "GWO", "HHO"]
+# 运行次数较高，用于更稳定统计。
 runs = 10
 
+# 批处理性能参数。
 [profiles.perf_batch.batch]
+# 中等任务规模。
 cloudletCount = 200
+# 较大种群，增强搜索但增加耗时。
 population = 50
+# 较多迭代，增强优化但增加耗时。
 maxIter = 200
 
+# 实时性能 profile。
 [profiles.perf_realtime]
+# 单规模 realtime 对比。
 mode = "realtime"
+# 实时基准和实时优化算法。
 algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+# 每个算法运行 5 次。
 runs = 5
 
+# 实时性能参数。
 [profiles.perf_realtime.realtime]
+# 较大实时任务数。
 cloudletCount = 500
+# 较长仿真时间。
 simulationDuration = 1000.0
+# 较高平均到达率，用于观察负载下表现。
 arrivalRate = 10.0

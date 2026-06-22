@@ -1,49 +1,83 @@
-# CloudSim-Benchmark 默认配置
+# 默认实验配置：提供一个批处理默认 profile 和一个实时默认 profile。
+# CLI 未传 --config 时不会自动读取本文件；它主要作为可运行默认样例和配置模板。
 
+# 未显式传 --profile 时选择的 profile，必须引用下方已定义的 profiles。
 defaultProfile = "batch_default"
 
+# 输出设置：控制实验结果根目录和 CSV 写出行为。
 [output]
+# 默认结果根目录；profile.outputDir 或 CLI --output 可以覆盖。
 resultsDir = "runs"
 
+# CSV 输出设置，影响 trial/summary/comparison 文件。
 [output.csv]
+# true 表示写出 CSV；false 时仍会执行实验但不生成 CSV。
 enabled = true
+# CSV 分隔符，默认逗号。
 delimiter = ","
 
+# 日志设置：控制控制台和文件日志。
 [logging]
+# 日志级别，常用 INFO；排查问题时可改为 DEBUG。
 level = "INFO"
+# 是否写文件日志。
 file = true
+# 是否输出到控制台。
 console = true
 
+# 实验运行通用设置。
 [experiment]
+# true 表示自动创建输出目录。
 autoCreateDirs = true
+# 实验目录命名模板，支持 mode、timestamp、algorithms、preset、tasks token。
 nameFormat = "{mode}_{timestamp}_{algorithms}"
+# 最大并发数；影响多算法/多 trial 并行执行上限。
 maxConcurrent = 2
 
+# 随机性设置。
 [random]
+# 默认随机种子；相同 seed 有助于复现实验。
 seed = 42
 
+# 通用实时优化器默认值；profile 或算法级配置可覆盖实际使用值。
 [optimizer]
+# 优化器种群大小，必须大于 0。
 population = 20
+# 优化器最大迭代次数，必须大于 0。
 maxIter = 20
 
+# 默认批处理 profile：用于快速验证 batch 调度链路。
 [profiles.batch_default]
+# 实验模式，可选 batch、realtime、batch-multi、realtime-multi。
 mode = "batch"
+# 直接指定算法列表；与 preset 互斥。
 algorithms = ["RANDOM", "PSO"]
+# 每个算法执行的 trial 次数。
 runs = 1
+# 当前 profile 的输出目录，会覆盖 output.resultsDir。
 outputDir = "runs/default"
 
+# batch 子配置：只对 batch/batch-multi profile 生效。
 [profiles.batch_default.batch]
+# 单规模实验的任务数量。
 cloudletCount = 100
+# 批处理元启发式算法种群大小。
 population = 30
+# 批处理元启发式算法最大迭代次数。
 maxIter = 50
 
+# 默认实时 profile：用于快速验证 realtime 调度链路。
 [profiles.realtime_default]
 mode = "realtime"
 algorithms = ["MIN_LOAD", "RANDOM"]
 runs = 1
 outputDir = "runs/default_realtime"
 
+# realtime 子配置：只对 realtime/realtime-multi profile 生效。
 [profiles.realtime_default.realtime]
+# 实时任务总数。
 cloudletCount = 200
+# 仿真持续时间，单位为模拟时间。
 simulationDuration = 500.0
+# 平均任务到达率，值越大负载越重。
 arrivalRate = 5.0

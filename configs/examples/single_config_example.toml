@@ -1,403 +1,660 @@
+# 综合示例配置：集中展示 batch、realtime、SLA、过载、优先级、资源模型、
+# autoscaling、抢占、失败迁移、多租户、拓扑、Google trace 和 DRF 等场景。
+# 可用 list profiles 查看所有 profile：
+# .\run.cmd list profiles --config configs/examples/single_config_example.toml
+
+# 默认 profile；未传 --profile 时运行 batch_small。
 defaultProfile = "batch_small"
 
+# 输出设置。
 [output]
+# 基础结果目录；profile.outputDir 或 CLI --output 可覆盖。
 resultsDir = "runs"
 
 [output.csv]
+# true 表示写出 trial/summary/comparison CSV。
 enabled = true
+# CSV 分隔符。
 delimiter = ","
 
+# 日志设置。
 [logging]
+# 常规日志级别。
 level = "INFO"
+# 写文件日志。
 file = true
+# 输出控制台日志。
 console = true
 
+# 实验运行设置。
 [experiment]
+# 自动创建输出目录。
 autoCreateDirs = true
+# 实验目录命名模板，支持 mode、timestamp、algorithms、preset、tasks。
 nameFormat = "{mode}_{timestamp}_{algorithms}"
+# 最大并发数，影响多算法和多 trial 调度。
 maxConcurrent = 4
 
+# JVM 建议参数。
 [jvm]
+# 综合示例建议更大堆。
 maxHeapSize = "4g"
+# GC 建议。
 gcAlgorithm = "ZGC"
 
+# 随机种子。
 [random]
+# 固定 seed，便于复现实验。
 seed = 42
 
+# 通用优化器默认值。
 [optimizer]
+# 实时优化默认种群大小。
 population = 20
+# 实时优化默认迭代次数。
 maxIter = 20
 
+# 算法级覆盖：PSO 的默认启用状态和参数。
 [algorithms.PSO]
+# true 表示可被 preset/ALL 展开。
 enabled = true
+# PSO 种群大小，必须大于 0。
 population = 30
+# PSO 最大迭代次数，必须大于 0。
 maxIter = 50
 
+# 算法级覆盖：WOA 的默认启用状态和参数。
 [algorithms.WOA]
 enabled = true
+# WOA 种群大小。
 population = 25
+# WOA 最大迭代次数。
 maxIter = 40
 
+# 小规模 batch preset：用于快速对比多个启发式算法。
 [presets.small_scale]
+# preset 中算法由当前 mode 的 registry 解析。
 algorithms = ["PSO", "WOA", "GWO"]
 
+# 大规模 batch preset：用于更完整的 batch 算法覆盖。
 [presets.large_scale]
 algorithms = ["PSO", "WOA", "GWO", "HHO", "IMPROVED_RL"]
 
+# Batch 小规模场景：默认 profile，验证 preset 和 batch 参数写法。
 [profiles.batch_small]
+# 单规模批处理模式。
 mode = "batch"
+# 引用 small_scale preset；与 algorithms 互斥。
 preset = "small_scale"
+# 每个算法运行 5 次，用于统计均值和标准差。
 runs = 5
+# profile 输出目录。
 outputDir = "runs/batch_small"
 
+# batch_small 的 batch 参数。
 [profiles.batch_small.batch]
+# 单次实验任务数。
 cloudletCount = 100
+# batch 元启发式种群大小。
 population = 30
+# batch 元启发式最大迭代次数。
 maxIter = 50
 
+# 实时 smoke 场景：最小负载和随机算法的快速验证。
 [profiles.realtime_smoke]
+# 单规模实时调度模式。
 mode = "realtime"
+# 两个轻量实时基准算法。
 algorithms = ["MIN_LOAD", "RANDOM"]
+# 只运行一次，适合快速验证。
 runs = 1
+# profile 输出目录。
 outputDir = "runs/realtime_smoke"
 
+# realtime_smoke 的实时参数。
 [profiles.realtime_smoke.realtime]
+# 实时任务总数。
 cloudletCount = 200
+# 仿真持续时间。
 simulationDuration = 500.0
+# 平均到达率。
 arrivalRate = 5.0
 
+# SLA 场景：启用 deadline、timeout、retry 和 checkpoint，观察超时与重试指标。
 [profiles.realtime_sla]
 mode = "realtime"
+# 使用 MIN_LOAD 便于隔离 SLA 参数影响。
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_sla"
 
+# SLA 场景基础负载。
 [profiles.realtime_sla.realtime]
+# 任务总数。
 cloudletCount = 120
+# 仿真持续时间。
 simulationDuration = 240.0
+# 平均到达率。
 arrivalRate = 4.0
 
+# SLA 调度参数。
 [profiles.realtime_sla.realtime.scheduling]
+# deadline 生成系数，必须非负；值越小 SLA 越紧。
 deadlineFactor = 1.2
+# 任务超时时间，0 表示不启用 timeout。
 taskTimeout = 20.0
+# timeout 后动作，可选 fail、retry、cancel、degrade。
 timeoutAction = "retry"
+# 每个任务最大重试次数，不能为负。
 retryLimit = 1
+# 重试延迟，必须非负。
 retryDelay = 1.0
+# checkpoint 间隔，必须非负；用于失败恢复指标。
 checkpointInterval = 5.0
 
+# 过载场景：小 VM 队列、过载失败和节点/运行时失败共同施压。
 [profiles.realtime_overload]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_overload"
 
+# 过载基础负载。
 [profiles.realtime_overload.realtime]
+# 任务数量较高。
 cloudletCount = 180
+# 仿真时间较短，增加瞬时压力。
 simulationDuration = 180.0
+# 较高到达率，制造过载。
 arrivalRate = 12.0
 
+# 过载调度参数。
 [profiles.realtime_overload.realtime.scheduling]
+# 单 VM 队列容量；0 表示不启用容量限制。
 vmQueueCapacity = 2
+# 过载失败倍率，必须非负。
 overloadFailureMultiplier = 0.6
+# 运行时失败率，必须在 [0,1]。
 runtimeFailureRate = 0.05
+# 节点失败率，必须在 [0,1]。
 nodeFailureRate = 0.03
+# 最大重试次数。
 retryLimit = 2
+# 重试延迟。
 retryDelay = 0.5
 
+# 优先级队列场景：验证 priority queue 对高优先级任务的影响。
 [profiles.realtime_priority]
 mode = "realtime"
 algorithms = ["MIN_LOAD", "RANDOM"]
 runs = 1
 outputDir = "runs/realtime_priority"
 
+# 优先级场景基础负载。
 [profiles.realtime_priority.realtime]
 cloudletCount = 120
 simulationDuration = 300.0
 arrivalRate = 5.0
 
+# 优先级调度参数。
 [profiles.realtime_priority.realtime.scheduling]
+# 队列策略，可选 fifo、priority、deadline。
 queuePolicy = "priority"
+# 优先级层数，必须大于等于 1。
 priorityLevels = 4
+# 高优先级任务比例，必须在 [0,1]。
 highPriorityRatio = 0.25
+# deadline 生成系数，辅助观察优先级与 SLA 的交互。
 deadlineFactor = 1.5
 
+# 容量和资源模型场景：启用资源权重、网络延迟、镜像拉取和 VM 队列容量。
 [profiles.realtime_capacity]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_capacity"
 
+# 容量场景基础负载。
 [profiles.realtime_capacity.realtime]
 cloudletCount = 150
 simulationDuration = 250.0
 arrivalRate = 8.0
 
+# 容量和资源调度参数。
 [profiles.realtime_capacity.realtime.scheduling]
+# 是否启用资源模型。
 resourceModelEnabled = true
+# 网络延迟基线，必须非负。
 networkLatency = 0.05
+# 镜像拉取延迟，必须非负。
 imagePullDelay = 0.5
+# I/O 资源权重，必须非负。
 ioWeight = 1.0
+# RAM 资源权重，必须非负。
 ramWeight = 0.5
+# 带宽资源权重，必须非负。
 bwWeight = 0.5
+# 单 VM 队列容量。
 vmQueueCapacity = 3
 
+# Autoscaling 场景：通过队列阈值触发动态 VM 扩容。
 [profiles.realtime_autoscaling]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_autoscaling"
 
+# Autoscaling 基础负载。
 [profiles.realtime_autoscaling.realtime]
 cloudletCount = 180
 simulationDuration = 300.0
 arrivalRate = 10.0
 
+# Autoscaling 调度参数。
 [profiles.realtime_autoscaling.realtime.scheduling]
+# 是否启用动态扩缩容。
 autoscalingEnabled = true
+# 触发扩容的队列阈值，不能为负。
 scaleOutQueueThreshold = 2
+# 缩容空闲时间，必须非负。
 scaleInIdleTime = 20.0
+# 最大动态 VM 数，不能为负。
 maxDynamicVms = 2
+# VM 冷启动延迟，必须非负。
 vmColdStartDelay = 5.0
+# 扩容成本，必须非负。
 scaleOutCost = 0.25
+# 缩容保护时间，必须非负。
 scaleInProtectionTime = 15.0
+# 单 VM 队列容量。
 vmQueueCapacity = 3
 
+# 优先级抢占场景：高优先级任务可以抢占低优先级任务。
 [profiles.realtime_preemptive_priority]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_preemptive_priority"
 
+# 优先级抢占基础负载。
 [profiles.realtime_preemptive_priority.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 8.0
 
+# 优先级抢占调度参数。
 [profiles.realtime_preemptive_priority.realtime.scheduling]
+# 启用优先级队列。
 queuePolicy = "priority"
+# 优先级层数。
 priorityLevels = 4
+# 高优先级任务比例。
 highPriorityRatio = 0.35
+# 小队列容量提高抢占压力。
 vmQueueCapacity = 1
+# 是否启用抢占。
 preemptionEnabled = true
+# 抢占策略，可选 priority_then_deadline、deadline_then_priority。
 preemptionPolicy = "priority_then_deadline"
+# 触发抢占的最小优先级差。
 preemptionMinPriorityGap = 1
+# 单任务最大抢占次数。
 preemptionMaxPerTask = 1
+# 抢占延迟。
 preemptionDelay = 0.2
+# 抢占惩罚。
 preemptionPenalty = 0.5
+# 最大重试次数。
 retryLimit = 2
+# checkpoint 间隔。
 checkpointInterval = 2.0
 
+# Deadline 抢占场景：以 deadline 优先级作为抢占主依据。
 [profiles.realtime_preemptive_deadline]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_preemptive_deadline"
 
+# Deadline 抢占基础负载。
 [profiles.realtime_preemptive_deadline.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 8.0
 
+# Deadline 抢占调度参数。
 [profiles.realtime_preemptive_deadline.realtime.scheduling]
+# 使用 deadline 队列策略。
 queuePolicy = "deadline"
+# 较紧 deadline。
 deadlineFactor = 1.1
+# 小队列容量提高抢占压力。
 vmQueueCapacity = 1
+# 启用抢占。
 preemptionEnabled = true
+# deadline 优先的抢占策略。
 preemptionPolicy = "deadline_then_priority"
+# 触发抢占的最小优先级差。
 preemptionMinPriorityGap = 1
+# 单任务最大抢占次数。
 preemptionMaxPerTask = 1
+# 抢占延迟。
 preemptionDelay = 0.2
+# 抢占惩罚。
 preemptionPenalty = 0.5
+# 最大重试次数。
 retryLimit = 2
+# checkpoint 间隔。
 checkpointInterval = 2.0
 
+# 失败迁移场景：运行时失败、节点失败、重试和迁移延迟。
 [profiles.realtime_failure_migration]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_failure_migration"
 
+# 失败迁移基础负载。
 [profiles.realtime_failure_migration.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 6.0
 
+# 失败迁移调度参数。
 [profiles.realtime_failure_migration.realtime.scheduling]
+# 运行时失败率。
 runtimeFailureRate = 0.08
+# 节点失败率。
 nodeFailureRate = 0.04
+# 最大重试次数。
 retryLimit = 2
+# 重试延迟。
 retryDelay = 0.5
+# checkpoint 间隔。
 checkpointInterval = 3.0
+# 迁移延迟。
 migrationDelay = 0.5
+# timeout 后采用 retry 动作。
 timeoutAction = "retry"
 
+# 多租户公平场景：验证租户 quota、权重和 weighted fair 策略。
 [profiles.realtime_tenant_fairness]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_tenant_fairness"
 
+# 多租户基础负载。
 [profiles.realtime_tenant_fairness.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 8.0
 
+# 多租户调度参数。
 [profiles.realtime_tenant_fairness.realtime.scheduling]
+# 使用优先级队列。
 queuePolicy = "priority"
+# 优先级层数。
 priorityLevels = 3
+# 高优先级任务比例。
 highPriorityRatio = 0.2
+# 单 VM 队列容量。
 vmQueueCapacity = 2
+# 启用多租户模型。
 multiTenantEnabled = true
+# 租户数量，必须大于等于 1。
 tenantCount = 3
+# 每租户配额，非空时长度必须等于 tenantCount。
 tenantQuota = [2, 1, 1]
+# 租户权重，非空时长度必须等于 tenantCount 且每项大于 0。
 tenantWeights = [1.0, 2.0, 1.0]
+# 租户公平策略，可选 quota_first、weighted_fair。
 tenantFairnessPolicy = "weighted_fair"
 
+# 区域延迟场景：启用拓扑模型并使用 latency_aware 策略。
 [profiles.realtime_region_latency]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_region_latency"
 
+# 区域延迟基础负载。
 [profiles.realtime_region_latency.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 6.0
 
+# 区域拓扑调度参数。
 [profiles.realtime_region_latency.realtime.scheduling]
+# 启用拓扑模型。
 topologyEnabled = true
+# 拓扑策略，可选 latency_aware、spread_fault_domains。
 topologyPolicy = "latency_aware"
+# region 数量，必须大于等于 1。
 regionCount = 3
+# 每个 region 的 rack 数。
 racksPerRegion = 2
+# 每个 rack 的 host 数。
 hostsPerRack = 2
+# 本地 region 下标，范围 [0, regionCount)。
 localRegion = 0
+# 跨 rack 延迟，必须非负。
 crossRackLatency = 0.15
+# 跨 region 延迟，必须非负。
 crossRegionLatency = 1.25
+# 跨 region 成本，必须非负。
 crossRegionCost = 0.4
+# 单 VM 队列容量。
 vmQueueCapacity = 3
 
+# 故障域分散场景：拓扑调度偏向跨故障域分散并结合 autoscaling。
 [profiles.realtime_fault_domain_spread]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_fault_domain_spread"
 
+# 故障域基础负载。
 [profiles.realtime_fault_domain_spread.realtime]
 cloudletCount = 150
 simulationDuration = 260.0
 arrivalRate = 8.0
 
+# 故障域调度参数。
 [profiles.realtime_fault_domain_spread.realtime.scheduling]
+# 启用拓扑模型。
 topologyEnabled = true
+# 使用故障域分散策略。
 topologyPolicy = "spread_fault_domains"
+# region 数量。
 regionCount = 3
+# 每 region rack 数量。
 racksPerRegion = 2
+# 每 rack host 数量。
 hostsPerRack = 2
+# 本地 region 下标。
 localRegion = 0
+# 跨 rack 延迟。
 crossRackLatency = 0.1
+# 跨 region 延迟。
 crossRegionLatency = 1.0
+# 跨 region 成本。
 crossRegionCost = 0.2
+# host 故障率，必须在 [0,1]。
 hostFailureRate = 0.01
+# rack 故障率，必须在 [0,1]。
 rackFailureRate = 0.02
+# region 故障率，必须在 [0,1]。
 regionFailureRate = 0.03
+# 单 VM 队列容量。
 vmQueueCapacity = 2
+# 启用 autoscaling。
 autoscalingEnabled = true
+# 扩容队列阈值。
 scaleOutQueueThreshold = 2
+# 最大动态 VM 数。
 maxDynamicVms = 2
+# 动态 VM 冷启动延迟。
 vmColdStartDelay = 1.0
 
+# Trace 公平共享场景：Google trace 风格输入 + 多租户 weighted fair。
 [profiles.realtime_trace_fairshare]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_trace_fairshare"
 
+# Trace 公平共享基础负载。
 [profiles.realtime_trace_fairshare.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 8.0
+# 使用 Google trace 风格生成器。
 generatorType = "GOOGLE_TRACE"
 
+# Trace 公平共享调度参数。
 [profiles.realtime_trace_fairshare.realtime.scheduling]
+# 使用优先级队列。
 queuePolicy = "priority"
+# 优先级层数。
 priorityLevels = 4
+# 启用多租户。
 multiTenantEnabled = true
+# 租户数量。
 tenantCount = 4
+# 每租户 quota。
 tenantQuota = [2, 2, 1, 1]
+# 每租户权重。
 tenantWeights = [1.0, 1.5, 1.0, 2.0]
+# 租户公平策略。
 tenantFairnessPolicy = "weighted_fair"
+# 租户调度策略，可选 quota_first、weighted_fair、dominant_resource_fairness。
 tenantSchedulingPolicy = "weighted_fair"
+# 租户突发额度，不能为负。
 tenantBurstAllowance = 1
+# 启用资源模型。
 resourceModelEnabled = true
+# RAM 权重。
 ramWeight = 0.2
+# 带宽权重。
 bwWeight = 0.2
+# I/O 权重。
 ioWeight = 0.2
 
+# Trace SLA 成本场景：Google trace 风格输入 + deadline + 多租户成本预算 + 物理拓扑。
 [profiles.realtime_trace_sla_cost]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_trace_sla_cost"
 
+# Trace SLA 成本基础负载。
 [profiles.realtime_trace_sla_cost.realtime]
 cloudletCount = 120
 simulationDuration = 240.0
 arrivalRate = 8.0
+# 使用 Google trace 风格生成器。
 generatorType = "GOOGLE_TRACE"
 
+# Trace SLA 成本调度参数。
 [profiles.realtime_trace_sla_cost.realtime.scheduling]
+# 使用 deadline 队列。
 queuePolicy = "deadline"
+# SLA deadline 系数。
 deadlineFactor = 1.2
+# 启用多租户。
 multiTenantEnabled = true
+# 租户数量。
 tenantCount = 3
+# 租户成本预算，非空时长度必须等于 tenantCount。
 tenantCostBudget = [120.0, 180.0, 150.0]
+# 租户 SLA 惩罚权重，必须非负。
 tenantSlaPenaltyWeight = 1.5
+# 使用主导资源公平调度。
 tenantSchedulingPolicy = "dominant_resource_fairness"
+# 启用资源模型。
 resourceModelEnabled = true
+# 网络延迟。
 networkLatency = 0.05
+# 镜像拉取延迟。
 imagePullDelay = 0.5
+# 最大重试次数。
 retryLimit = 1
+# 启用物理拓扑容量。
 physicalTopologyEnabled = true
+# 启用数据本地性。
 dataLocalityEnabled = true
+# 启用镜像缓存。
 imageCacheEnabled = true
+# region 数量。
 regionCount = 3
+# 每 region rack 数量。
 racksPerRegion = 2
+# 每 rack host 数量，用于物理拓扑容量。
 hostCountPerRack = 2
+# 单 host CPU 容量。
 hostCpuCapacity = 4.0
+# 单 host RAM 容量。
 hostRamCapacity = 16.0
+# 单 host 带宽容量。
 hostBwCapacity = 4000.0
+# 单 host I/O 容量。
 hostIoCapacity = 2000.0
+# 跨 rack 延迟。
 crossRackLatency = 0.1
+# 跨 region 延迟。
 crossRegionLatency = 0.8
+# 跨 region 成本。
 crossRegionCost = 0.5
+# 跨 rack 带宽。
 crossRackBandwidth = 20.0
+# 跨 region 带宽。
 crossRegionBandwidth = 5.0
+# 数据本地性策略，可选 prefer_local、balanced、ignore。
 dataLocalityPolicy = "balanced"
+# 镜像缓存容量，不能为负。
 imageCacheCapacity = 4
 
+# DRF 容量场景：多租户 dominant resource fairness + 资源模型 + autoscaling。
 [profiles.realtime_drf_capacity]
 mode = "realtime"
 algorithms = ["MIN_LOAD"]
 runs = 1
 outputDir = "runs/realtime_drf_capacity"
 
+# DRF 基础负载。
 [profiles.realtime_drf_capacity.realtime]
 cloudletCount = 150
 simulationDuration = 260.0
 arrivalRate = 10.0
 
+# DRF 调度参数。
 [profiles.realtime_drf_capacity.realtime.scheduling]
+# 启用多租户。
 multiTenantEnabled = true
+# 租户数量。
 tenantCount = 3
+# 每租户 quota。
 tenantQuota = [3, 3, 3]
+# 每租户成本预算。
 tenantCostBudget = [80.0, 80.0, 80.0]
+# 主导资源公平调度。
 tenantSchedulingPolicy = "dominant_resource_fairness"
+# 启用资源模型。
 resourceModelEnabled = true
+# 单 VM 队列容量。
 vmQueueCapacity = 2
+# RAM 权重。
 ramWeight = 0.4
+# 带宽权重。
 bwWeight = 0.3
+# I/O 权重。
 ioWeight = 0.3
+# 启用 autoscaling。
 autoscalingEnabled = true
+# 扩容队列阈值。
 scaleOutQueueThreshold = 3
+# 最大动态 VM 数。
 maxDynamicVms = 2
+# 动态 VM 冷启动延迟。
 vmColdStartDelay = 1.0

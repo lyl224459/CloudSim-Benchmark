@@ -1,30 +1,55 @@
+# 扩展性实验配置：用于观察任务规模和实时负载变化下的表现。
+
+# 默认运行 batch_scale_200。
 defaultProfile = "batch_scale_200"
 
+# 输出设置。
 [output]
+# 扩展性实验结果目录。
 resultsDir = "runs/scalability_test"
 
+# 实验命名设置。
 [experiment]
+# 包含 tasks token，便于 multi/规模实验区分目录。
 nameFormat = "scale_{mode}_{timestamp}_{tasks}_{algorithms}"
 
+# 随机种子。
 [random]
+# 固定 seed，便于跨规模对比。
 seed = 54321
 
+# 批处理扩展性 profile。
 [profiles.batch_scale_200]
+# 单规模 batch；可作为 200 任务规模基线。
 mode = "batch"
+# 覆盖随机基准和三种元启发式算法。
 algorithms = ["RANDOM", "PSO", "WOA", "GWO"]
+# 每个算法运行 3 次。
 runs = 3
 
+# batch 扩展性参数。
 [profiles.batch_scale_200.batch]
+# 当前 profile 的任务数。
 cloudletCount = 200
+# 元启发式算法种群大小。
 population = 30
+# 元启发式算法最大迭代次数。
 maxIter = 50
 
+# 实时中等负载 profile。
 [profiles.realtime_load_medium]
+# 单规模实时调度。
 mode = "realtime"
+# 实时基准算法对比。
 algorithms = ["MIN_LOAD", "RANDOM"]
+# 每个算法运行 3 次。
 runs = 3
 
+# 实时负载参数。
 [profiles.realtime_load_medium.realtime]
+# 实时任务数。
 cloudletCount = 200
+# 仿真持续时间。
 simulationDuration = 300.0
+# 中等到达率。
 arrivalRate = 5.0

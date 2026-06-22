@@ -1,38 +1,65 @@
-# CloudSim-Benchmark 实时调度模式配置
+# 实时调度对比配置：用于比较实时基准和实时优化算法。
+# 适合验证实时到达、队列和调度指标链路。
 
+# 默认 profile；未传 --profile 时运行 realtime_compare。
 defaultProfile = "realtime_compare"
 
+# 输出设置。
 [output]
+# 基础结果目录，profile.outputDir 可覆盖。
 resultsDir = "runs"
 
 [output.csv]
+# 写出实时 trial/summary/comparison CSV。
 enabled = true
+# CSV 分隔符。
 delimiter = ","
 
+# 日志设置。
 [logging]
+# INFO 适合常规实验。
 level = "INFO"
+# 写文件日志。
 file = true
+# 输出控制台日志。
 console = true
 
+# 实验运行设置。
 [experiment]
+# 自动创建输出目录。
 autoCreateDirs = true
+# 实时实验目录命名模板。
 nameFormat = "realtime_{timestamp}_{algorithms}"
+# 最大并发数。
 maxConcurrent = 4
 
+# 随机种子，影响任务生成和随机算法路径。
 [random]
 seed = 42
 
+# 实时优化算法默认参数。
 [optimizer]
+# 实时优化种群大小；过大可能显著增加调度成本。
 population = 20
+# 实时优化最大迭代次数。
 maxIter = 20
 
+# 实时算法对比 profile。
 [profiles.realtime_compare]
+# realtime 表示动态到达的实时调度实验。
 mode = "realtime"
+# 实时算法列表，包含基准和优化算法。
 algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+# 每个算法运行 3 次，用于计算统计结果。
 runs = 3
+# 当前 profile 输出目录。
 outputDir = "runs/realtime_compare"
 
+# realtime 参数。
 [profiles.realtime_compare.realtime]
+# 实时任务总数。
 cloudletCount = 200
+# 仿真持续时间，单位为模拟时间。
 simulationDuration = 500.0
+# 平均任务到达率；越高表示负载越重。
 arrivalRate = 5.0

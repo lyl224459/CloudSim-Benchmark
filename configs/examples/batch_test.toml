@@ -1,36 +1,66 @@
+# 批处理单规模示例：比较多个 batch 元启发式算法。
+# 可运行：.\run.cmd run --config configs/examples/batch_test.toml --profile batch_test
+
+# 默认 profile，未传 --profile 时使用。
 defaultProfile = "batch_test"
 
+# 输出设置。
 [output]
+# 基础结果目录。
 resultsDir = "runs"
 
 [output.csv]
+# 启用 CSV 输出。
 enabled = true
+# CSV 分隔符。
 delimiter = ","
 
+# 日志设置。
 [logging]
+# INFO 适合示例运行。
 level = "INFO"
+# 写文件日志。
 file = true
+# 输出控制台日志。
 console = true
 
+# 实验运行设置。
 [experiment]
+# 自动创建输出目录。
 autoCreateDirs = true
+# batch 示例目录命名模板。
 nameFormat = "batch_{timestamp}_{algorithms}"
+# 最大并发数。
 maxConcurrent = 4
 
+# JVM 建议参数，供运行脚本/文档参考。
 [jvm]
+# 最大堆建议。
 maxHeapSize = "2g"
+# GC 建议。
 gcAlgorithm = "ZGC"
 
+# 随机种子。
 [random]
+# 固定 seed，便于复现实验。
 seed = 42
 
+# batch 示例 profile。
 [profiles.batch_test]
+# 单规模批处理模式。
 mode = "batch"
+# 参与对比的 batch 算法。
 algorithms = ["PSO", "WOA", "GWO", "HHO"]
+# 每个算法运行次数。
 runs = 3
+# profile 输出目录。
 outputDir = "runs/batch_test"
 
+# batch 参数。
 [profiles.batch_test.batch]
+# 单次实验任务数。
 cloudletCount = 100
+# 元启发式算法种群大小。
 population = 30
+# 元启发式算法最大迭代次数。
 maxIter = 50

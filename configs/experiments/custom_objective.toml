@@ -1,29 +1,55 @@
+# 自定义场景配置：展示 batch 和 realtime 使用 UNIFORM 任务生成器。
+# 文件名保留 custom_objective，但当前配置未显式设置 objective 权重。
+
+# 默认运行 batch 自定义 profile。
 defaultProfile = "custom_batch"
 
+# 输出设置。
 [output]
+# 自定义实验结果目录。
 resultsDir = "runs/custom_objective_test"
 
+# 随机种子。
 [random]
+# 固定 seed，便于复现实验。
 seed = 12345
 
+# 自定义 batch profile。
 [profiles.custom_batch]
+# 单规模批处理模式。
 mode = "batch"
+# 三个 batch 元启发式算法对比。
 algorithms = ["PSO", "WOA", "GWO"]
+# 每个算法运行 2 次。
 runs = 2
 
+# batch 参数。
 [profiles.custom_batch.batch]
+# 中小任务规模。
 cloudletCount = 50
+# 较大种群，增强搜索。
 population = 40
+# 较多迭代，增强优化。
 maxIter = 80
+# 使用均匀分布任务生成器。
 generatorType = "UNIFORM"
 
+# 自定义 realtime profile。
 [profiles.custom_realtime]
+# 单规模实时调度。
 mode = "realtime"
+# 最小负载基准和实时 PSO 对比。
 algorithms = ["MIN_LOAD", "PSO_REALTIME"]
+# 每个算法运行 2 次。
 runs = 2
 
+# realtime 参数。
 [profiles.custom_realtime.realtime]
+# 实时任务总数。
 cloudletCount = 100
+# 仿真持续时间。
 simulationDuration = 800.0
+# 平均到达率。
 arrivalRate = 8.0
+# 使用均匀分布任务生成器。
 generatorType = "UNIFORM"

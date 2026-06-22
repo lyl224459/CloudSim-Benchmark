@@ -1,34 +1,58 @@
-# CloudSim-Benchmark 批处理模式配置
+# 批处理对比配置：用于比较 RANDOM、PSO、WOA、GWO、HHO 在同一任务规模下的表现。
+# 适合本地手动运行和作为 batch profile 写法参考。
 
+# 默认 profile；未传 --profile 时运行 batch_compare。
 defaultProfile = "batch_compare"
 
+# 输出设置。
 [output]
+# 基础输出目录，profile.outputDir 会覆盖本值。
 resultsDir = "runs"
 
 [output.csv]
+# 写出 trial、summary 和 comparison CSV。
 enabled = true
+# CSV 使用逗号分隔。
 delimiter = ","
 
+# 日志设置。
 [logging]
+# 默认 INFO，避免批量实验输出过多调试日志。
 level = "INFO"
+# 写文件日志，便于实验后排查。
 file = true
+# 保留控制台输出。
 console = true
 
+# 实验运行设置。
 [experiment]
+# 自动创建 runs/batch_compare 等输出目录。
 autoCreateDirs = true
+# 批处理实验目录命名模板。
 nameFormat = "batch_{timestamp}_{algorithms}"
+# 最大并发算法/trial 数。
 maxConcurrent = 4
 
+# 随机种子，用于复现实验输入和随机算法路径。
 [random]
 seed = 42
 
+# 批处理算法对比 profile。
 [profiles.batch_compare]
+# batch 表示单一任务规模的批处理调度。
 mode = "batch"
+# 参与对比的算法列表。
 algorithms = ["RANDOM", "PSO", "WOA", "GWO", "HHO"]
+# 每个算法运行 3 次，用于计算均值和标准差。
 runs = 3
+# 输出目录覆盖全局 output.resultsDir。
 outputDir = "runs/batch_compare"
 
+# batch 参数。
 [profiles.batch_compare.batch]
+# 任务数量；值越大越能观察算法扩展性，但耗时更长。
 cloudletCount = 100
+# 元启发式算法种群大小。
 population = 30
+# 元启发式算法最大迭代次数。
 maxIter = 50

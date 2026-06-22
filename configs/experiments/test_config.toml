@@ -1,19 +1,37 @@
+# 测试用配置：小规模 UNIFORM 任务生成器实验。
+# 适合验证配置解析、输出目录和 batch 执行链路。
+
+# 默认测试 profile。
 defaultProfile = "test_uniform"
 
+# 随机种子。
 [random]
+# 固定 seed，保证生成任务可复现。
 seed = 42
 
+# 输出设置。
 [output]
+# 测试结果目录。
 resultsDir = "runs/test_results"
 
+# batch 测试 profile。
 [profiles.test_uniform]
+# 单规模批处理模式。
 mode = "batch"
+# 随机基准与 PSO 对比。
 algorithms = ["RANDOM", "PSO"]
+# 只运行一次，控制测试耗时。
 runs = 1
+# profile 输出目录。
 outputDir = "runs/test_results"
 
+# batch 测试参数。
 [profiles.test_uniform.batch]
+# 小任务数。
 cloudletCount = 30
+# PSO 种群大小。
 population = 20
+# PSO 最大迭代次数。
 maxIter = 50
+# 使用均匀分布任务生成器。
 generatorType = "UNIFORM"

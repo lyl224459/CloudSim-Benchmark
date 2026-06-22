@@ -1,24 +1,46 @@
+# 快速实验配置：用于确认 batch/realtime 主链路能跑通。
+# 规模和迭代次数都较小，不适合作为性能结论。
+
+# 默认运行 batch 快速 profile。
 defaultProfile = "quick_batch"
 
+# 输出设置。
 [output]
+# 快速实验结果目录。
 resultsDir = "runs/quick_test"
 
+# batch 快速 profile。
 [profiles.quick_batch]
+# 单规模批处理模式。
 mode = "batch"
+# 覆盖随机基准和两个元启发式算法。
 algorithms = ["RANDOM", "PSO", "WOA"]
+# 只运行一次，降低 smoke 成本。
 runs = 1
 
+# batch 快速参数。
 [profiles.quick_batch.batch]
+# 小任务数，便于快速完成。
 cloudletCount = 20
+# 小种群，减少优化耗时。
 population = 10
+# 小迭代次数，减少优化耗时。
 maxIter = 10
 
+# realtime 快速 profile。
 [profiles.quick_realtime]
+# 动态到达实时调度模式。
 mode = "realtime"
+# 覆盖实时最小负载和随机基准。
 algorithms = ["MIN_LOAD", "RANDOM"]
+# 只运行一次，适合 smoke。
 runs = 1
 
+# realtime 快速参数。
 [profiles.quick_realtime.realtime]
+# 小任务数。
 cloudletCount = 50
+# 短仿真时间。
 simulationDuration = 50.0
+# 低到达率，避免 smoke 过载。
 arrivalRate = 1.0

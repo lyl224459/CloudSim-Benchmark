@@ -1,32 +1,60 @@
+# Google Trace 风格实验配置：使用 GOOGLE_TRACE 生成器或 fallback 任务生成逻辑。
+# 适合验证 trace 输入链路、批处理和实时模式兼容性。
+
+# 默认运行 batch trace profile。
 defaultProfile = "google_trace_batch"
 
+# 输出设置。
 [output]
+# trace 实验结果目录。
 resultsDir = "runs/google_trace_test"
 
+# 实验命名设置。
 [experiment]
+# trace 实验目录命名模板。
 nameFormat = "google_trace_{mode}_{timestamp}_{algorithms}"
 
+# 随机种子。
 [random]
+# 固定 seed，影响 fallback 或随机路径。
 seed = 123456
 
+# Google trace batch profile。
 [profiles.google_trace_batch]
+# 单规模批处理模式。
 mode = "batch"
+# 随机基准和 PSO 对比。
 algorithms = ["RANDOM", "PSO"]
+# 每个算法运行 3 次。
 runs = 3
 
+# batch trace 参数。
 [profiles.google_trace_batch.batch]
+# trace 最大任务数/目标任务规模。
 cloudletCount = 500
+# PSO 种群大小。
 population = 50
+# PSO 最大迭代次数。
 maxIter = 100
+# 使用 Google trace 风格任务生成。
 generatorType = "GOOGLE_TRACE"
 
+# Google trace realtime profile。
 [profiles.google_trace_realtime]
+# 单规模实时调度。
 mode = "realtime"
+# 实时基准算法对比。
 algorithms = ["MIN_LOAD", "RANDOM"]
+# 每个算法运行 3 次。
 runs = 3
 
+# realtime trace 参数。
 [profiles.google_trace_realtime.realtime]
+# trace 最大任务数/目标任务规模。
 cloudletCount = 1000
+# 较长仿真时间，容纳 trace 到达过程。
 simulationDuration = 1800.0
+# 平均到达率，trace fallback 时使用。
 arrivalRate = 10.0
+# 使用 Google trace 风格任务生成。
 generatorType = "GOOGLE_TRACE"

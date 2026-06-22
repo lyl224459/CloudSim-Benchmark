@@ -1,54 +1,77 @@
-# CloudSim-Benchmark 算法与预设配置
+# 算法库配置：RunResolver 会在加载用户实验配置后尝试合并本文件。
+# 这里定义算法是否默认启用、算法说明，以及支持启发式参数的默认值。
+# 当 CLI 使用 --algorithms ALL 或 profile/preset 需要展开算法时，enabled=false 的算法不会进入默认候选集。
 
+# RANDOM 是批处理随机调度基准算法，不使用 population/maxIter。
 [algorithms.RANDOM]
+# 是否启用该算法参与默认展开。
 enabled = true
+# 算法说明，主要用于 list/config 输出和人工阅读。
 description = "随机调度算法（基准）"
 
+# PSO 是批处理粒子群优化算法，使用 population 和 maxIter 控制搜索规模。
 [algorithms.PSO]
+# true 表示可由 preset 或 ALL 选择。
 enabled = true
+# 说明文本，不参与调度计算。
 description = "粒子群优化算法"
+# 种群大小；必须大于 0，值越大搜索更充分但耗时更长。
 population = 30
+# 最大迭代次数；必须大于 0，值越大优化时间越长。
 maxIter = 100
 
+# WOA 是批处理鲸鱼优化算法，参数含义与 PSO 相同。
 [algorithms.WOA]
 enabled = true
 description = "鲸鱼优化算法"
 population = 30
 maxIter = 100
 
+# GWO 是批处理灰狼优化算法，用于和其他元启发式算法对比。
 [algorithms.GWO]
 enabled = true
 description = "灰狼优化算法"
 population = 30
 maxIter = 100
 
+# HHO 是批处理哈里斯鹰优化算法，用于完整 batch 对比。
 [algorithms.HHO]
 enabled = true
 description = "哈里斯鹰优化算法"
 population = 30
 maxIter = 100
 
+# MIN_LOAD 是实时调度最小负载基准算法，不使用 population/maxIter。
 [algorithms.MIN_LOAD]
 enabled = true
 description = "最小负载调度算法（基准）"
 
+# PSO_REALTIME 是实时粒子群优化算法，参数控制实时候选搜索规模。
 [algorithms.PSO_REALTIME]
 enabled = true
 description = "实时粒子群优化"
+# 实时优化默认种群较小，避免实时实验过慢。
 population = 20
+# 实时优化默认迭代较少，控制调度决策成本。
 maxIter = 20
 
+# WOA_REALTIME 是实时鲸鱼优化算法，参数控制实时候选搜索规模。
 [algorithms.WOA_REALTIME]
 enabled = true
 description = "实时鲸鱼优化"
 population = 20
 maxIter = 20
 
+# 快速 smoke preset：用于验证链路可运行，不追求完整算法覆盖。
 [presets.quick_test]
+# preset 中的算法会按当前 mode 解析，包含不兼容算法时会由 resolver 报错。
 algorithms = ["RANDOM", "PSO"]
 
+# 完整批处理 preset：用于 batch 算法横向比较。
 [presets.full_batch]
+# IMPROVED_RL 由算法注册表解析；这里不单独配置 population/maxIter。
 algorithms = ["RANDOM", "PSO", "WOA", "GWO", "HHO", "IMPROVED_RL"]
 
+# 实时调度 preset：覆盖实时基准和实时优化算法。
 [presets.realtime_test]
 algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
