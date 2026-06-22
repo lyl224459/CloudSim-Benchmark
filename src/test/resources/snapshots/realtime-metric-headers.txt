@@ -21,6 +21,10 @@ SubmittedCount
 SlaViolationCount
 SlaViolationRate
 CapacityRejectedCount
+DeadlineRejectedCount
+DeadlineDegradedCount
+DeadlineRetryLaterCount
+DeadlineMissAcceptedCount
 AvgQueueDepth
 MaxQueueDepth
 P95ResponseTime
@@ -86,6 +90,10 @@ SubmittedCount
 SlaViolationCount
 SlaViolationRate
 CapacityRejectedCount
+DeadlineRejectedCount
+DeadlineDegradedCount
+DeadlineRetryLaterCount
+DeadlineMissAcceptedCount
 AvgQueueDepth
 MaxQueueDepth
 P95ResponseTime
@@ -154,6 +162,10 @@ SubmittedCount_Mean
 SlaViolationCount_Mean
 SlaViolationRate_Mean
 CapacityRejectedCount_Mean
+DeadlineRejectedCount_Mean
+DeadlineDegradedCount_Mean
+DeadlineRetryLaterCount_Mean
+DeadlineMissAcceptedCount_Mean
 AvgQueueDepth_Mean
 MaxQueueDepth_Mean
 P95ResponseTime_Mean
@@ -214,6 +226,10 @@ SubmittedCount_StdDev
 SlaViolationCount_StdDev
 SlaViolationRate_StdDev
 CapacityRejectedCount_StdDev
+DeadlineRejectedCount_StdDev
+DeadlineDegradedCount_StdDev
+DeadlineRetryLaterCount_StdDev
+DeadlineMissAcceptedCount_StdDev
 AvgQueueDepth_StdDev
 MaxQueueDepth_StdDev
 P95ResponseTime_StdDev
@@ -283,6 +299,10 @@ SubmittedCount_Mean
 SlaViolationCount_Mean
 SlaViolationRate_Mean
 CapacityRejectedCount_Mean
+DeadlineRejectedCount_Mean
+DeadlineDegradedCount_Mean
+DeadlineRetryLaterCount_Mean
+DeadlineMissAcceptedCount_Mean
 AvgQueueDepth_Mean
 MaxQueueDepth_Mean
 P95ResponseTime_Mean
@@ -343,6 +363,10 @@ SubmittedCount_StdDev
 SlaViolationCount_StdDev
 SlaViolationRate_StdDev
 CapacityRejectedCount_StdDev
+DeadlineRejectedCount_StdDev
+DeadlineDegradedCount_StdDev
+DeadlineRetryLaterCount_StdDev
+DeadlineMissAcceptedCount_StdDev
 AvgQueueDepth_StdDev
 MaxQueueDepth_StdDev
 P95ResponseTime_StdDev

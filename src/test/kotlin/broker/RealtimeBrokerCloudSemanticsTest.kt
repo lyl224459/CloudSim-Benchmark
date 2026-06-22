@@ -91,6 +91,64 @@ class RealtimeBrokerCloudSemanticsTest {
     }
 
     @Test
+    fun `deadline reject action records deadline rejection without submission`() {
+        val fixture =
+            brokerFixture(
+                RealtimeSchedulingConfig(
+                    deadlineFactor = 0.1,
+                    deadlineMissAction = "reject",
+                ),
+            )
+        fixture.broker.submitCloudletListRealtime(listOf(createCloudlet(length = 20_000)))
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getDeadlineRejectedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getRejectedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(0)
+    }
+
+    @Test
+    fun `deadline degrade action submits task and preserves sla violation accounting`() {
+        val fixture =
+            brokerFixture(
+                RealtimeSchedulingConfig(
+                    deadlineFactor = 0.1,
+                    deadlineMissAction = "degrade",
+                ),
+            )
+        val cloudlet = createCloudlet(length = 20_000)
+        fixture.broker.submitCloudletListRealtime(listOf(cloudlet))
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getDeadlineDegradedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getSlaViolationCount(listOf(cloudlet))).isEqualTo(1)
+    }
+
+    @Test
+    fun `deadline retry later action requeues until retry limit then rejects`() {
+        val fixture =
+            brokerFixture(
+                RealtimeSchedulingConfig(
+                    deadlineFactor = 0.1,
+                    deadlineMissAction = "retry_later",
+                    retryLimit = 1,
+                    retryDelay = 0.5,
+                ),
+            )
+        fixture.broker.submitCloudletListRealtime(listOf(createCloudlet(length = 20_000)))
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getDeadlineRetryLaterCount()).isEqualTo(1)
+        assertThat(fixture.broker.getDeadlineRejectedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getRetryCount()).isEqualTo(1)
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(0)
+    }
+
+    @Test
     fun `priority queue policy orders same-time arrivals before scheduling`() {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)

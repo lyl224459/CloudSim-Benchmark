@@ -16,6 +16,7 @@ internal data class RealtimeSubmissionControllers(
     val queueDepthSampler: RealtimeQueueDepthSampler,
 )
 
+@Suppress("TooManyFunctions") // Submission service owns all state transitions around pending submission attempts.
 internal class RealtimeSubmissionService(
     private val submissionState: RealtimeSubmissionState,
     private val controllers: RealtimeSubmissionControllers,
@@ -82,6 +83,25 @@ internal class RealtimeSubmissionService(
             )
         }
         state.metrics.recordRetry()
+        return RealtimeBrokerCommand.ScheduleArrival(delay, cloudlet)
+    }
+
+    fun retryDeadlineAdmission(
+        cloudlet: Cloudlet,
+        delay: Double,
+    ): RealtimeBrokerCommand {
+        val attempt = state.arrival.attemptOf(cloudlet)
+        state.arrival.incrementAttempt(cloudlet)
+        state.reservation.remove(cloudlet)
+        lifecycleService.updateMetadata(cloudlet) {
+            it.copy(
+                attempt = attempt + 1,
+                assignedVmIndex = null,
+                lifecycle = RealtimeTaskLifecycle.RETRYING,
+            )
+        }
+        state.metrics.recordRetry()
+        state.metrics.recordDeadlineRetryLater()
         return RealtimeBrokerCommand.ScheduleArrival(delay, cloudlet)
     }
 

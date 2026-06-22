@@ -26,6 +26,26 @@ internal data class RealtimeBrokerPreemptionAttempt(
     val commands: List<RealtimeBrokerCommand>,
 )
 
+internal sealed interface RealtimeVmSelectionOutcome {
+    data class Selected(
+        val vmIndex: Int,
+        val failurePressure: Double,
+    ) : RealtimeVmSelectionOutcome
+
+    data object NeedsPreemption : RealtimeVmSelectionOutcome
+
+    data class Rejected(
+        val reason: RealtimeRejectReason,
+    ) : RealtimeVmSelectionOutcome
+
+    data class RetryLater(
+        val delay: Double,
+    ) : RealtimeVmSelectionOutcome
+
+    data object NoSelection : RealtimeVmSelectionOutcome
+}
+
+@Suppress("TooManyFunctions") // Facade intentionally exposes selection, preview, preemption and read helpers together.
 internal class RealtimeVmSelectionFacade(
     private val schedulingConfig: RealtimeSchedulingConfig,
     private val state: RealtimeBrokerStateBundle,
@@ -34,16 +54,36 @@ internal class RealtimeVmSelectionFacade(
     private val policies: RealtimeVmSelectionPolicies,
 ) {
     private val scoreCalculator = RealtimeCandidateScoreCalculator()
+    private val deadlineAdmissionController = RealtimeDeadlineAdmissionController(schedulingConfig, scoreCalculator)
 
     fun selectVm(
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
         currentTime: Double,
-    ): Pair<Int, Double>? {
+        allowDeadlinePreemption: Boolean = true,
+    ): RealtimeVmSelectionOutcome {
         val strategy = schedulingConfig.strategy.lowercase()
         val context = schedulingContext(cloudlet, activeCloudlets, currentTime)
-        val selected = schedulerSelectedVm(strategy, cloudlet, activeCloudlets, currentTime, context)
-        return selected?.let { validatedVmSelection(it, cloudlet, activeCloudlets, context) }
+        return when (
+            val admission =
+                deadlineAdmissionController.evaluate(
+                    context = context,
+                    attempt = state.arrival.attemptOf(cloudlet),
+                    allowPreemption = allowDeadlinePreemption,
+                )
+        ) {
+            is DeadlineAdmissionResult.Continue ->
+                selectFromAdmittedContext(
+                    strategy = strategy,
+                    cloudlet = cloudlet,
+                    activeCloudlets = activeCloudlets,
+                    context = admission.context,
+                    metricAction = admission.metricAction,
+                )
+            DeadlineAdmissionResult.NeedsPreemption -> RealtimeVmSelectionOutcome.NeedsPreemption
+            DeadlineAdmissionResult.Reject -> RealtimeVmSelectionOutcome.Rejected(RealtimeRejectReason.DEADLINE)
+            is DeadlineAdmissionResult.RetryLater -> RealtimeVmSelectionOutcome.RetryLater(admission.delay)
+        }
     }
 
     fun staticPreviewSelection(
@@ -156,17 +196,28 @@ internal class RealtimeVmSelectionFacade(
     private fun schedulerSelectedVm(
         strategy: String,
         cloudlet: Cloudlet,
-        activeCloudlets: List<Cloudlet>,
-        currentTime: Double,
         context: RealtimeSchedulingContext,
     ): Int? {
         if (context.hasNoAcceptedCapacityCandidate()) return null
         return if (strategy == "static") {
             state.arrival.preassignedVmIndexOf(cloudlet)
-                ?: policies.scheduler.scheduleOnArrival(schedulingContext(cloudlet, activeCloudlets, currentTime))
+                ?: policies.scheduler.scheduleOnArrival(context)
         } else {
             policies.scheduler.scheduleOnArrival(context)
         }
+    }
+
+    private fun selectFromAdmittedContext(
+        strategy: String,
+        cloudlet: Cloudlet,
+        activeCloudlets: List<Cloudlet>,
+        context: RealtimeSchedulingContext,
+        metricAction: DeadlineAdmissionMetricAction?,
+    ): RealtimeVmSelectionOutcome {
+        val selected = schedulerSelectedVm(strategy, cloudlet, context)
+        return selected
+            ?.let { validatedVmSelection(it, cloudlet, activeCloudlets, context, metricAction) }
+            ?: RealtimeVmSelectionOutcome.NoSelection
     }
 
     private fun validatedVmSelection(
@@ -174,7 +225,8 @@ internal class RealtimeVmSelectionFacade(
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
         context: RealtimeSchedulingContext,
-    ): Pair<Int, Double>? {
+        metricAction: DeadlineAdmissionMetricAction?,
+    ): RealtimeVmSelectionOutcome.Selected? {
         val reserved = applyReservationPolicy(selectedVmIndex, cloudlet, activeCloudlets)
         val bounded = reserved.coerceIn(environment.vmList.indices)
         val placementState = context.acceptedCandidates.firstOrNull { it.vmIndex == bounded }?.nodeState
@@ -184,7 +236,8 @@ internal class RealtimeVmSelectionFacade(
             selectedState != null && !selectedState.acceptingWork -> null
             else -> {
                 state.metrics.recordCandidateScores(scoreCalculator.scoreRecords(context, bounded))
-                bounded to (selectedState?.failurePressure ?: 0.0)
+                state.metrics.recordDeadlineAdmission(metricAction)
+                RealtimeVmSelectionOutcome.Selected(bounded, selectedState?.failurePressure ?: 0.0)
             }
         }
     }

@@ -239,6 +239,14 @@ class RealtimeBroker(
 
     fun getResourceRejectedCount(): Int = readModel.resourceRejectedCount()
 
+    fun getDeadlineRejectedCount(): Int = readModel.deadlineRejectedCount()
+
+    fun getDeadlineDegradedCount(): Int = readModel.deadlineDegradedCount()
+
+    fun getDeadlineRetryLaterCount(): Int = readModel.deadlineRetryLaterCount()
+
+    fun getDeadlineMissAcceptedCount(): Int = readModel.deadlineMissAcceptedCount()
+
     fun getTenantQuotaRejectedCount(): Int = readModel.tenantQuotaRejectedCount()
 
     fun getTenantBudgetRejectedCount(): Int = readModel.tenantBudgetRejectedCount()

@@ -85,7 +85,9 @@ internal class RealtimeArrivalWorkflowAdapter(
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
         currentTime: Double,
-    ): Pair<Int, Double>? = core.vmSelectionFacade.selectVm(cloudlet, activeCloudlets, currentTime)
+        allowDeadlinePreemption: Boolean,
+    ): RealtimeVmSelectionOutcome =
+        core.vmSelectionFacade.selectVm(cloudlet, activeCloudlets, currentTime, allowDeadlinePreemption)
 
     override fun latestRejectionReason(
         cloudlet: Cloudlet,
@@ -108,6 +110,11 @@ internal class RealtimeArrivalWorkflowAdapter(
 
     override fun preparePendingSubmission(request: RealtimePendingSubmissionRequest): RealtimePendingSubmission =
         core.submissionService.preparePendingSubmission(request)
+
+    override fun retryDeadlineAdmission(
+        cloudlet: Cloudlet,
+        delay: Double,
+    ): RealtimeBrokerCommand = core.submissionService.retryDeadlineAdmission(cloudlet, delay)
 
     override fun recordPreemptionFailed() {
         core.metrics.recordPreemptionFailed()

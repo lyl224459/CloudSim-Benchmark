@@ -38,6 +38,14 @@ internal class RealtimeBrokerReadModel(
 
     fun resourceRejectedCount(): Int = scalarMetrics.resourceRejectedCount()
 
+    fun deadlineRejectedCount(): Int = scalarMetrics.deadlineRejectedCount()
+
+    fun deadlineDegradedCount(): Int = scalarMetrics.deadlineDegradedCount()
+
+    fun deadlineRetryLaterCount(): Int = scalarMetrics.deadlineRetryLaterCount()
+
+    fun deadlineMissAcceptedCount(): Int = scalarMetrics.deadlineMissAcceptedCount()
+
     fun tenantQuotaRejectedCount(): Int = scalarMetrics.tenantQuotaRejectedCount()
 
     fun tenantBudgetRejectedCount(): Int = scalarMetrics.tenantBudgetRejectedCount()

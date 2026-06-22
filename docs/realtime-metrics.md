@@ -26,6 +26,10 @@
 | SlaViolationCount | count | 越低越好 | 完成但超过 deadline 的任务数。 |
 | SlaViolationRate | ratio | 越低越好 | SLA 违约数除以成功完成任务数。 |
 | CapacityRejectedCount | count | 越低越好 | VM 队列容量导致的拒绝数。 |
+| DeadlineRejectedCount | count | 越低越好 | deadline admission 判定无法按期完成并拒绝的任务数。 |
+| DeadlineDegradedCount | count | 越低越好 | deadline miss 后按降级策略继续提交的任务数。 |
+| DeadlineRetryLaterCount | count | 越低越好 | deadline miss 后被重新排队等待再次 admission 的次数。 |
+| DeadlineMissAcceptedCount | count | 越低越好 | deadline miss 但按 accept 策略继续提交的任务数。 |
 | AvgQueueDepth | count | 越低越好 | 被选中 VM 的队列深度采样平均值。 |
 | MaxQueueDepth | count | 越低越好 | 队列深度采样最大值。 |
 | P95ResponseTime | seconds | 越低越好 | 响应时间第 95 百分位。 |

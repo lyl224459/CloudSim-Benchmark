@@ -6,6 +6,10 @@ data class RealtimeBrokerMetricsSnapshot(
     val rejectedCount: Int,
     val capacityRejectedCount: Int,
     val resourceRejectedCount: Int,
+    val deadlineRejectedCount: Int,
+    val deadlineDegradedCount: Int,
+    val deadlineRetryLaterCount: Int,
+    val deadlineMissAcceptedCount: Int,
     val tenantQuotaRejectedCount: Int,
     val tenantBudgetRejectedCount: Int,
     val submittedCount: Int,
@@ -41,6 +45,14 @@ class RealtimeBrokerMetrics {
     var capacityRejectedCount: Int = 0
         private set
     var resourceRejectedCount: Int = 0
+        private set
+    var deadlineRejectedCount: Int = 0
+        private set
+    var deadlineDegradedCount: Int = 0
+        private set
+    var deadlineRetryLaterCount: Int = 0
+        private set
+    var deadlineMissAcceptedCount: Int = 0
         private set
     var tenantQuotaRejectedCount: Int = 0
         private set
@@ -130,9 +142,22 @@ class RealtimeBrokerMetrics {
             RealtimeRejectReason.QUEUE -> Unit
             RealtimeRejectReason.CAPACITY -> capacityRejectedCount++
             RealtimeRejectReason.RESOURCE -> resourceRejectedCount++
+            RealtimeRejectReason.DEADLINE -> deadlineRejectedCount++
             RealtimeRejectReason.TENANT_QUOTA -> tenantQuotaRejectedCount++
             RealtimeRejectReason.TENANT_BUDGET -> tenantBudgetRejectedCount++
         }
+    }
+
+    internal fun recordDeadlineAdmission(action: DeadlineAdmissionMetricAction?) {
+        when (action) {
+            DeadlineAdmissionMetricAction.MISS_ACCEPTED -> deadlineMissAcceptedCount++
+            DeadlineAdmissionMetricAction.DEGRADED -> deadlineDegradedCount++
+            null -> Unit
+        }
+    }
+
+    fun recordDeadlineRetryLater() {
+        deadlineRetryLaterCount++
     }
 
     fun recordSubmitted() {
@@ -229,6 +254,10 @@ class RealtimeBrokerMetrics {
             rejectedCount,
             capacityRejectedCount,
             resourceRejectedCount,
+            deadlineRejectedCount,
+            deadlineDegradedCount,
+            deadlineRetryLaterCount,
+            deadlineMissAcceptedCount,
             tenantQuotaRejectedCount,
             tenantBudgetRejectedCount,
             submittedCount,

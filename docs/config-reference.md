@@ -143,6 +143,9 @@
 | `priorityLevels` | `1` | 优先级数量。 |
 | `highPriorityRatio` | `0.0` | 高优先级任务比例。 |
 | `deadlineFactor` | `0.0` | deadline 生成系数。 |
+| `deadlineAdmissionEnabled` | `true` | 是否在调度前按 projected finish time 做 deadline 可调度性判断。 |
+| `deadlineType` | `soft` | `soft`、`firm`、`hard`；firm/hard 会在可按期候选存在时过滤 late 候选。 |
+| `deadlineMissAction` | `accept` | `accept`、`reject`、`degrade`、`retry_later`；`retry_later` 复用 retry 参数。 |
 | `vmQueueCapacity` | `0` | 单 VM 队列容量，0 表示不启用。 |
 | `taskTimeout` | `0.0` | 0 表示不启用 timeout。 |
 | `timeoutAction` | `fail` | `fail`、`retry`、`cancel`、`degrade`。 |

@@ -32,6 +32,10 @@ data class RealtimeAlgorithmResult(
     val slaViolationCount: Int get() = metrics.intValue(RealtimeMetricKey.SLA_VIOLATION_COUNT)
     val slaViolationRate: Double get() = metrics[RealtimeMetricKey.SLA_VIOLATION_RATE]
     val capacityRejectedCount: Int get() = metrics.intValue(RealtimeMetricKey.CAPACITY_REJECTED_COUNT)
+    val deadlineRejectedCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_REJECTED_COUNT)
+    val deadlineDegradedCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_DEGRADED_COUNT)
+    val deadlineRetryLaterCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_RETRY_LATER_COUNT)
+    val deadlineMissAcceptedCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_MISS_ACCEPTED_COUNT)
     val averageQueueDepth: Double get() = metrics[RealtimeMetricKey.AVERAGE_QUEUE_DEPTH]
     val maxQueueDepth: Int get() = metrics.intValue(RealtimeMetricKey.MAX_QUEUE_DEPTH)
     val p95ResponseTime: Double get() = metrics[RealtimeMetricKey.P95_RESPONSE_TIME]

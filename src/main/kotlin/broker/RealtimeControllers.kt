@@ -16,6 +16,7 @@ enum class RealtimeRejectReason {
     QUEUE,
     CAPACITY,
     RESOURCE,
+    DEADLINE,
     TENANT_QUOTA,
     TENANT_BUDGET,
 }

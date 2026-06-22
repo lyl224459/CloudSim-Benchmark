@@ -98,6 +98,7 @@ class ConfigValidationTest {
     }
 
     @Test
+    @Suppress("LongMethod") // This snapshot-style test intentionally lists all realtime core validation paths.
     fun `should validate realtime core and resource scheduling parameters`() {
         assertInvalidRealtimeFields(
             scheduling =
@@ -112,6 +113,8 @@ class ConfigValidationTest {
                     priorityLevels = 0,
                     highPriorityRatio = 1.1,
                     deadlineFactor = -0.1,
+                    deadlineType = "urgent",
+                    deadlineMissAction = "wait",
                     vmQueueCapacity = -1,
                     overloadFailureMultiplier = -0.2,
                     scaleOutQueueThreshold = -1,
@@ -138,6 +141,8 @@ class ConfigValidationTest {
                     "priorityLevels",
                     "highPriorityRatio",
                     "deadlineFactor",
+                    "deadlineType",
+                    "deadlineMissAction",
                     "vmQueueCapacity",
                     "overloadFailureMultiplier",
                     "scaleOutQueueThreshold",
@@ -152,6 +157,14 @@ class ConfigValidationTest {
                     "ramWeight",
                     "bwWeight",
                 ),
+        )
+    }
+
+    @Test
+    fun `should require retry limit for deadline retry later action`() {
+        assertInvalidRealtimeFields(
+            scheduling = RealtimeSchedulingConfig(deadlineMissAction = "retry_later", retryLimit = 0),
+            expectedFields = listOf("retryLimit"),
         )
     }
 

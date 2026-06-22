@@ -46,6 +46,36 @@ RealtimeCloudletGenerator
 
 `priorityLevels` 和 `highPriorityRatio` 控制任务优先级分布。`deadlineFactor` 控制 deadline 相对任务估计运行时间的松紧程度。
 
+## Deadline Admission
+
+deadline admission 在 scheduler 选择 VM 前使用 realtime score 中的 projected finish time 计算 slack。默认 `deadlineAdmissionEnabled = true`，但默认 `deadlineType = "soft"`、`deadlineMissAction = "accept"`，因此旧配置仍会继续提交 miss 风险任务并保留 SLA penalty 统计。
+
+字段：
+
+- `deadlineAdmissionEnabled`
+- `deadlineType`
+- `deadlineMissAction`
+- `retryLimit`
+- `retryDelay`
+- `retryBackoffMultiplier`
+
+`deadlineType` 可选值：
+
+| Value | Behavior |
+| :--- | :--- |
+| `soft` | 不过滤 late candidates；如果所有候选都会 miss，则按 `deadlineMissAction` 处理。 |
+| `firm` | 如果存在可按期完成候选，只允许这些候选进入 scheduler；全部 miss 时按 `deadlineMissAction` 处理。 |
+| `hard` | 当前实现与 firm 一样执行候选过滤和 all-miss action，用于表达更严格的实验语义。 |
+
+`deadlineMissAction` 可选值：
+
+| Value | Behavior |
+| :--- | :--- |
+| `accept` | 继续提交最优候选，计入 `DeadlineMissAcceptedCount`，后续 SLA violation 正常统计。 |
+| `reject` | 拒绝任务，原因计为 `DEADLINE`，指标计入 `DeadlineRejectedCount`。 |
+| `degrade` | 继续提交最优候选，计入 `DeadlineDegradedCount`，不放宽 deadline。 |
+| `retry_later` | 使用 `retryDelay`、`retryBackoffMultiplier`、`retryLimit` 重新排队；耗尽后按 deadline 拒绝。 |
+
 ## Admission And Rejection
 
 broker 可以因为多种原因拒绝任务或候选 VM：
@@ -54,10 +84,11 @@ broker 可以因为多种原因拒绝任务或候选 VM：
 | :--- | :--- |
 | resource | RAM/BW/IO/CPU 需求超过候选容量。 |
 | capacity | VM 队列容量满。 |
+| deadline | deadline admission 判定所有候选都会 miss，且 miss action 要求拒绝。 |
 | tenant | 租户 quota、budget 或 fairness 约束。 |
 | topology | 拓扑策略、故障域或数据本地性不满足。 |
 
-拒绝任务不会让算法 trial 失败，而是计入 realtime metrics，例如 `RejectedCount`、`ResourceRejectedCount`、`TenantRejectedCount`。
+拒绝任务不会让算法 trial 失败，而是计入 realtime metrics，例如 `RejectedCount`、`ResourceRejectedCount`、`DeadlineRejectedCount`、`TenantRejectedCount`。
 
 ## Timeout
 

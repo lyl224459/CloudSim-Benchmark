@@ -80,6 +80,32 @@ internal object RealtimeCoreSchedulingValidator {
             "高优先级任务比例必须在 [0,1] 范围内",
         )
         nonNegative(context, "realtime.scheduling.deadlineFactor", scheduling.deadlineFactor, "SLA deadline 系数不能为负数")
+        enumValue(
+            context,
+            "realtime.scheduling.deadlineType",
+            scheduling.deadlineType,
+            RealtimeDeadlineType.valuesForConfig(),
+            "实时 deadline 类型",
+        )
+        enumValue(
+            context,
+            "realtime.scheduling.deadlineMissAction",
+            scheduling.deadlineMissAction,
+            RealtimeDeadlineMissAction.valuesForConfig(),
+            "实时 deadline miss 动作",
+        )
+        val retriesDeadlineMissLater =
+            scheduling.deadlineMissAction.equals(
+                RealtimeDeadlineMissAction.RETRY_LATER.configValue,
+                ignoreCase = true,
+            )
+        if (retriesDeadlineMissLater && scheduling.retryLimit <= 0) {
+            context.addError(
+                "realtime.scheduling.retryLimit",
+                scheduling.retryLimit,
+                "deadlineMissAction=retry_later 时 retryLimit 必须大于 0",
+            )
+        }
         if (scheduling.vmQueueCapacity < 0) {
             context.addError("realtime.scheduling.vmQueueCapacity", scheduling.vmQueueCapacity, "单 VM 队列容量不能为负数")
         }

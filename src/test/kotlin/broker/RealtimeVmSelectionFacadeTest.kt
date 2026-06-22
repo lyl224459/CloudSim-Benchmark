@@ -20,7 +20,7 @@ class RealtimeVmSelectionFacadeTest {
         val incoming = cloudlet(1)
         val active = cloudlet(2).also { it.setVm(vms[1]) }
 
-        assertThat(facade.selectVm(incoming, emptyList(), 0.0)?.first).isEqualTo(1)
+        assertThat(facade.selectVm(incoming, emptyList(), 0.0).selectedVmIndex()).isEqualTo(1)
         assertThat(facade.activeVmIndexes(listOf(active))).containsExactly(1)
         assertThat(facade.tryPreemptFor(incoming, listOf(active)).applied).isFalse()
         assertThat(broker.getCandidateScoreRecords()).hasSize(2)
@@ -37,7 +37,7 @@ class RealtimeVmSelectionFacadeTest {
         val cloudlet = cloudlet(3)
 
         assertThat(facade.staticPreviewSelection(cloudlet, emptyList())).isZero()
-        assertThat(facade.selectVm(cloudlet, emptyList(), 0.0)?.first).isZero()
+        assertThat(facade.selectVm(cloudlet, emptyList(), 0.0).selectedVmIndex()).isZero()
         assertThat(facade.decisionDelay(cloudlet)).isGreaterThanOrEqualTo(2.0).isLessThan(3.0)
         assertThat(facade.decisionDelay(cloudlet)).isEqualTo(facade.decisionDelay(cloudlet))
     }
@@ -55,7 +55,7 @@ class RealtimeVmSelectionFacadeTest {
         val active = cloudlet(4).also { it.setVm(vm) }
         val incoming = cloudlet(5)
 
-        assertThat(facade.selectVm(incoming, listOf(active), 0.0)).isNull()
+        assertThat(facade.selectVm(incoming, listOf(active), 0.0)).isSameAs(RealtimeVmSelectionOutcome.NoSelection)
         assertThat(facade.latestRejectionReason(incoming, listOf(active), 0.0))
             .isEqualTo(RealtimeRejectReason.CAPACITY)
     }
@@ -77,9 +77,75 @@ class RealtimeVmSelectionFacadeTest {
         val facade = broker.selectionFacade()
         val incoming = cloudlet(6)
 
-        assertThat(facade.selectVm(incoming, emptyList(), 0.0)).isNull()
+        assertThat(facade.selectVm(incoming, emptyList(), 0.0)).isSameAs(RealtimeVmSelectionOutcome.NoSelection)
         assertThat(facade.latestRejectionReason(incoming, emptyList(), 0.0))
             .isEqualTo(RealtimeRejectReason.RESOURCE)
+    }
+
+    @Test
+    fun `firm deadline admission filters late candidates before scheduler selection`() {
+        val vms = createVms()
+        val broker =
+            broker(
+                vms,
+                firstCandidateScheduler(),
+                RealtimeSchedulingConfig(deadlineFactor = 1.2, deadlineType = "firm"),
+            )
+        val facade = broker.selectionFacade()
+        val incoming = cloudlet(8)
+
+        assertThat(facade.selectVm(incoming, emptyList(), 0.0).selectedVmIndex()).isEqualTo(1)
+        assertThat(broker.getCandidateScoreRecords().single { it.candidateVmIndex == 0 }.accepted).isFalse()
+        assertThat(broker.getCandidateScoreRecords().single { it.candidateVmIndex == 1 }.accepted).isTrue()
+    }
+
+    @Test
+    fun `all miss deadline admission returns configured non-selected outcomes`() {
+        val rejectBroker =
+            broker(
+                createVms(),
+                fixedScheduler(0),
+                RealtimeSchedulingConfig(deadlineFactor = 0.1, deadlineMissAction = "reject"),
+            )
+        val retryBroker =
+            broker(
+                createVms(),
+                fixedScheduler(0),
+                RealtimeSchedulingConfig(
+                    deadlineFactor = 0.1,
+                    deadlineMissAction = "retry_later",
+                    retryLimit = 1,
+                    retryDelay = 0.25,
+                ),
+            )
+
+        assertThat(rejectBroker.selectionFacade().selectVm(cloudlet(9), emptyList(), 0.0))
+            .isEqualTo(RealtimeVmSelectionOutcome.Rejected(RealtimeRejectReason.DEADLINE))
+        assertThat(retryBroker.selectionFacade().selectVm(cloudlet(10), emptyList(), 0.0))
+            .isEqualTo(RealtimeVmSelectionOutcome.RetryLater(0.25))
+    }
+
+    @Test
+    fun `all miss accept and degrade actions select and record admission counters`() {
+        val acceptBroker =
+            broker(
+                createVms(),
+                fixedScheduler(0),
+                RealtimeSchedulingConfig(deadlineFactor = 0.1, deadlineMissAction = "accept"),
+            )
+        val degradeBroker =
+            broker(
+                createVms(),
+                fixedScheduler(0),
+                RealtimeSchedulingConfig(deadlineFactor = 0.1, deadlineMissAction = "degrade"),
+            )
+
+        assertThat(acceptBroker.selectionFacade().selectVm(cloudlet(11), emptyList(), 0.0).selectedVmIndex())
+            .isZero()
+        assertThat(acceptBroker.getDeadlineMissAcceptedCount()).isEqualTo(1)
+        assertThat(degradeBroker.selectionFacade().selectVm(cloudlet(12), emptyList(), 0.0).selectedVmIndex())
+            .isZero()
+        assertThat(degradeBroker.getDeadlineDegradedCount()).isEqualTo(1)
     }
 
     @Test
@@ -100,6 +166,12 @@ class RealtimeVmSelectionFacadeTest {
             override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int = index
         }
 
+    private fun firstCandidateScheduler(): RealtimeScheduler =
+        object : RealtimeScheduler {
+            override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
+                context.candidateNodeStates.firstOrNull()?.vmIndex ?: 0
+        }
+
     private fun createVms(): List<Vm> =
         listOf(
             VmSimple(1_000.0, 1).also { it.setId(10) },
@@ -107,6 +179,9 @@ class RealtimeVmSelectionFacadeTest {
         )
 
     private fun cloudlet(id: Long): Cloudlet = CloudletSimple(1_000, 1).also { it.setId(id) }
+
+    private fun RealtimeVmSelectionOutcome.selectedVmIndex(): Int? =
+        (this as? RealtimeVmSelectionOutcome.Selected)?.vmIndex
 
     private fun RealtimeBroker.selectionFacade(): RealtimeVmSelectionFacade =
         javaClass

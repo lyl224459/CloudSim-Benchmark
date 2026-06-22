@@ -146,6 +146,9 @@ data class RealtimeSchedulingConfig(
     val priorityLevels: Int = 1,
     val highPriorityRatio: Double = 0.0,
     val deadlineFactor: Double = 0.0,
+    val deadlineAdmissionEnabled: Boolean = true,
+    val deadlineType: String = "soft",
+    val deadlineMissAction: String = "accept",
     val vmQueueCapacity: Int = 0,
     val overloadFailureMultiplier: Double = 0.0,
     val autoscalingEnabled: Boolean = false,
@@ -219,6 +222,11 @@ data class RealtimeSchedulingConfig(
     fun normalizedTopologyPolicy(): RealtimeTopologyPolicy = RealtimeTopologyPolicy.parse(topologyPolicy)
 
     fun normalizedDataLocalityPolicy(): DataLocalityPolicy = DataLocalityPolicy.parse(dataLocalityPolicy)
+
+    fun normalizedDeadlineType(): RealtimeDeadlineType = RealtimeDeadlineType.parse(deadlineType)
+
+    fun normalizedDeadlineMissAction(): RealtimeDeadlineMissAction =
+        RealtimeDeadlineMissAction.parse(deadlineMissAction)
 }
 
 @Serializable

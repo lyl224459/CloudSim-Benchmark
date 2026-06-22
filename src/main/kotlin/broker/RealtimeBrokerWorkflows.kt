@@ -21,10 +21,23 @@ private data class ArrivalSelection(
     val failurePressure: Double,
 )
 
-private data class ArrivalSelectionAttempt(
-    val selection: ArrivalSelection?,
-    val recordPreemptionFailure: Boolean,
-)
+private sealed interface ArrivalSelectionAttempt {
+    data class Selected(
+        val selection: ArrivalSelection,
+    ) : ArrivalSelectionAttempt
+
+    data class Rejected(
+        val reason: RealtimeRejectReason,
+    ) : ArrivalSelectionAttempt
+
+    data class RetryLater(
+        val delay: Double,
+    ) : ArrivalSelectionAttempt
+
+    data class NoSelection(
+        val recordPreemptionFailure: Boolean,
+    ) : ArrivalSelectionAttempt
+}
 
 internal interface RealtimeArrivalLifecycleContext {
     fun lifecycleOf(cloudlet: Cloudlet): RealtimeTaskLifecycle?
@@ -68,7 +81,8 @@ internal interface RealtimeArrivalPlacementContext {
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
         currentTime: Double,
-    ): Pair<Int, Double>?
+        allowDeadlinePreemption: Boolean,
+    ): RealtimeVmSelectionOutcome
 
     fun latestRejectionReason(
         cloudlet: Cloudlet,
@@ -89,6 +103,11 @@ internal interface RealtimeArrivalSubmissionContext {
 
     fun preparePendingSubmission(request: RealtimePendingSubmissionRequest): RealtimePendingSubmission
 
+    fun retryDeadlineAdmission(
+        cloudlet: Cloudlet,
+        delay: Double,
+    ): RealtimeBrokerCommand
+
     fun recordPreemptionFailed()
 }
 
@@ -101,6 +120,7 @@ internal interface RealtimeArrivalWorkflowContext :
 internal class RealtimeArrivalWorkflow(
     private val context: RealtimeArrivalWorkflowContext,
 ) {
+    @Suppress("LongMethod") // Arrival handling is the workflow boundary for admission, preemption and submission.
     fun onArrival(
         cloudlet: Cloudlet,
         arrivalTime: Double,
@@ -140,17 +160,28 @@ internal class RealtimeArrivalWorkflow(
             }
 
             val selectionAttempt = selectVmWithPreemption(cloudlet, activeCloudlets, arrivalTime)
-            val finalSelection = selectionAttempt.selection
-            if (finalSelection == null) {
-                if (selectionAttempt.recordPreemptionFailure) {
-                    context.recordPreemptionFailed()
+            val finalSelection =
+                when (selectionAttempt) {
+                    is ArrivalSelectionAttempt.Selected -> selectionAttempt.selection
+                    is ArrivalSelectionAttempt.Rejected -> {
+                        context.rejectCloudlet(cloudlet, selectionAttempt.reason)
+                        return@buildList
+                    }
+                    is ArrivalSelectionAttempt.RetryLater -> {
+                        add(context.retryDeadlineAdmission(cloudlet, selectionAttempt.delay))
+                        return@buildList
+                    }
+                    is ArrivalSelectionAttempt.NoSelection -> {
+                        if (selectionAttempt.recordPreemptionFailure) {
+                            context.recordPreemptionFailed()
+                        }
+                        context.rejectCloudlet(
+                            cloudlet,
+                            context.latestRejectionReason(cloudlet, context.activeCloudlets(), arrivalTime),
+                        )
+                        return@buildList
+                    }
                 }
-                context.rejectCloudlet(
-                    cloudlet,
-                    context.latestRejectionReason(cloudlet, context.activeCloudlets(), arrivalTime),
-                )
-                return@buildList
-            }
 
             val delay = context.decisionDelay(cloudlet)
             context.recordDecisionDelay(delay)
@@ -173,26 +204,74 @@ internal class RealtimeArrivalWorkflow(
         activeCloudlets: List<Cloudlet>,
         arrivalTime: Double,
     ): ArrivalSelectionAttempt {
-        var currentActiveCloudlets = activeCloudlets
-        val selection = context.selectVm(cloudlet, currentActiveCloudlets, arrivalTime)
-        var preempted = false
-        if (selection == null) {
-            if (!context.tryPreemptFor(cloudlet, currentActiveCloudlets)) {
-                return ArrivalSelectionAttempt(selection = null, recordPreemptionFailure = false)
-            }
-            preempted = true
-            currentActiveCloudlets = context.activeCloudlets()
+        val selection = context.selectVm(cloudlet, activeCloudlets, arrivalTime, allowDeadlinePreemption = true)
+        return when (selection) {
+            is RealtimeVmSelectionOutcome.Selected ->
+                ArrivalSelectionAttempt.Selected(
+                    ArrivalSelection(activeCloudlets, selection.vmIndex, selection.failurePressure),
+                )
+            RealtimeVmSelectionOutcome.NeedsPreemption ->
+                selectAfterDeadlinePreemption(cloudlet, activeCloudlets, arrivalTime)
+            RealtimeVmSelectionOutcome.NoSelection ->
+                selectAfterCapacityPreemption(cloudlet, activeCloudlets, arrivalTime)
+            is RealtimeVmSelectionOutcome.Rejected -> ArrivalSelectionAttempt.Rejected(selection.reason)
+            is RealtimeVmSelectionOutcome.RetryLater -> ArrivalSelectionAttempt.RetryLater(selection.delay)
         }
+    }
 
-        val finalSelection = selection ?: context.selectVm(cloudlet, currentActiveCloudlets, arrivalTime)
-        return ArrivalSelectionAttempt(
-            selection =
-                finalSelection?.let { (vmIndex, failurePressure) ->
-                    ArrivalSelection(currentActiveCloudlets, vmIndex, failurePressure)
-                },
-            recordPreemptionFailure = preempted && finalSelection == null,
+    private fun selectAfterDeadlinePreemption(
+        cloudlet: Cloudlet,
+        activeCloudlets: List<Cloudlet>,
+        arrivalTime: Double,
+    ): ArrivalSelectionAttempt {
+        if (!context.tryPreemptFor(cloudlet, activeCloudlets)) {
+            return selectionAttemptFromOutcome(
+                outcome = context.selectVm(cloudlet, activeCloudlets, arrivalTime, allowDeadlinePreemption = false),
+                activeCloudlets = activeCloudlets,
+                recordPreemptionFailure = false,
+            )
+        }
+        val currentActiveCloudlets = context.activeCloudlets()
+        return selectionAttemptFromOutcome(
+            outcome = context.selectVm(cloudlet, currentActiveCloudlets, arrivalTime, allowDeadlinePreemption = false),
+            activeCloudlets = currentActiveCloudlets,
+            recordPreemptionFailure = false,
         )
     }
+
+    private fun selectAfterCapacityPreemption(
+        cloudlet: Cloudlet,
+        activeCloudlets: List<Cloudlet>,
+        arrivalTime: Double,
+    ): ArrivalSelectionAttempt {
+        if (!context.tryPreemptFor(cloudlet, activeCloudlets)) {
+            return ArrivalSelectionAttempt.NoSelection(recordPreemptionFailure = false)
+        }
+        val currentActiveCloudlets = context.activeCloudlets()
+        return selectionAttemptFromOutcome(
+            outcome = context.selectVm(cloudlet, currentActiveCloudlets, arrivalTime, allowDeadlinePreemption = false),
+            activeCloudlets = currentActiveCloudlets,
+            recordPreemptionFailure = true,
+        )
+    }
+
+    private fun selectionAttemptFromOutcome(
+        outcome: RealtimeVmSelectionOutcome,
+        activeCloudlets: List<Cloudlet>,
+        recordPreemptionFailure: Boolean,
+    ): ArrivalSelectionAttempt =
+        when (outcome) {
+            is RealtimeVmSelectionOutcome.Selected ->
+                ArrivalSelectionAttempt.Selected(
+                    ArrivalSelection(activeCloudlets, outcome.vmIndex, outcome.failurePressure),
+                )
+            RealtimeVmSelectionOutcome.NeedsPreemption ->
+                ArrivalSelectionAttempt.NoSelection(recordPreemptionFailure)
+            RealtimeVmSelectionOutcome.NoSelection ->
+                ArrivalSelectionAttempt.NoSelection(recordPreemptionFailure)
+            is RealtimeVmSelectionOutcome.Rejected -> ArrivalSelectionAttempt.Rejected(outcome.reason)
+            is RealtimeVmSelectionOutcome.RetryLater -> ArrivalSelectionAttempt.RetryLater(outcome.delay)
+        }
 }
 
 internal interface RealtimeSubmissionWorkflowContext {

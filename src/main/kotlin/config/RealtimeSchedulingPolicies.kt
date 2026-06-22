@@ -17,6 +17,41 @@ enum class RealtimeQueuePolicy(
     }
 }
 
+enum class RealtimeDeadlineType(
+    val configValue: String,
+) {
+    SOFT("soft"),
+    FIRM("firm"),
+    HARD("hard"),
+    ;
+
+    companion object {
+        fun parse(value: String): RealtimeDeadlineType =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时 deadline 类型: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
+enum class RealtimeDeadlineMissAction(
+    val configValue: String,
+) {
+    ACCEPT("accept"),
+    REJECT("reject"),
+    DEGRADE("degrade"),
+    RETRY_LATER("retry_later"),
+    ;
+
+    companion object {
+        fun parse(value: String): RealtimeDeadlineMissAction =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时 deadline miss 动作: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
 enum class RealtimeTimeoutAction(
     val configValue: String,
 ) {
