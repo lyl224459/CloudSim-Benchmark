@@ -202,7 +202,8 @@ jobs:
         podman build --format oci -t "${version_tag}" -f build/container-context/Containerfile build/container-context
         podman push --digestfile image-digest.txt "${version_tag}"
 
-        if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+        if { [ "${GITHUB_EVENT_NAME}" = "push" ] && [[ "${GITHUB_REF}" == refs/tags/v* ]]; } ||
+           { [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ] && [ "${GITHUB_REF}" = "refs/heads/main" ]; }; then
           podman tag "${version_tag}" "${image}:latest"
           podman push "${image}:latest"
         fi

@@ -110,7 +110,20 @@ Release workflow 使用 Podman 从同一最小上下文构建并推送 GHCR 镜�
 ghcr.io/lyl224459/cloudsim-benchmark
 ```
 
-Release 会为镜像 digest 生成 provenance 和 SBOM attestation。
+可运行镜像使用语义化版本 tag，并在正式 tag 发布时同步 `latest`：
+
+```powershell
+docker pull ghcr.io/lyl224459/cloudsim-benchmark:1.2.0
+docker pull ghcr.io/lyl224459/cloudsim-benchmark:latest
+```
+
+如果需要固定到不可变镜像摘要，Docker/Podman digest 引用使用 `@sha256:...`，不是 `:sha256-...`：
+
+```powershell
+docker pull ghcr.io/lyl224459/cloudsim-benchmark@sha256:<image-digest>
+```
+
+Release 会为镜像 digest 生成 provenance 和 SBOM attestation。启用 registry attestation 后，GHCR 可能显示 `sha256-<digest>` 形式的 attestation fallback tag；这类 tag 是证明材料索引，不是应用运行镜像。不要使用 `docker pull ghcr.io/lyl224459/cloudsim-benchmark:sha256-...` 作为运行版本。
 
 ## Troubleshooting
 
