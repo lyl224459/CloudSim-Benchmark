@@ -84,6 +84,96 @@ class SchedulerCoreCoverageTest {
     }
 
     @Test
+    fun `realtime deadline baselines choose expected candidates`() {
+        val vms = vms(3)
+        val states =
+            listOf(
+                nodeState(0, accepting = true, NodeStateOverrides(availableTime = 0.1)),
+                nodeState(1, accepting = true, NodeStateOverrides(availableTime = 0.6)),
+                nodeState(2, accepting = true, NodeStateOverrides(availableTime = 0.0)),
+            )
+        val context =
+            context(
+                vms,
+                active = cloudlets(3),
+                states = states,
+                taskMetadata =
+                    RealtimeTaskRecord(
+                        cloudletId = 1L,
+                        originalArrivalTime = 0.0,
+                        priority = 10,
+                        deadline = 1.2,
+                    ),
+                preemptionCandidates =
+                    listOf(
+                        RealtimePreemptionCandidate(
+                            victimCloudletId = CloudletId(99L),
+                            victimVmIndex = VmIndex(1),
+                            victimPriority = 1,
+                            victimDeadline = 2.0,
+                            preemptedCount = 0,
+                        ),
+                    ),
+            )
+
+        assertThat(RealtimeEdfScheduler(vms).scheduleOnArrival(context)).isEqualTo(2)
+        assertThat(RealtimeLlfScheduler(vms).scheduleOnArrival(context)).isEqualTo(0)
+        assertThat(RealtimeEftScheduler(vms).scheduleOnArrival(context)).isEqualTo(2)
+        assertThat(RealtimeSrptScheduler(vms).scheduleOnArrival(context)).isEqualTo(2)
+        assertThat(RealtimePriorityDeadlineScheduler(vms).scheduleOnArrival(context)).isEqualTo(1)
+        assertThat(
+            RealtimeLlfScheduler(vms).scheduleOnArrival(
+                context.copy(taskMetadata = context.taskMetadata.copy(deadline = 0.5)),
+            ),
+        ).isEqualTo(2)
+    }
+
+    @Test
+    fun `realtime deadline baselines do not select rejected candidates`() {
+        val vms = vms(3)
+        val context =
+            context(
+                vms,
+                states =
+                    listOf(
+                        nodeState(0, accepting = false, NodeStateOverrides(availableTime = 0.0)),
+                        nodeState(1, accepting = true, NodeStateOverrides(availableTime = 4.0)),
+                        nodeState(2, accepting = false, NodeStateOverrides(availableTime = 0.1)),
+                    ),
+                taskMetadata = RealtimeTaskRecord(cloudletId = 1L, originalArrivalTime = 0.0, deadline = 5.0),
+            )
+
+        listOf(
+            RealtimeEdfScheduler(vms),
+            RealtimeLlfScheduler(vms),
+            RealtimeEftScheduler(vms),
+            RealtimeSrptScheduler(vms),
+            RealtimePriorityDeadlineScheduler(vms),
+        ).forEach { scheduler ->
+            assertThat(scheduler.scheduleOnArrival(context)).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `edf and llf fall back to eft without deadline`() {
+        val vms = vms(3)
+        val context =
+            context(
+                vms,
+                states =
+                    listOf(
+                        nodeState(0, accepting = true, NodeStateOverrides(availableTime = 1.0)),
+                        nodeState(1, accepting = true, NodeStateOverrides(availableTime = 0.4)),
+                        nodeState(2, accepting = true, NodeStateOverrides(availableTime = 0.0)),
+                    ),
+            )
+        val eftChoice = RealtimeEftScheduler(vms).scheduleOnArrival(context)
+
+        assertThat(RealtimeEdfScheduler(vms).scheduleOnArrival(context)).isEqualTo(eftChoice)
+        assertThat(RealtimeLlfScheduler(vms).scheduleOnArrival(context)).isEqualTo(eftChoice)
+    }
+
+    @Test
     fun `realtime base covers threshold repair fallback and noncontinuous vm ids`() {
         val vms = vms(2).onEachIndexed { index, vm -> vm.setId((10 + index).toLong()) }
         val probe = RealtimeSchedulerProbe(vms)
@@ -170,13 +260,22 @@ class SchedulerCoreCoverageTest {
         vms: List<Vm>,
         active: List<Cloudlet> = emptyList(),
         states: List<RealtimeNodeState>,
+        newCloudlet: Cloudlet = cloudlets(1).first(),
+        taskMetadata: RealtimeTaskMetadata =
+            RealtimeTaskRecord(
+                cloudletId = newCloudlet.id,
+                originalArrivalTime = newCloudlet.submissionDelay,
+            ),
+        preemptionCandidates: List<RealtimePreemptionCandidate> = emptyList(),
     ): RealtimeSchedulingContext =
         RealtimeSchedulingContext(
-            newCloudlet = cloudlets(1).first(),
+            newCloudlet = newCloudlet,
             activeCloudlets = active,
             vmList = vms,
             currentTime = 0.0,
             nodeStates = states,
+            taskMetadata = taskMetadata,
+            preemptionCandidates = preemptionCandidates,
         )
 
     private fun nodeState(
@@ -192,18 +291,24 @@ class SchedulerCoreCoverageTest {
             queueDepth = overrides.queueDepth,
             availableSlots = overrides.slots ?: if (accepting) Int.MAX_VALUE else 0,
             acceptingWork = accepting,
-            estimatedLoad = overrides.queueDepth.toDouble(),
-            availableTime = overrides.queueDepth.toDouble(),
+            estimatedLoad = overrides.estimatedLoad ?: overrides.queueDepth.toDouble(),
+            availableTime = overrides.availableTime ?: overrides.queueDepth.toDouble(),
             failurePressure = 0.0,
+            resourcePressure = overrides.resourcePressure,
             topologyLatency = overrides.latency,
+            topologyCost = overrides.topologyCost,
             failureDomainLoad = overrides.domainLoad,
         )
 
     private data class NodeStateOverrides(
         val queueDepth: Int = 0,
         val slots: Int? = null,
+        val estimatedLoad: Double? = null,
+        val availableTime: Double? = null,
         val latency: Double = 0.0,
+        val topologyCost: Double = 0.0,
         val domainLoad: Int = 0,
+        val resourcePressure: Double = 0.0,
     )
 }
 

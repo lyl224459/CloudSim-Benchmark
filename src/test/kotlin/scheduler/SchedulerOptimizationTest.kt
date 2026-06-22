@@ -66,6 +66,10 @@ class SchedulerOptimizationTest {
             .isEqualTo("IMPROVED_RL")
         assertThat(AlgorithmRegistry.resolve(AlgorithmMode.REALTIME, "MINLOAD").name)
             .isEqualTo("MIN_LOAD")
+        assertThat(AlgorithmRegistry.resolve(AlgorithmMode.REALTIME, "EDF").name)
+            .isEqualTo("EDF_REALTIME")
+        assertThat(AlgorithmRegistry.resolve(AlgorithmMode.REALTIME, "priority deadline").name)
+            .isEqualTo("PRIORITY_DEADLINE_REALTIME")
         assertThat(AlgorithmRegistry.resolve(AlgorithmMode.REALTIME, "PSO").name)
             .isEqualTo("PSO_REALTIME")
     }
@@ -76,8 +80,9 @@ class SchedulerOptimizationTest {
         val pso = AlgorithmRegistry.resolveBatch("PSO")
         val improvedRl = AlgorithmRegistry.resolveBatch("improved rl")
 
-        assertThat(AlgorithmRegistry.all()).hasSize(11)
+        assertThat(AlgorithmRegistry.all()).hasSize(16)
         assertThat(AlgorithmRegistry.forMode(AlgorithmMode.BATCH)).hasSize(7)
+        assertThat(AlgorithmRegistry.forMode(AlgorithmMode.REALTIME)).hasSize(9)
         assertThat(random.displayName).isEqualTo("Random")
         assertThat(random.defaultEnabled).isTrue()
         assertThat(random.supportsPopulation).isFalse()
@@ -141,7 +146,17 @@ class SchedulerOptimizationTest {
         assertThat(batchDefaults.map { it.name })
             .containsExactly("RANDOM", "PSO", "WOA", "GWO", "HHO", "RL", "IMPROVED_RL")
         assertThat(realtimeDefaults.map { it.name })
-            .containsExactly("MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME")
+            .containsExactly(
+                "MIN_LOAD",
+                "RANDOM",
+                "EDF_REALTIME",
+                "LLF_REALTIME",
+                "EFT_REALTIME",
+                "SRPT_REALTIME",
+                "PRIORITY_DEADLINE_REALTIME",
+                "PSO_REALTIME",
+                "WOA_REALTIME",
+            )
         assertThat(realtimeAliases.map { it.name }).containsExactly("RANDOM")
     }
 

@@ -52,7 +52,7 @@ JMH JSON 用于机器读取，Markdown 用于 PR artifact 或人工查看。
 
 - objective function calculate；
 - PSO/WOA/GWO/HHO 固定输入调度；
-- realtime `MIN_LOAD`、`PSO_REALTIME`、`WOA_REALTIME` 在不同 cloudlet count 下调度；
+- realtime `MIN_LOAD`、deadline/finish/runtime 基线、`PSO_REALTIME`、`WOA_REALTIME` 在不同 cloudlet count 下调度；
 - GC allocation profiler；
 - 固定 JVM/GC 参数。
 

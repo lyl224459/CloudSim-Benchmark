@@ -138,8 +138,11 @@ abstract class RealtimeSchedulerBase(
             context.candidateNodeStates.ifEmpty { context.nodeStates }
         }
 
-    protected fun acceptingOptimizationCandidates(context: RealtimeSchedulingContext): List<RealtimeNodeState> =
+    protected fun acceptedCandidateStates(context: RealtimeSchedulingContext): List<RealtimeNodeState> =
         selectableNodeStates(context).filter { it.acceptingWork }
+
+    protected fun acceptingOptimizationCandidates(context: RealtimeSchedulingContext): List<RealtimeNodeState> =
+        acceptedCandidateStates(context)
 
     protected fun optimizedRealtimeVm(
         context: RealtimeSchedulingContext,
@@ -172,6 +175,53 @@ abstract class RealtimeSchedulerBase(
         }
     }
 
+    protected fun estimatedRuntime(
+        context: RealtimeSchedulingContext,
+        state: RealtimeNodeState,
+    ): Double {
+        val mips = context.vmList[state.vmIndex].mips
+        return if (mips > 0.0) context.newCloudlet.length.toDouble() / mips else Double.POSITIVE_INFINITY
+    }
+
+    protected fun projectedFinishTime(
+        context: RealtimeSchedulingContext,
+        state: RealtimeNodeState,
+    ): Double = state.availableTime + estimatedRuntime(context, state)
+
+    protected fun deadlineSlack(
+        context: RealtimeSchedulingContext,
+        state: RealtimeNodeState,
+    ): Double? = context.taskMetadata.deadline?.let { deadline -> deadline - projectedFinishTime(context, state) }
+
+    protected fun deadlineLateness(
+        context: RealtimeSchedulingContext,
+        state: RealtimeNodeState,
+    ): Double =
+        context.taskMetadata.deadline
+            ?.let { deadline -> (projectedFinishTime(context, state) - deadline).coerceAtLeast(0.0) }
+            ?: 0.0
+
+    protected fun stableCandidateTieBreaker(): Comparator<RealtimeNodeState> =
+        compareBy<RealtimeNodeState> { it.availableTime }
+            .thenBy { it.estimatedLoad }
+            .thenBy { it.queueDepth }
+            .thenBy { it.topologyLatency }
+            .thenBy { it.topologyCost }
+            .thenBy { it.vmIndex }
+
+    protected fun earliestFinishComparator(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> =
+        compareBy<RealtimeNodeState> { projectedFinishTime(context, it) }
+            .then(stableCandidateTieBreaker())
+
+    protected fun selectAcceptedOrFallback(
+        context: RealtimeSchedulingContext,
+        comparator: Comparator<RealtimeNodeState>,
+    ): Int =
+        acceptedCandidateStates(context)
+            .minWithOrNull(comparator)
+            ?.vmIndex
+            ?: fallbackCandidateVm(context)
+
     private fun tenantAdjustedCost(
         context: RealtimeSchedulingContext,
         state: RealtimeNodeState,
@@ -183,14 +233,6 @@ abstract class RealtimeSchedulerBase(
             config.TenantSchedulingPolicy.DOMINANT_RESOURCE_FAIRNESS ->
                 state.resourcePressure + state.topologyCost * (1.0 + pressure)
         }
-    }
-
-    private fun projectedFinishTime(
-        context: RealtimeSchedulingContext,
-        state: RealtimeNodeState,
-    ): Double {
-        val vm = context.vmList[state.vmIndex]
-        return state.availableTime + context.newCloudlet.length.toDouble() / vm.mips
     }
 }
 

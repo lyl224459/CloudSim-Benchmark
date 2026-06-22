@@ -13,6 +13,11 @@ typealias RealtimeScheduler = scheduler.realtime.RealtimeScheduler
 typealias RealtimeSchedulerBase = scheduler.realtime.RealtimeSchedulerBase
 typealias RealtimeRandomScheduler = scheduler.realtime.RealtimeRandomScheduler
 typealias RealtimeMinLoadScheduler = scheduler.realtime.RealtimeMinLoadScheduler
+typealias RealtimeEdfScheduler = scheduler.realtime.RealtimeEdfScheduler
+typealias RealtimeLlfScheduler = scheduler.realtime.RealtimeLlfScheduler
+typealias RealtimeEftScheduler = scheduler.realtime.RealtimeEftScheduler
+typealias RealtimeSrptScheduler = scheduler.realtime.RealtimeSrptScheduler
+typealias RealtimePriorityDeadlineScheduler = scheduler.realtime.RealtimePriorityDeadlineScheduler
 typealias RealtimePSOScheduler = scheduler.realtime.RealtimePSOScheduler
 typealias RealtimeWOAScheduler = scheduler.realtime.RealtimeWOAScheduler
 

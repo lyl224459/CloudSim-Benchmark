@@ -214,6 +214,63 @@ object AlgorithmRegistry {
             ),
             RealtimeAlgorithmDefinition(
                 metadata =
+                    AlgorithmMetadata(
+                        name = "EDF_REALTIME",
+                        displayName = "EDF-Realtime",
+                        aliases = setOf("EDF", "EDF-Realtime", "EDF Realtime"),
+                    ),
+                legacyRealtimeType = RealtimeAlgorithmType.EDF_REALTIME,
+                factory = { vms, _, _, _ -> RealtimeEdfScheduler(vms) },
+            ),
+            RealtimeAlgorithmDefinition(
+                metadata =
+                    AlgorithmMetadata(
+                        name = "LLF_REALTIME",
+                        displayName = "LLF-Realtime",
+                        aliases = setOf("LLF", "LLF-Realtime", "LLF Realtime"),
+                    ),
+                legacyRealtimeType = RealtimeAlgorithmType.LLF_REALTIME,
+                factory = { vms, _, _, _ -> RealtimeLlfScheduler(vms) },
+            ),
+            RealtimeAlgorithmDefinition(
+                metadata =
+                    AlgorithmMetadata(
+                        name = "EFT_REALTIME",
+                        displayName = "EFT-Realtime",
+                        aliases = setOf("EFT", "EFT-Realtime", "EFT Realtime"),
+                    ),
+                legacyRealtimeType = RealtimeAlgorithmType.EFT_REALTIME,
+                factory = { vms, _, _, _ -> RealtimeEftScheduler(vms) },
+            ),
+            RealtimeAlgorithmDefinition(
+                metadata =
+                    AlgorithmMetadata(
+                        name = "SRPT_REALTIME",
+                        displayName = "SRPT-Realtime",
+                        aliases = setOf("SRPT", "SRPT-Realtime", "SRPT Realtime"),
+                    ),
+                legacyRealtimeType = RealtimeAlgorithmType.SRPT_REALTIME,
+                factory = { vms, _, _, _ -> RealtimeSrptScheduler(vms) },
+            ),
+            RealtimeAlgorithmDefinition(
+                metadata =
+                    AlgorithmMetadata(
+                        name = "PRIORITY_DEADLINE_REALTIME",
+                        displayName = "Priority-Deadline-Realtime",
+                        aliases =
+                            setOf(
+                                "PRIORITY_DEADLINE",
+                                "PRIORITY-DEADLINE",
+                                "PRIORITY DEADLINE",
+                                "PRIORITY-DEADLINE-Realtime",
+                                "PRIORITY DEADLINE Realtime",
+                            ),
+                    ),
+                legacyRealtimeType = RealtimeAlgorithmType.PRIORITY_DEADLINE_REALTIME,
+                factory = { vms, _, _, _ -> RealtimePriorityDeadlineScheduler(vms) },
+            ),
+            RealtimeAlgorithmDefinition(
+                metadata =
                     optimizerMetadata(
                         name = "PSO_REALTIME",
                         displayName = "PSO-Realtime",

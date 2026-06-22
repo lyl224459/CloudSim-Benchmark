@@ -46,6 +46,31 @@ maxIter = 100
 enabled = true
 description = "最小负载调度算法（基准）"
 
+# EDF_REALTIME 是最早截止时间实时基准，不使用 population/maxIter。
+[algorithms.EDF_REALTIME]
+enabled = true
+description = "最早截止时间实时调度基准"
+
+# LLF_REALTIME 是最小松弛时间实时基准，不使用 population/maxIter。
+[algorithms.LLF_REALTIME]
+enabled = true
+description = "最小松弛时间实时调度基准"
+
+# EFT_REALTIME 是最早完成时间实时基准，不使用 population/maxIter。
+[algorithms.EFT_REALTIME]
+enabled = true
+description = "最早完成时间实时调度基准"
+
+# SRPT_REALTIME 是最短剩余处理时间实时基准，不使用 population/maxIter。
+[algorithms.SRPT_REALTIME]
+enabled = true
+description = "最短剩余处理时间实时调度基准"
+
+# PRIORITY_DEADLINE_REALTIME 是优先级/截止时间混合实时基准，不使用 population/maxIter。
+[algorithms.PRIORITY_DEADLINE_REALTIME]
+enabled = true
+description = "优先级和截止时间混合实时调度基准"
+
 # PSO_REALTIME 是实时粒子群优化算法，参数控制实时候选搜索规模。
 [algorithms.PSO_REALTIME]
 enabled = true
@@ -74,4 +99,14 @@ algorithms = ["RANDOM", "PSO", "WOA", "GWO", "HHO", "IMPROVED_RL"]
 
 # 实时调度 preset：覆盖实时基准和实时优化算法。
 [presets.realtime_test]
-algorithms = ["MIN_LOAD", "RANDOM", "PSO_REALTIME", "WOA_REALTIME"]
+algorithms = [
+  "MIN_LOAD",
+  "RANDOM",
+  "EDF_REALTIME",
+  "LLF_REALTIME",
+  "EFT_REALTIME",
+  "SRPT_REALTIME",
+  "PRIORITY_DEADLINE_REALTIME",
+  "PSO_REALTIME",
+  "WOA_REALTIME",
+]

@@ -63,3 +63,31 @@ cloudletCount = 200
 simulationDuration = 500.0
 # 平均任务到达率；越高表示负载越重。
 arrivalRate = 5.0
+
+# 实时轻量基线 profile：用于单独比较不依赖 population/maxIter 的确定性基线。
+[profiles.realtime_baselines]
+# realtime 表示动态到达的实时调度实验。
+mode = "realtime"
+# 只包含轻量 realtime baseline，适合快速判断 deadline/队列/抢占策略的影响。
+algorithms = [
+  "MIN_LOAD",
+  "RANDOM",
+  "EDF_REALTIME",
+  "LLF_REALTIME",
+  "EFT_REALTIME",
+  "SRPT_REALTIME",
+  "PRIORITY_DEADLINE_REALTIME",
+]
+# 每个算法运行 3 次，便于和 realtime_compare profile 的统计口径一致。
+runs = 3
+# 当前 profile 输出目录。
+outputDir = "runs/realtime_baselines"
+
+# realtime 参数。
+[profiles.realtime_baselines.realtime]
+# 实时任务总数。
+cloudletCount = 200
+# 仿真持续时间，单位为模拟时间。
+simulationDuration = 500.0
+# 平均任务到达率；越高表示负载越重。
+arrivalRate = 5.0

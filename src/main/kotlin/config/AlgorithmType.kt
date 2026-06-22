@@ -19,6 +19,11 @@ enum class BatchAlgorithmType {
 enum class RealtimeAlgorithmType {
     MIN_LOAD, // 最小负载调度
     RANDOM, // 随机调度
+    EDF_REALTIME, // 最早截止时间实时调度
+    LLF_REALTIME, // 最小松弛时间实时调度
+    EFT_REALTIME, // 最早完成时间实时调度
+    SRPT_REALTIME, // 最短剩余处理时间实时调度
+    PRIORITY_DEADLINE_REALTIME, // 优先级和截止时间混合实时调度
     PSO_REALTIME, // PSO实时调度
     WOA_REALTIME, // WOA实时调度
 }

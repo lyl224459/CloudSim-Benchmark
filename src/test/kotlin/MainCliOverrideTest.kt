@@ -376,6 +376,7 @@ class MainCliOverrideTest {
 
         assertEquals(BatchAlgorithmType.RANDOM, RunResolver.parseBatchAlgorithms(listOf("RANDOM")).single())
         assertEquals(RealtimeAlgorithmType.MIN_LOAD, RunResolver.parseRealtimeAlgorithms(listOf("MIN_LOAD")).single())
+        assertEquals(RealtimeAlgorithmType.EDF_REALTIME, RunResolver.parseRealtimeAlgorithms(listOf("EDF")).single())
         assertEquals("batch_20260615_RANDOM", RunResolver.renderExperimentName(resolved, "20260615"))
         assertEquals(
             "batch-multi_20260615_RANDOM_none_50-100",

@@ -109,7 +109,7 @@ config print --config FILE [--profile NAME]
 
 `--algorithms ALL` 会展开当前 mode 下所有启用算法。batch 与 realtime 算法能力是强类型分离的：
 
-- batch mode 不接受 `MIN_LOAD`、`PSO_REALTIME`、`WOA_REALTIME`。
+- batch mode 不接受 `MIN_LOAD`、`EDF_REALTIME`、`LLF_REALTIME`、`EFT_REALTIME`、`SRPT_REALTIME`、`PRIORITY_DEADLINE_REALTIME`、`PSO_REALTIME`、`WOA_REALTIME`。
 - realtime mode 不接受 `PSO`、`WOA`、`GWO`、`HHO`、`RL`、`IMPROVED_RL`。
 
 常用 batch 算法：
@@ -121,10 +121,10 @@ RANDOM, PSO, WOA, GWO, HHO, RL, IMPROVED_RL
 常用 realtime 算法：
 
 ```text
-MIN_LOAD, RANDOM, PSO_REALTIME, WOA_REALTIME
+MIN_LOAD, RANDOM, EDF_REALTIME, LLF_REALTIME, EFT_REALTIME, SRPT_REALTIME, PRIORITY_DEADLINE_REALTIME, PSO_REALTIME, WOA_REALTIME
 ```
 
-算法别名由 `AlgorithmRegistry` 统一解析，例如 `RAND`、`MINLOAD`、`MIN-LOAD`。
+算法别名由 `AlgorithmRegistry` 统一解析，例如 `RAND`、`MINLOAD`、`MIN-LOAD`、`EDF`、`LLF`、`EFT`、`SRPT`、`PRIORITY_DEADLINE`。
 
 ## Task Counts
 

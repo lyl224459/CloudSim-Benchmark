@@ -11,7 +11,7 @@ CloudSim-Benchmark 是一个基于 CloudSim Plus 和 Kotlin 的云任务调度�
 这个仓库适合用来：
 
 - 对比 `RANDOM`、`PSO`、`WOA`、`GWO`、`HHO`、`RL`、`IMPROVED_RL` 等批处理算法。
-- 验证 `MIN_LOAD`、`RANDOM`、`PSO_REALTIME`、`WOA_REALTIME` 等实时调度算法。
+- 验证 `MIN_LOAD`、`RANDOM`、`EDF_REALTIME`、`LLF_REALTIME`、`EFT_REALTIME`、`SRPT_REALTIME`、`PRIORITY_DEADLINE_REALTIME`、`PSO_REALTIME`、`WOA_REALTIME` 等实时调度算法。
 - 通过 TOML profile 固化实验参数，并用 `--dry-run` 保存可复现实验配置。
 - 生成 trial CSV、summary CSV、resolved config、实时指标、性能趋势和 release manifest。
 - 在 CI 中验证 CloudSim Plus 锁定版本、构建逻辑、许可证、SBOM、attestation 和发布包。
