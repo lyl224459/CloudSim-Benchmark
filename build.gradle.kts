@@ -35,7 +35,7 @@ import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
     kotlin("jvm") version "2.3.21"
-    kotlin("plugin.serialization") version "2.3.21"
+    kotlin("plugin.serialization") version "2.4.0"
     application
     jacoco
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
