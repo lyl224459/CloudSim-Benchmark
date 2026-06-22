@@ -25,6 +25,9 @@ DeadlineRejectedCount
 DeadlineDegradedCount
 DeadlineRetryLaterCount
 DeadlineMissAcceptedCount
+DependencyBlockedCount
+DependencyReleasedCount
+DependencyRejectedCount
 RescheduleAttemptCount
 RescheduleSuccessCount
 RescheduleFailureCount
@@ -98,6 +101,9 @@ DeadlineRejectedCount
 DeadlineDegradedCount
 DeadlineRetryLaterCount
 DeadlineMissAcceptedCount
+DependencyBlockedCount
+DependencyReleasedCount
+DependencyRejectedCount
 RescheduleAttemptCount
 RescheduleSuccessCount
 RescheduleFailureCount
@@ -174,6 +180,9 @@ DeadlineRejectedCount_Mean
 DeadlineDegradedCount_Mean
 DeadlineRetryLaterCount_Mean
 DeadlineMissAcceptedCount_Mean
+DependencyBlockedCount_Mean
+DependencyReleasedCount_Mean
+DependencyRejectedCount_Mean
 RescheduleAttemptCount_Mean
 RescheduleSuccessCount_Mean
 RescheduleFailureCount_Mean
@@ -242,6 +251,9 @@ DeadlineRejectedCount_StdDev
 DeadlineDegradedCount_StdDev
 DeadlineRetryLaterCount_StdDev
 DeadlineMissAcceptedCount_StdDev
+DependencyBlockedCount_StdDev
+DependencyReleasedCount_StdDev
+DependencyRejectedCount_StdDev
 RescheduleAttemptCount_StdDev
 RescheduleSuccessCount_StdDev
 RescheduleFailureCount_StdDev
@@ -319,6 +331,9 @@ DeadlineRejectedCount_Mean
 DeadlineDegradedCount_Mean
 DeadlineRetryLaterCount_Mean
 DeadlineMissAcceptedCount_Mean
+DependencyBlockedCount_Mean
+DependencyReleasedCount_Mean
+DependencyRejectedCount_Mean
 RescheduleAttemptCount_Mean
 RescheduleSuccessCount_Mean
 RescheduleFailureCount_Mean
@@ -387,6 +402,9 @@ DeadlineRejectedCount_StdDev
 DeadlineDegradedCount_StdDev
 DeadlineRetryLaterCount_StdDev
 DeadlineMissAcceptedCount_StdDev
+DependencyBlockedCount_StdDev
+DependencyReleasedCount_StdDev
+DependencyRejectedCount_StdDev
 RescheduleAttemptCount_StdDev
 RescheduleSuccessCount_StdDev
 RescheduleFailureCount_StdDev

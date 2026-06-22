@@ -44,6 +44,8 @@ internal interface RealtimeArrivalLifecycleContext {
 
     fun markArrivedAfterInterruption(cloudlet: Cloudlet)
 
+    fun decideDependencyAdmission(cloudlet: Cloudlet): RealtimeDependencyArrivalDecision
+
     fun taskRecord(cloudlet: Cloudlet): RealtimeTaskRecord
 }
 
@@ -127,11 +129,23 @@ internal class RealtimeArrivalWorkflow(
     ): List<RealtimeBrokerCommand> =
         buildList {
             val currentLifecycle = context.lifecycleOf(cloudlet)
+            if (currentLifecycle.isTerminalArrivalLifecycle()) {
+                return@buildList
+            }
             val arrivedAfterInterruption =
                 currentLifecycle == RealtimeTaskLifecycle.RETRYING ||
                     currentLifecycle == RealtimeTaskLifecycle.MIGRATING
             if (arrivedAfterInterruption) {
                 context.markArrivedAfterInterruption(cloudlet)
+            }
+
+            when (val dependencyDecision = context.decideDependencyAdmission(cloudlet)) {
+                RealtimeDependencyArrivalDecision.Ready -> Unit
+                RealtimeDependencyArrivalDecision.Blocked -> return@buildList
+                is RealtimeDependencyArrivalDecision.Rejected -> {
+                    addAll(dependencyDecision.commands)
+                    return@buildList
+                }
             }
 
             context.refreshVmLifecycles(arrivalTime)
@@ -329,3 +343,10 @@ internal class RealtimeSubmissionWorkflow(
         }
     }
 }
+
+private fun RealtimeTaskLifecycle?.isTerminalArrivalLifecycle(): Boolean =
+    this == RealtimeTaskLifecycle.COMPLETED ||
+        this == RealtimeTaskLifecycle.REJECTED ||
+        this == RealtimeTaskLifecycle.FAILED ||
+        this == RealtimeTaskLifecycle.CANCELLED ||
+        this == RealtimeTaskLifecycle.TIMED_OUT

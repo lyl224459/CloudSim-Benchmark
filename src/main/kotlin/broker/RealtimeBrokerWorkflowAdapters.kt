@@ -16,6 +16,7 @@ internal data class RealtimeArrivalCoreServices(
     val readModel: RealtimeBrokerReadModel,
     val vmSelectionFacade: RealtimeVmSelectionFacade,
     val submissionService: RealtimeSubmissionService,
+    val dependencyController: RealtimeDependencyController,
     val metrics: RealtimeBrokerMetrics,
 )
 
@@ -35,6 +36,9 @@ internal class RealtimeArrivalWorkflowAdapter(
     override fun markArrivedAfterInterruption(cloudlet: Cloudlet) {
         core.lifecycleService.markArrivedAfterInterruption(cloudlet)
     }
+
+    override fun decideDependencyAdmission(cloudlet: Cloudlet): RealtimeDependencyArrivalDecision =
+        core.dependencyController.onArrival(cloudlet)
 
     override fun refreshVmLifecycles(currentTime: Double) {
         controls.autoscalingController.refresh(currentTime, activeVmIndexes())

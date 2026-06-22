@@ -128,6 +128,20 @@ data class RealtimeArrivalConfig(
     val distribution: String = "poisson",
     val burstIntensity: Double = 2.0,
     val burstDuration: Double = 50.0,
+    val workloadPattern: String = "standard",
+    val periodSeconds: Double = 1.0,
+    val arrivalJitter: Double = 0.0,
+    val sporadicMinInterArrival: Double = 0.1,
+    val sporadicMaxInterArrival: Double = 1.0,
+    val diurnalPeakMultiplier: Double = 2.0,
+    val diurnalOffPeakMultiplier: Double = 0.5,
+    val shortTaskRatio: Double = 0.8,
+    val shortTaskLengthMultiplier: Double = 0.5,
+    val longTaskLengthMultiplier: Double = 2.0,
+    val runtimeReferenceMips: Double = 1000.0,
+    val dagDepth: Int = 3,
+    val dagWidth: Int = 2,
+    val dagFanOut: Int = 1,
 )
 
 @Serializable
@@ -153,6 +167,7 @@ data class RealtimeSchedulingConfig(
     val reschedulingInterval: Double = 0.0,
     val reschedulingPolicy: String = "deadline_score",
     val maxReschedulesPerTask: Int = 1,
+    val dependencyEnforcementEnabled: Boolean = true,
     val vmQueueCapacity: Int = 0,
     val overloadFailureMultiplier: Double = 0.0,
     val autoscalingEnabled: Boolean = false,
@@ -242,6 +257,8 @@ data class GoogleTraceConfig(
     val maxTasks: Int = 1000,
     val timeWindowStart: Long = 0L,
     val timeWindowEnd: Long = Long.MAX_VALUE,
+    val normalizeTimestamps: Boolean = true,
+    val timestampDivisor: Double = 1_000_000.0,
 )
 
 @Serializable

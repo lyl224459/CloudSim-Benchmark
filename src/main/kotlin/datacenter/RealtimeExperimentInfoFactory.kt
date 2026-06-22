@@ -27,6 +27,7 @@ internal object RealtimeExperimentInfoFactory {
         this["仿真持续时间"] = config.simulationDuration
         this["到达率"] = config.arrivalRate
         this["到达分布"] = config.arrival.distribution
+        this["负载模式"] = config.arrival.workloadPattern
         this["调度策略"] = config.scheduling.strategy
         this["随机数种子"] = randomSeed
         this["运行次数"] = runs
@@ -49,6 +50,7 @@ internal object RealtimeExperimentInfoFactory {
         this["优先级层级"] = scheduling.priorityLevels
         this["高优先级比例"] = scheduling.highPriorityRatio
         this["SLA deadline 系数"] = scheduling.deadlineFactor
+        this["依赖强约束"] = scheduling.dependencyEnforcementEnabled
         this["单 VM 队列容量"] = scheduling.vmQueueCapacity
         this["过载失败倍率"] = scheduling.overloadFailureMultiplier
     }

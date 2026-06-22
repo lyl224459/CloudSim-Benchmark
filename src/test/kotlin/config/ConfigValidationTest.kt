@@ -188,6 +188,66 @@ class ConfigValidationTest {
     }
 
     @Test
+    fun `should validate realtime workload parameters`() {
+        assertInvalidRealtimeArrivalFields(
+            arrival =
+                RealtimeArrivalConfig(
+                    distribution = "calendar",
+                    workloadPattern = "mesh",
+                    periodSeconds = 0.0,
+                    arrivalJitter = -0.1,
+                    sporadicMinInterArrival = 0.0,
+                    sporadicMaxInterArrival = -1.0,
+                    diurnalPeakMultiplier = 0.0,
+                    diurnalOffPeakMultiplier = 0.0,
+                    shortTaskRatio = 1.5,
+                    shortTaskLengthMultiplier = 0.0,
+                    longTaskLengthMultiplier = 0.0,
+                    runtimeReferenceMips = 0.0,
+                    dagDepth = 0,
+                    dagWidth = 0,
+                    dagFanOut = 0,
+                ),
+            expectedFields =
+                listOf(
+                    "distribution",
+                    "workloadPattern",
+                    "periodSeconds",
+                    "arrivalJitter",
+                    "sporadicMinInterArrival",
+                    "sporadicMaxInterArrival",
+                    "diurnalPeakMultiplier",
+                    "diurnalOffPeakMultiplier",
+                    "shortTaskRatio",
+                    "shortTaskLengthMultiplier",
+                    "longTaskLengthMultiplier",
+                    "runtimeReferenceMips",
+                    "dagDepth",
+                    "dagWidth",
+                    "dagFanOut",
+                ),
+        )
+    }
+
+    @Test
+    fun `should accept new realtime workload distributions and patterns`() {
+        val defaults = ExperimentConfig.createDefault()
+        val config =
+            defaults.copy(
+                realtime =
+                    defaults.realtime.copy(
+                        arrival =
+                            RealtimeArrivalConfig(
+                                distribution = "diurnal_burst",
+                                workloadPattern = "dag_layered",
+                            ),
+                    ),
+            )
+
+        ExperimentConfig.validate(config)
+    }
+
+    @Test
     fun `should validate realtime reliability parameters`() {
         assertInvalidRealtimeFields(
             scheduling =
@@ -404,6 +464,8 @@ class ConfigValidationTest {
                 maxTasks = 100,
                 timeWindowStart = 1000L,
                 timeWindowEnd = 2000L,
+                normalizeTimestamps = false,
+                timestampDivisor = 1000.0,
             )
 
         // When - Then
@@ -411,6 +473,26 @@ class ConfigValidationTest {
         assertThat(config.maxTasks).isEqualTo(100)
         assertThat(config.timeWindowStart).isEqualTo(1000L)
         assertThat(config.timeWindowEnd).isEqualTo(2000L)
+        assertThat(config.normalizeTimestamps).isFalse()
+        assertThat(config.timestampDivisor).isEqualTo(1000.0)
+    }
+
+    @Test
+    fun `should validate google trace timestamp divisor`() {
+        val defaults = ExperimentConfig.createDefault()
+        val invalidConfig =
+            defaults.copy(
+                realtime =
+                    defaults.realtime.copy(
+                        googleTraceConfig = GoogleTraceConfig(timestampDivisor = 0.0),
+                    ),
+            )
+        val error =
+            org.junit.jupiter.api.assertThrows<ConfigValidationException> {
+                ExperimentConfig.validate(invalidConfig)
+            }
+
+        assertThat(error.errors.map { it.field }).contains("realtime.googleTrace.timestampDivisor")
     }
 
     private fun assertInvalidRealtimeFields(
@@ -424,6 +506,22 @@ class ConfigValidationTest {
                 ExperimentConfig.validate(invalidConfig)
             }
         val fieldPrefix = "realtime.scheduling."
+
+        assertThat(error.errors.map { it.field })
+            .containsExactlyElementsOf(expectedFields.map { "$fieldPrefix$it" })
+    }
+
+    private fun assertInvalidRealtimeArrivalFields(
+        arrival: RealtimeArrivalConfig,
+        expectedFields: List<String>,
+    ) {
+        val defaults = ExperimentConfig.createDefault()
+        val invalidConfig = defaults.copy(realtime = defaults.realtime.copy(arrival = arrival))
+        val error =
+            org.junit.jupiter.api.assertThrows<ConfigValidationException> {
+                ExperimentConfig.validate(invalidConfig)
+            }
+        val fieldPrefix = "realtime.arrival."
 
         assertThat(error.errors.map { it.field })
             .containsExactlyElementsOf(expectedFields.map { "$fieldPrefix$it" })

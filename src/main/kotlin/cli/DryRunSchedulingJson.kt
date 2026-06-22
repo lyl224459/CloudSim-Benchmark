@@ -28,6 +28,7 @@ internal fun JsonObjectBuilder.putRealtimeScheduling(scheduling: RealtimeSchedul
         put("reschedulingInterval", scheduling.reschedulingInterval)
         put("reschedulingPolicy", scheduling.reschedulingPolicy)
         put("maxReschedulesPerTask", scheduling.maxReschedulesPerTask)
+        put("dependencyEnforcementEnabled", scheduling.dependencyEnforcementEnabled)
         put("vmQueueCapacity", scheduling.vmQueueCapacity)
         put("overloadFailureMultiplier", scheduling.overloadFailureMultiplier)
         put("autoscalingEnabled", scheduling.autoscalingEnabled)

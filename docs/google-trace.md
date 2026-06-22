@@ -28,6 +28,8 @@ filePath = "data/google_trace/task_events.csv"
 maxTasks = 1000
 timeWindowStart = 0
 timeWindowEnd = 9223372036854775807
+normalizeTimestamps = true
+timestampDivisor = 1000000.0
 ```
 
 默认值：
@@ -38,6 +40,16 @@ timeWindowEnd = 9223372036854775807
 | `maxTasks` | `1000` |
 | `timeWindowStart` | `0` |
 | `timeWindowEnd` | `Long.MAX_VALUE` |
+| `normalizeTimestamps` | `true` |
+| `timestampDivisor` | `1000000.0` |
+
+在 realtime 模式中，trace timestamp 会映射为 cloudlet 原始 `submissionDelay`。默认计算方式：
+
+```text
+arrivalTimestamp = (timestamp - firstTimestamp) / timestampDivisor
+```
+
+如果 `normalizeTimestamps = false`，则使用 `timestamp / timestampDivisor`。batch 模式仍只使用 trace-derived cloudlets 做静态调度。
 
 ## Expected Input
 
@@ -122,6 +134,8 @@ Trace 字段会映射为 realtime metadata：
 | `imageId` | `trace-image-${jobId modulo 16}` |
 | `imageSize` | memory request * 1024, fallback 1.0 |
 | `retryHint` | 1 for evict/fail/kill/lost, otherwise 0 |
+| `arrivalTimestamp` | normalized trace timestamp in simulation seconds |
+| `expectedDuration` | cloudlet length divided by `1000.0` |
 
 Negative memory/disk values are coerced where used for size fields. Missing resource requests can still produce a runnable cloudlet.
 

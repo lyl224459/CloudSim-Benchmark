@@ -30,6 +30,9 @@
 | DeadlineDegradedCount | count | 越低越好 | deadline miss 后按降级策略继续提交的任务数。 |
 | DeadlineRetryLaterCount | count | 越低越好 | deadline miss 后被重新排队等待再次 admission 的次数。 |
 | DeadlineMissAcceptedCount | count | 越低越好 | deadline miss 但按 accept 策略继续提交的任务数。 |
+| DependencyBlockedCount | count | 越低越好 | DAG 依赖未满足而暂缓进入调度链路的任务数。 |
+| DependencyReleasedCount | count | 越高越好 | 前驱全部成功后被释放回实时调度链路的任务数。 |
+| DependencyRejectedCount | count | 越低越好 | 因前驱失败、拒绝、取消或超时而被级联拒绝的任务数。 |
 | RescheduleAttemptCount | count | 越低越好 | 周期性重调度检查中尝试重新安排任务的次数。 |
 | RescheduleSuccessCount | count | 越高越好 | 周期性重调度成功迁移或重排到新 VM 的次数。 |
 | RescheduleFailureCount | count | 越低越好 | 周期性重调度尝试后未找到更优 VM 或未执行迁移的次数。 |

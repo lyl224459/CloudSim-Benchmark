@@ -93,6 +93,21 @@ class GoogleTraceCloudletSpecFactoryTest {
         assertThat(spec.traceMetadata?.retryHint).isZero()
     }
 
+    @Test
+    fun `trace metadata includes normalized arrival timestamp and expected duration`() {
+        val spec =
+            GoogleTraceCloudletSpecFactory.create(
+                record {
+                    cpuRequest = 0.5
+                    priority = 2
+                },
+                arrivalTimestamp = 12.5,
+            )
+
+        assertThat(spec.traceMetadata?.arrivalTimestamp).isEqualTo(12.5)
+        assertThat(spec.traceMetadata?.expectedDuration).isEqualTo(spec.cloudlet.length / 1000.0)
+    }
+
     private fun record(configure: TraceRecordFixture.() -> Unit = {}): GoogleTraceRecord {
         val fixture = TraceRecordFixture().apply(configure)
         return GoogleTraceRecord(

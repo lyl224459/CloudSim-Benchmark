@@ -7,6 +7,7 @@ import org.cloudsimplus.utilizationmodels.UtilizationModelDynamic
 
 private const val DEFAULT_CPU_REQUEST = 0.5
 private const val BASE_CLOUDLET_LENGTH = 100_000L
+private const val TRACE_RUNTIME_REFERENCE_MIPS = 1000.0
 private const val PRIORITY_LENGTH_BASE = 1.0
 private const val PRIORITY_LENGTH_WEIGHT = 0.1
 private const val CLOUDLET_PES = 1
@@ -32,7 +33,10 @@ private val retryHintEvents =
     )
 
 internal object GoogleTraceCloudletSpecFactory {
-    fun create(record: GoogleTraceRecord): RealtimeCloudletSpec {
+    fun create(
+        record: GoogleTraceRecord,
+        arrivalTimestamp: Double? = null,
+    ): RealtimeCloudletSpec {
         val cloudlet =
             CloudletSimple(cloudletLength(record), CLOUDLET_PES)
                 .setFileSize(CLOUDLET_FILE_SIZE)
@@ -41,7 +45,7 @@ internal object GoogleTraceCloudletSpecFactory {
                 .setPriority(record.priority)
         return RealtimeCloudletSpec(
             cloudlet,
-            traceMetadata = traceMetadata(record),
+            traceMetadata = traceMetadata(record, arrivalTimestamp),
         )
     }
 
@@ -53,8 +57,13 @@ internal object GoogleTraceCloudletSpecFactory {
         return (BASE_CLOUDLET_LENGTH * cpuRequest * priorityMultiplier).toLong()
     }
 
-    private fun traceMetadata(record: GoogleTraceRecord): RealtimeTraceMetadata =
+    private fun traceMetadata(
+        record: GoogleTraceRecord,
+        arrivalTimestamp: Double? = null,
+    ): RealtimeTraceMetadata =
         RealtimeTraceMetadata(
+            arrivalTimestamp = arrivalTimestamp,
+            expectedDuration = cloudletLength(record).toDouble() / TRACE_RUNTIME_REFERENCE_MIPS,
             tenantKey = record.userName,
             tenantId = record.userName?.let(::stableTenantId),
             priority = record.priority,

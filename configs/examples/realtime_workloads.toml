@@ -1,0 +1,140 @@
+# 实时 workload 示例：覆盖周期、sporadic、昼夜突发、长短混合任务和 DAG 依赖。
+# 可运行：.\run.cmd list profiles --config configs/examples/realtime_workloads.toml
+
+# 默认运行 DAG 场景，便于验证依赖阻塞和释放链路。
+defaultProfile = "realtime_dag"
+
+# 输出设置。
+[output]
+# 基础结果目录。
+resultsDir = "runs"
+
+[output.csv]
+# 启用 CSV 输出。
+enabled = true
+# CSV 分隔符。
+delimiter = ","
+
+# 日志设置。
+[logging]
+# 常规日志级别。
+level = "INFO"
+# 写文件日志。
+file = true
+# 输出控制台日志。
+console = true
+
+# 实验运行设置。
+[experiment]
+# 自动创建输出目录。
+autoCreateDirs = true
+# 实时 workload 实验目录命名模板。
+nameFormat = "realtime_workload_{timestamp}_{algorithms}"
+# 最大并发数。
+maxConcurrent = 2
+
+# 随机种子。
+[random]
+# 固定 seed，保证 workload 生成可复现。
+seed = 42
+
+# 周期任务场景：固定周期到达，带少量 jitter。
+[profiles.realtime_periodic]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_periodic"
+
+[profiles.realtime_periodic.realtime]
+cloudletCount = 80
+simulationDuration = 160.0
+arrivalRate = 2.0
+
+[profiles.realtime_periodic.realtime.arrival]
+distribution = "periodic"
+periodSeconds = 1.5
+arrivalJitter = 0.2
+workloadPattern = "standard"
+
+# Sporadic 场景：在最小/最大间隔内采样，到达时间保持有序。
+[profiles.realtime_sporadic]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_sporadic"
+
+[profiles.realtime_sporadic.realtime]
+cloudletCount = 80
+simulationDuration = 180.0
+arrivalRate = 2.0
+
+[profiles.realtime_sporadic.realtime.arrival]
+distribution = "sporadic"
+sporadicMinInterArrival = 0.5
+sporadicMaxInterArrival = 3.0
+workloadPattern = "standard"
+
+# 昼夜突发场景：用仿真时长作为一个周期调制到达率。
+[profiles.realtime_diurnal]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_diurnal"
+
+[profiles.realtime_diurnal.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 2.5
+
+[profiles.realtime_diurnal.realtime.arrival]
+distribution = "diurnal_burst"
+diurnalPeakMultiplier = 2.4
+diurnalOffPeakMultiplier = 0.4
+workloadPattern = "standard"
+
+# 长短任务混合场景：按比例生成短任务和长任务。
+[profiles.realtime_mixed]
+mode = "realtime"
+algorithms = ["SRPT_REALTIME", "EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_mixed"
+
+[profiles.realtime_mixed.realtime]
+cloudletCount = 100
+simulationDuration = 220.0
+arrivalRate = 3.0
+
+[profiles.realtime_mixed.realtime.arrival]
+distribution = "poisson"
+workloadPattern = "mixed_short_long"
+shortTaskRatio = 0.75
+shortTaskLengthMultiplier = 0.45
+longTaskLengthMultiplier = 2.2
+runtimeReferenceMips = 1000.0
+
+# DAG 场景：生成分层 workflow，依赖未完成的后继会被 broker 阻塞。
+[profiles.realtime_dag]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_dag"
+
+[profiles.realtime_dag.realtime]
+cloudletCount = 36
+simulationDuration = 180.0
+arrivalRate = 4.0
+
+[profiles.realtime_dag.realtime.arrival]
+distribution = "periodic"
+periodSeconds = 0.8
+arrivalJitter = 0.1
+workloadPattern = "dag_layered"
+runtimeReferenceMips = 1000.0
+dagDepth = 4
+dagWidth = 3
+dagFanOut = 2
+
+[profiles.realtime_dag.realtime.scheduling]
+dependencyEnforcementEnabled = true
+deadlineFactor = 2.0
+queuePolicy = "deadline"

@@ -42,6 +42,7 @@ value class DatacenterId(
 
 enum class RealtimeTaskLifecycle {
     ARRIVED,
+    DEPENDENCY_BLOCKED,
     PENDING_DECISION,
     SUBMITTED,
     RUNNING,
@@ -60,6 +61,10 @@ sealed interface RealtimeTaskState {
 
     data object Arrived : RealtimeTaskState {
         override val lifecycle = RealtimeTaskLifecycle.ARRIVED
+    }
+
+    data object DependencyBlocked : RealtimeTaskState {
+        override val lifecycle = RealtimeTaskLifecycle.DEPENDENCY_BLOCKED
     }
 
     data object PendingDecision : RealtimeTaskState {
@@ -114,6 +119,7 @@ sealed interface RealtimeTaskState {
         fun fromLifecycle(lifecycle: RealtimeTaskLifecycle): RealtimeTaskState =
             when (lifecycle) {
                 RealtimeTaskLifecycle.ARRIVED -> Arrived
+                RealtimeTaskLifecycle.DEPENDENCY_BLOCKED -> DependencyBlocked
                 RealtimeTaskLifecycle.PENDING_DECISION -> PendingDecision
                 RealtimeTaskLifecycle.SUBMITTED -> Submitted
                 RealtimeTaskLifecycle.RUNNING -> Running
@@ -135,6 +141,11 @@ data class RealtimeTaskRecord(
     val attempt: Int = 0,
     val priority: Int = 0,
     val deadline: Double? = null,
+    val expectedDuration: Double? = null,
+    val dependencyIds: List<Long> = emptyList(),
+    val workflowId: String? = null,
+    val stageIndex: Int? = null,
+    val workloadClass: String? = null,
     val assignedVmIndex: Int? = null,
     val lastDecisionDelay: Double = 0.0,
     val lifecycle: RealtimeTaskLifecycle = RealtimeTaskLifecycle.ARRIVED,

@@ -66,6 +66,12 @@ internal class RealtimeBrokerScalarMetricsView(
 
     fun deadlineMissAcceptedCount(): Int = metrics.deadlineMissAcceptedCount
 
+    fun dependencyBlockedCount(): Int = metrics.dependencyBlockedCount
+
+    fun dependencyReleasedCount(): Int = metrics.dependencyReleasedCount
+
+    fun dependencyRejectedCount(): Int = metrics.dependencyRejectedCount
+
     fun rescheduleAttemptCount(): Int = metrics.rescheduleAttemptCount
 
     fun rescheduleSuccessCount(): Int = metrics.rescheduleSuccessCount

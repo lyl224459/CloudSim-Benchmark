@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test
 import scheduler.RealtimeMinLoadScheduler
 import scheduler.RealtimeSchedulerBase
 import scheduler.RealtimeSchedulingContext
+import scheduler.RealtimeTaskLifecycle
 
 class RealtimeBrokerCloudSemanticsTest {
     @Test
@@ -125,6 +126,64 @@ class RealtimeBrokerCloudSemanticsTest {
         assertThat(fixture.broker.getDeadlineDegradedCount()).isEqualTo(1)
         assertThat(fixture.broker.getSubmittedCount()).isEqualTo(1)
         assertThat(fixture.broker.getSlaViolationCount(listOf(cloudlet))).isEqualTo(1)
+    }
+
+    @Test
+    fun `dependency blocked task is released after predecessor succeeds`() {
+        val fixture = brokerFixture()
+        val predecessor = createCloudlet(id = 0, length = 1000, submissionDelay = 0.1)
+        val dependent = createCloudlet(id = 1, length = 1000, submissionDelay = 0.1)
+
+        fixture.broker.submitCloudletSpecsRealtime(
+            listOf(
+                RealtimeCloudletSpec(predecessor),
+                RealtimeCloudletSpec(
+                    dependent,
+                    RealtimeTraceMetadata(dependencyIds = listOf(predecessor.id)),
+                ),
+            ),
+        )
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getDependencyBlockedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getDependencyReleasedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getDependencyRejectedCount()).isZero()
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(2)
+        assertThat(fixture.broker.getTaskMetadata(dependent)?.lifecycle).isEqualTo(RealtimeTaskLifecycle.COMPLETED)
+    }
+
+    @Test
+    fun `dependency blocked task is rejected when predecessor permanently fails`() {
+        val fixture =
+            brokerFixture(
+                RealtimeSchedulingConfig(
+                    failureRate = 1.0,
+                    retryLimit = 0,
+                    decisionDelay = 0.1,
+                ),
+            )
+        val predecessor = createCloudlet(id = 0, length = 1000, submissionDelay = 0.1)
+        val dependent = createCloudlet(id = 1, length = 1000, submissionDelay = 0.1)
+
+        fixture.broker.submitCloudletSpecsRealtime(
+            listOf(
+                RealtimeCloudletSpec(predecessor),
+                RealtimeCloudletSpec(
+                    dependent,
+                    RealtimeTraceMetadata(dependencyIds = listOf(predecessor.id)),
+                ),
+            ),
+        )
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getDependencyBlockedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getDependencyReleasedCount()).isZero()
+        assertThat(fixture.broker.getDependencyRejectedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getRejectedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getRetryCount()).isZero()
+        assertThat(fixture.broker.getTaskMetadata(dependent)?.lifecycle).isEqualTo(RealtimeTaskLifecycle.REJECTED)
     }
 
     @Test

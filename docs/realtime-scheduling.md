@@ -8,6 +8,7 @@
 RealtimeCloudletGenerator
   -> CloudSim arrival event
   -> RealtimeBroker.processEvent
+  -> dependency gate
   -> admission / metadata / candidate snapshot
   -> RealtimeScheduler.scheduleOnArrival
   -> accepted VM index or rejection
@@ -27,11 +28,16 @@ RealtimeCloudletGenerator
 | `cloudletCount` | 总任务数。 |
 | `simulationDuration` | 实时仿真持续时间。 |
 | `arrivalRate` | 平均到达率。 |
-| `arrival.distribution` | 到达分布，目前配置层保留 `poisson` 等值。 |
+| `arrival.distribution` | 到达分布：`poisson`、`uniform`、`burst`、`periodic`、`sporadic`、`diurnal_burst`。 |
 | `arrival.burstIntensity` | burst 到达强度。 |
 | `arrival.burstDuration` | burst 持续时间。 |
+| `arrival.workloadPattern` | 负载模式：`standard`、`mixed_short_long`、`dag_chain`、`dag_layered`。 |
 
 到达模型决定任务何时进入 broker。默认情况下调度器只在任务到达时做选择，不会像 batch 一样一次性看到全部未来任务；启用周期性重调度后，broker 会在后续 tick 中重新评估未终止任务。
+
+`periodic` 使用 `periodSeconds` 和可选 `arrivalJitter` 生成固定周期任务；`sporadic` 在 `sporadicMinInterArrival` 与 `sporadicMaxInterArrival` 之间采样；`diurnal_burst` 用仿真时长作为一个周期，并通过 `diurnalPeakMultiplier`、`diurnalOffPeakMultiplier` 调制到达率。
+
+`mixed_short_long` 会按 `shortTaskRatio` 调整 cloudlet length，并把 `expectedDuration`、`workloadClass` 写入 realtime metadata。`dag_chain` 和 `dag_layered` 会写入 `workflowId`、`stageIndex`、`dependencyIds`，供 broker 的依赖控制器使用。
 
 ## Queue Policy
 
@@ -100,6 +106,23 @@ deadline admission 在 scheduler 选择 VM 前使用 realtime score 中的 proje
 
 pending 任务会废弃旧 pending reservation 和旧 submit token，再按新的 `decisionDelay + decisionJitter` 安排提交。waiting/running 任务会先中断当前执行片段，按 checkpoint 估算剩余长度；如果 `migrationDelay > 0`，该延迟会叠加到新的 pending submission，并计入 migration 指标。重调度不增加 `RetryCount`，而是使用 `RescheduleAttemptCount`、`RescheduleSuccessCount`、`RescheduleFailureCount` 和 `AvgRescheduleDelay` 单独观测。
 
+## DAG Dependency Enforcement
+
+`dependencyEnforcementEnabled` 默认开启，但只有任务 metadata 中存在 `dependencyIds` 时才生效。没有依赖 metadata 的旧 workload 仍按 arrival-only 流程进入准入和 VM 选择。
+
+DAG 强约束语义：
+
+- 任务到达后，如果任一前驱未成功完成，broker 将任务标记为 `DEPENDENCY_BLOCKED`，不进入租户、容量、deadline admission、VM 选择、retry 或 reschedule。
+- 前驱成功完成后，所有依赖已满足的 blocked 后继会以 delay `0.0` 重新进入 arrival workflow；原始 arrival time 不重写，因此响应时间和 deadline 仍包含依赖等待。
+- 任一前驱失败、拒绝、取消或超时，后继会按 `DEPENDENCY` 原因拒绝，并级联处理其下游，避免 blocked 任务无限等待。
+- `dependencyEnforcementEnabled = false` 时，broker 忽略 dependency metadata，任务按普通实时任务处理。
+
+相关指标：
+
+- `DependencyBlockedCount`
+- `DependencyReleasedCount`
+- `DependencyRejectedCount`
+
 ## Admission And Rejection
 
 broker 可以因为多种原因拒绝任务或候选 VM：
@@ -109,6 +132,7 @@ broker 可以因为多种原因拒绝任务或候选 VM：
 | resource | RAM/BW/IO/CPU 需求超过候选容量。 |
 | capacity | VM 队列容量满。 |
 | deadline | deadline admission 判定所有候选都会 miss，且 miss action 要求拒绝。 |
+| dependency | DAG 前驱失败、拒绝、取消或超时，导致后继级联拒绝。 |
 | tenant | 租户 quota、budget 或 fairness 约束。 |
 | topology | 拓扑策略、故障域或数据本地性不满足。 |
 
@@ -290,6 +314,7 @@ Realtime PSO/WOA 只在 accepted candidates 上优化。返回值最终必须是
 | :--- | :--- |
 | Overload | queue depth、rejected、timeout、failed。 |
 | SLA | SLA violation、SLA penalty、average waiting/response time。 |
+| DAG dependency | dependency blocked/released/rejected、response time、deadline slack。 |
 | Tenant fairness | Jain index、DRF、tenant SLA penalty、fairness violation。 |
 | Topology | topology cost、latency、cross-region/rack placement。 |
 | Autoscaling | dynamic VM peak、cold start delay、autoscaling cost。 |

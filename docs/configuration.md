@@ -129,10 +129,37 @@ maxIter = 50
 实时 profile 的 realtime 子段控制到达、调度、资源、租户和拓扑策略。示例文件：
 
 - `configs/examples/realtime_test.toml`
+- `configs/examples/realtime_workloads.toml`
 - `configs/examples/single_config_example.toml`
 - `configs/experiments/google_trace_test.toml`
 
 实时指标字段见 [realtime-metrics.md](realtime-metrics.md)。实时调度模型、策略和指标使用建议见 [realtime-scheduling.md](realtime-scheduling.md)。
+
+### Realtime Arrival And Workload
+
+到达分布写在 `[profiles.NAME.realtime.arrival]`。默认 `distribution = "poisson"`、`workloadPattern = "standard"`，旧配置无需修改。
+
+```toml
+[profiles.realtime_dag.realtime.arrival]
+distribution = "periodic"
+periodSeconds = 0.8
+arrivalJitter = 0.1
+workloadPattern = "dag_layered"
+runtimeReferenceMips = 1000.0
+dagDepth = 4
+dagWidth = 3
+dagFanOut = 2
+```
+
+常见 workload：
+
+| Workload | Key Fields | Meaning |
+| :--- | :--- | :--- |
+| periodic | `periodSeconds`、`arrivalJitter` | 固定周期到达，可加 seed 可复现 jitter。 |
+| sporadic | `sporadicMinInterArrival`、`sporadicMaxInterArrival` | 在最小/最大间隔内采样，保持到达时间有序。 |
+| diurnal burst | `diurnalPeakMultiplier`、`diurnalOffPeakMultiplier` | 用仿真时长作为一个昼夜周期调制到达率。 |
+| mixed short/long | `shortTaskRatio`、`shortTaskLengthMultiplier`、`longTaskLengthMultiplier` | 按比例生成长短任务，并写入 expected duration metadata。 |
+| DAG | `dagDepth`、`dagWidth`、`dagFanOut` | 生成 chain 或 layered workflow dependency metadata。 |
 
 ## Realtime Scheduling Subsections
 
@@ -148,6 +175,7 @@ reschedulingEnabled = false
 reschedulingInterval = 0.0
 reschedulingPolicy = "deadline_score"
 maxReschedulesPerTask = 1
+dependencyEnforcementEnabled = true
 taskTimeout = 20.0
 timeoutAction = "retry"
 retryLimit = 1
@@ -161,6 +189,7 @@ checkpointInterval = 5.0
 | :--- | :--- | :--- |
 | Queue/deadline | `queuePolicy`、`deadlineFactor`、`deadlineAdmissionEnabled`、`deadlineType`、`deadlineMissAction`、`taskTimeout` | 控制 FIFO、priority、deadline admission 和 timeout。 |
 | Rescheduling | `reschedulingEnabled`、`reschedulingInterval`、`reschedulingPolicy`、`maxReschedulesPerTask` | 控制周期性检查 pending、waiting、running 任务并按内置策略重调度。 |
+| Dependency | `dependencyEnforcementEnabled` | 控制 DAG metadata 存在时是否强制等待前驱成功完成。 |
 | Resource model | `resourceModelEnabled`、`vmQueueCapacity`、`ramWeight`、`bwWeight`、`ioWeight` | 控制资源需求、容量拒绝和候选评分。 |
 | Failure/retry | `runtimeFailureRate`、`nodeFailureRate`、`retryLimit`、`retryDelay` | 控制运行时失败、节点失败和重试。 |
 | Autoscaling | `autoscalingEnabled`、`scaleOutQueueThreshold`、`maxDynamicVms`、`vmColdStartDelay` | 控制动态 VM 扩缩容。 |
@@ -171,6 +200,8 @@ checkpointInterval = 5.0
 ## Google Trace
 
 Google trace 配置通过 generator 设置启用。示例见 `configs/experiments/google_trace_test.toml`。解析逻辑会跳过字段不足、非法数字和时间窗口外记录，并在 trace 不可用时使用可运行 fallback。
+
+realtime 模式会把 trace timestamp 转成仿真秒。默认 `normalizeTimestamps = true`，到达时间按 `(timestamp - firstTimestamp) / timestampDivisor` 计算；如果关闭归一化，则按 `timestamp / timestampDivisor` 计算。
 
 新增 trace 字段时需要同步：
 
@@ -197,6 +228,7 @@ Google trace 配置通过 generator 设置启用。示例见 `configs/experiment
 - `configs/examples/batch_multi_test.toml`
 - `configs/examples/realtime_multi_test.toml`
 - `configs/examples/single_config_example.toml`
+- `configs/examples/realtime_workloads.toml`
 
 实验配置：
 

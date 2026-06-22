@@ -46,6 +46,12 @@ internal class RealtimeBrokerReadModel(
 
     fun deadlineMissAcceptedCount(): Int = scalarMetrics.deadlineMissAcceptedCount()
 
+    fun dependencyBlockedCount(): Int = scalarMetrics.dependencyBlockedCount()
+
+    fun dependencyReleasedCount(): Int = scalarMetrics.dependencyReleasedCount()
+
+    fun dependencyRejectedCount(): Int = scalarMetrics.dependencyRejectedCount()
+
     fun rescheduleAttemptCount(): Int = scalarMetrics.rescheduleAttemptCount()
 
     fun rescheduleSuccessCount(): Int = scalarMetrics.rescheduleSuccessCount()

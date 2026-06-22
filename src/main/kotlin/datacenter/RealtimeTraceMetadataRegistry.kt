@@ -3,6 +3,8 @@ package datacenter
 import org.cloudsimplus.cloudlets.Cloudlet
 
 data class RealtimeTraceMetadata(
+    val arrivalTimestamp: Double? = null,
+    val expectedDuration: Double? = null,
     val tenantKey: String? = null,
     val tenantId: Int? = null,
     val priority: Int? = null,
@@ -16,6 +18,10 @@ data class RealtimeTraceMetadata(
     val imageId: String? = null,
     val imageSize: Double? = null,
     val retryHint: Int? = null,
+    val dependencyIds: List<Long> = emptyList(),
+    val workflowId: String? = null,
+    val stageIndex: Int? = null,
+    val workloadClass: String? = null,
 )
 
 data class RealtimeCloudletSpec(

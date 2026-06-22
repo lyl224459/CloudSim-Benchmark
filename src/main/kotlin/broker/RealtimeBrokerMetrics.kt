@@ -10,6 +10,9 @@ data class RealtimeBrokerMetricsSnapshot(
     val deadlineDegradedCount: Int,
     val deadlineRetryLaterCount: Int,
     val deadlineMissAcceptedCount: Int,
+    val dependencyBlockedCount: Int,
+    val dependencyReleasedCount: Int,
+    val dependencyRejectedCount: Int,
     val rescheduleAttemptCount: Int,
     val rescheduleSuccessCount: Int,
     val rescheduleFailureCount: Int,
@@ -57,6 +60,12 @@ class RealtimeBrokerMetrics {
     var deadlineRetryLaterCount: Int = 0
         private set
     var deadlineMissAcceptedCount: Int = 0
+        private set
+    var dependencyBlockedCount: Int = 0
+        private set
+    var dependencyReleasedCount: Int = 0
+        private set
+    var dependencyRejectedCount: Int = 0
         private set
     var rescheduleAttemptCount: Int = 0
         private set
@@ -156,9 +165,22 @@ class RealtimeBrokerMetrics {
             RealtimeRejectReason.CAPACITY -> capacityRejectedCount++
             RealtimeRejectReason.RESOURCE -> resourceRejectedCount++
             RealtimeRejectReason.DEADLINE -> deadlineRejectedCount++
+            RealtimeRejectReason.DEPENDENCY -> Unit
             RealtimeRejectReason.TENANT_QUOTA -> tenantQuotaRejectedCount++
             RealtimeRejectReason.TENANT_BUDGET -> tenantBudgetRejectedCount++
         }
+    }
+
+    fun recordDependencyBlocked() {
+        dependencyBlockedCount++
+    }
+
+    fun recordDependencyReleased() {
+        dependencyReleasedCount++
+    }
+
+    fun recordDependencyRejected() {
+        dependencyRejectedCount++
     }
 
     internal fun recordDeadlineAdmission(action: DeadlineAdmissionMetricAction?) {
@@ -284,6 +306,9 @@ class RealtimeBrokerMetrics {
             deadlineDegradedCount,
             deadlineRetryLaterCount,
             deadlineMissAcceptedCount,
+            dependencyBlockedCount,
+            dependencyReleasedCount,
+            dependencyRejectedCount,
             rescheduleAttemptCount,
             rescheduleSuccessCount,
             rescheduleFailureCount,

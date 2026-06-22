@@ -23,6 +23,7 @@ internal data class RealtimeTaskInterruptionServices(
     val timeout: RealtimeTimeoutController,
     val recovery: RealtimeCloudletRecoveryEstimator,
     val updateMetadata: RealtimeMetadataUpdater,
+    val onTerminalFailure: (Cloudlet) -> List<RealtimeBrokerCommand> = { emptyList() },
 )
 
 internal class RealtimeTaskInterruptionController(
@@ -94,8 +95,7 @@ internal class RealtimeTaskInterruptionController(
         cloudlet.setStatus(Cloudlet.Status.FAILED)
         state.metrics.recordTimeoutCancelled()
         services.updateMetadata(cloudlet) { it.copy(timeoutActionTaken = scheduling.timeoutAction) }
-        retryHandler.markPermanentFailure(cloudlet)
-        return emptyList()
+        return retryHandler.markPermanentFailure(cloudlet)
     }
 
     private fun shouldIgnoreInterruption(
@@ -204,6 +204,6 @@ internal class RealtimeInterruptedCloudletRetryHandler(
         state.reservation.remove(cloudlet)
         state.metrics.recordPermanentFailure()
         services.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.FAILED) }
-        return emptyList()
+        return services.onTerminalFailure(cloudlet)
     }
 }

@@ -7,8 +7,15 @@ internal object RealtimeTaskTransitionPolicy {
         mapOf(
             RealtimeTaskLifecycle.ARRIVED to
                 allowed(
+                    RealtimeTaskLifecycle.DEPENDENCY_BLOCKED,
                     RealtimeTaskLifecycle.PENDING_DECISION,
                     RealtimeTaskLifecycle.RETRYING,
+                    RealtimeTaskLifecycle.REJECTED,
+                    RealtimeTaskLifecycle.FAILED,
+                ),
+            RealtimeTaskLifecycle.DEPENDENCY_BLOCKED to
+                allowed(
+                    RealtimeTaskLifecycle.ARRIVED,
                     RealtimeTaskLifecycle.REJECTED,
                     RealtimeTaskLifecycle.FAILED,
                 ),

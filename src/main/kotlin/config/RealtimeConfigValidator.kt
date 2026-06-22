@@ -9,7 +9,21 @@ internal object RealtimeConfigValidator {
         RealtimeExperimentShapeValidator.validate(realtime, context)
         RealtimeArrivalValidator.validate(realtime.arrival, context)
         RealtimeSchedulingValidator.validate(realtime.scheduling, context)
+        realtime.googleTraceConfig?.let { validateGoogleTrace(it, context) }
         validateCloudletCounts(realtime.cloudletCounts, context)
+    }
+
+    private fun validateGoogleTrace(
+        googleTrace: GoogleTraceConfig,
+        context: RealtimeValidationContext,
+    ) {
+        if (googleTrace.timestampDivisor <= 0.0) {
+            context.addError(
+                "realtime.googleTrace.timestampDivisor",
+                googleTrace.timestampDivisor,
+                "Google Trace timestampDivisor 必须大于0",
+            )
+        }
     }
 
     private fun validateCloudletCounts(

@@ -14,6 +14,7 @@ internal data class RealtimeSubmissionControllers(
     val failureController: RealtimeFailureController,
     val runtimePlanner: RealtimeRuntimeEventPlanner,
     val queueDepthSampler: RealtimeQueueDepthSampler,
+    val dependencyController: RealtimeDependencyController,
 )
 
 @Suppress("TooManyFunctions") // Submission service owns all state transitions around pending submission attempts.
@@ -52,6 +53,7 @@ internal class RealtimeSubmissionService(
         cloudlet.setStatus(Cloudlet.Status.FAILED)
         state.reservation.remove(cloudlet)
         lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.REJECTED) }
+        callbacks.applyCommands(controllers.dependencyController.onTerminalFailure(cloudlet))
     }
 
     fun isCurrentPendingDecision(submission: RealtimePendingSubmission): Boolean =
@@ -115,6 +117,7 @@ internal class RealtimeSubmissionService(
         state.reservation.remove(cloudlet)
         lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.FAILED) }
         state.metrics.recordPermanentFailure()
+        callbacks.applyCommands(controllers.dependencyController.onTerminalFailure(cloudlet))
     }
 
     fun submitAcceptedCloudlet(submission: RealtimePendingSubmission): List<RealtimeBrokerCommand> {

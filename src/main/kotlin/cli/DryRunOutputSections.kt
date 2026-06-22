@@ -6,6 +6,7 @@ private val bracketedRealtimeKeys = setOf("tenantQuota", "tenantWeights", "tenan
 private val realtimeOverviewFormat =
     listOf(
         "distribution",
+        "workloadPattern",
         "strategy",
         "maxQueueSize",
         "taskTimeout",
@@ -27,6 +28,7 @@ private val realtimeOverviewFormat =
         "reschedulingInterval",
         "reschedulingPolicy",
         "maxReschedulesPerTask",
+        "dependencyEnforcementEnabled",
         "vmQueueCapacity",
         "overloadFailureMultiplier",
         "autoscalingEnabled",
@@ -130,6 +132,7 @@ private fun realtimeOverviewValues(resolved: ResolvedExperimentConfig): Array<An
     val scheduling = resolved.realtime.scheduling
     val values =
         listOf(resolved.realtime.arrival.distribution) +
+            listOf(resolved.realtime.arrival.workloadPattern) +
             realtimeCoreSchedulingValues(scheduling) +
             realtimeFailureSchedulingValues(scheduling) +
             realtimeTenantSchedulingValues(scheduling) +
@@ -160,6 +163,7 @@ private fun realtimeCoreSchedulingValues(scheduling: RealtimeSchedulingConfig): 
         scheduling.reschedulingInterval,
         scheduling.reschedulingPolicy,
         scheduling.maxReschedulesPerTask,
+        scheduling.dependencyEnforcementEnabled,
         scheduling.vmQueueCapacity,
         scheduling.overloadFailureMultiplier,
         scheduling.autoscalingEnabled,

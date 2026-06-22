@@ -68,6 +68,12 @@ class RealtimeBroker(
             metadataFactory = metadataFactory,
             environment = environment,
         )
+    private val dependencyController =
+        RealtimeDependencyController(
+            scheduling = schedulingConfig,
+            state = brokerState,
+            lifecycleService = lifecycleService,
+        )
     private val tenantFairnessContextBuilder = TenantFairnessContextBuilder(tenantController)
     private val vmReservationPolicy = RealtimeVmReservationPolicy(schedulingConfig)
     private val recoveryEstimator =
@@ -96,6 +102,7 @@ class RealtimeBroker(
                 timeoutController,
                 recoveryEstimator,
                 lifecycleService::updateMetadata,
+                dependencyController::onTerminalFailure,
             ),
         )
     private val preemptionExecutor =
@@ -162,6 +169,7 @@ class RealtimeBroker(
                     failureController = failureController,
                     runtimePlanner = runtimeEventPlanner,
                     queueDepthSampler = queueDepthSampler,
+                    dependencyController = dependencyController,
                 ),
             callbacks = brokerCallbacks,
         )
@@ -197,6 +205,7 @@ class RealtimeBroker(
                         readModel = readModel,
                         vmSelectionFacade = vmSelectionFacade,
                         submissionService = submissionService,
+                        dependencyController = dependencyController,
                         metrics = brokerMetrics,
                     ),
                 controls =
@@ -223,6 +232,10 @@ class RealtimeBroker(
         for (cloudlet in cloudletList) {
             arrivalState.recordArrival(cloudlet)
             lifecycleStore.put(lifecycleService.createMetadata(cloudlet))
+            dependencyController.register(cloudlet)
+            cloudlet.addOnFinishListener {
+                applyCommands(dependencyController.onSucceeded(cloudlet))
+            }
         }
         val sortedCloudlets = cloudletList.sortedWith(cloudletOrdering.arrivalComparator())
         if (schedulingConfig.strategy.equals("static", ignoreCase = true)) {
@@ -256,6 +269,12 @@ class RealtimeBroker(
     fun getDeadlineRetryLaterCount(): Int = readModel.deadlineRetryLaterCount()
 
     fun getDeadlineMissAcceptedCount(): Int = readModel.deadlineMissAcceptedCount()
+
+    fun getDependencyBlockedCount(): Int = readModel.dependencyBlockedCount()
+
+    fun getDependencyReleasedCount(): Int = readModel.dependencyReleasedCount()
+
+    fun getDependencyRejectedCount(): Int = readModel.dependencyRejectedCount()
 
     fun getRescheduleAttemptCount(): Int = readModel.rescheduleAttemptCount()
 

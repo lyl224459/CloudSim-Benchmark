@@ -130,6 +130,22 @@
 | `distribution` | `poisson` | 到达分布名称。 |
 | `burstIntensity` | `2.0` | burst 强度。 |
 | `burstDuration` | `50.0` | burst 持续时间。 |
+| `workloadPattern` | `standard` | `standard`、`mixed_short_long`、`dag_chain`、`dag_layered`。 |
+| `periodSeconds` | `1.0` | `periodic` 到达的固定周期，单位秒。 |
+| `arrivalJitter` | `0.0` | 周期到达的对称 jitter，单位秒。 |
+| `sporadicMinInterArrival` | `0.1` | `sporadic` 最小到达间隔，单位秒。 |
+| `sporadicMaxInterArrival` | `1.0` | `sporadic` 最大到达间隔，必须不小于最小间隔。 |
+| `diurnalPeakMultiplier` | `2.0` | `diurnal_burst` 峰值到达率倍率。 |
+| `diurnalOffPeakMultiplier` | `0.5` | `diurnal_burst` 低谷到达率倍率。 |
+| `shortTaskRatio` | `0.8` | `mixed_short_long` 中短任务比例，范围 `0.0..1.0`。 |
+| `shortTaskLengthMultiplier` | `0.5` | 短任务长度倍率，必须大于 0。 |
+| `longTaskLengthMultiplier` | `2.0` | 长任务长度倍率，必须大于 0。 |
+| `runtimeReferenceMips` | `1000.0` | 将 expected duration 映射为 cloudlet length 的参考 MIPS，必须大于 0。 |
+| `dagDepth` | `3` | DAG 生成深度，必须大于 0。 |
+| `dagWidth` | `2` | DAG 分层宽度，必须大于 0。 |
+| `dagFanOut` | `1` | 每个 DAG 节点最多依赖的前驱数，必须大于 0。 |
+
+`distribution` 支持 `poisson`、`uniform`、`burst`、`periodic`、`sporadic`、`diurnal_burst`。旧配置默认仍是 `poisson` + `standard`。
 
 ## Realtime Scheduling
 
@@ -150,6 +166,7 @@
 | `reschedulingInterval` | `0.0` | 重调度 tick 间隔，单位秒；启用时必须大于 0。 |
 | `reschedulingPolicy` | `deadline_score` | `deadline_score`、`score_only`、`deadline_only`。 |
 | `maxReschedulesPerTask` | `1` | 单任务最多执行的周期性重调度次数；启用时必须大于 0。 |
+| `dependencyEnforcementEnabled` | `true` | 存在 DAG dependency metadata 时是否强制等待前驱成功完成。 |
 | `vmQueueCapacity` | `0` | 单 VM 队列容量，0 表示不启用。 |
 | `taskTimeout` | `0.0` | 0 表示不启用 timeout。 |
 | `timeoutAction` | `fail` | `fail`、`retry`、`cancel`、`degrade`。 |
@@ -241,6 +258,17 @@
 | `UNIFORM` | 均匀分布任务生成器。 |
 | `LOG_NORMAL_SCI` | 科研参数 log-normal 任务生成器。 |
 | `GOOGLE_TRACE` | Google trace 风格输入。 |
+
+## Google Trace Fields
+
+| Field | Default | Notes |
+| :--- | :--- | :--- |
+| `filePath` | `data/google_trace/task_events.csv` | trace task events 路径。 |
+| `maxTasks` | `1000` | 最多读取的 trace 记录数。 |
+| `timeWindowStart` | `0` | 原始 trace timestamp 下界。 |
+| `timeWindowEnd` | `Long.MAX_VALUE` | 原始 trace timestamp 上界。 |
+| `normalizeTimestamps` | `true` | realtime 模式下是否把首条记录作为 0 秒基准。 |
+| `timestampDivisor` | `1000000.0` | 原始 timestamp 转仿真秒的除数，必须大于 0。 |
 
 ## Validation Notes
 
