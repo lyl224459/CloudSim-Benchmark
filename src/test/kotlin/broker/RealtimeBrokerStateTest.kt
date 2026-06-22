@@ -7,6 +7,8 @@ import org.cloudsimplus.utilizationmodels.UtilizationModelFull
 import org.cloudsimplus.vms.VmSimple
 import org.junit.jupiter.api.Test
 import scheduler.CloudletId
+import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeScoreBreakdown
 import scheduler.RealtimeTaskLifecycle
 import scheduler.VmIndex
 
@@ -74,9 +76,37 @@ class RealtimeBrokerStateTest {
         assertThat(snapshot.averageDecisionDelay).isEqualTo(3.0)
         assertThat(snapshot.averageQueueDepth).isEqualTo(5.0)
         assertThat(snapshot.maxQueueDepth).isEqualTo(7)
+        assertThat(snapshot.averageRealtimeScore).isZero()
+        assertThat(snapshot.averageCandidateScoreSpread).isZero()
         assertThat(snapshot.retrySuccessCount).isEqualTo(1)
         assertThat(snapshot.timeoutCancelledCount).isEqualTo(1)
         assertThat(snapshot.hostFailureCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `metrics state aggregates realtime candidate score records`() {
+        val metrics = RealtimeBrokerMetrics()
+
+        metrics.recordCandidateScores(
+            listOf(
+                candidateScore(candidateVmIndex = 0, selected = true, totalScore = 7.0, slack = 2.0),
+                candidateScore(candidateVmIndex = 1, selected = false, totalScore = 11.0, slack = -1.0),
+            ),
+        )
+        metrics.recordCandidateScores(
+            listOf(
+                candidateScore(candidateVmIndex = 0, selected = false, totalScore = 5.0, slack = 5.0),
+                candidateScore(candidateVmIndex = 1, selected = true, totalScore = 6.0, slack = 4.0),
+            ),
+        )
+        metrics.recordCandidateScores(emptyList())
+
+        val snapshot = metrics.snapshot()
+        assertThat(snapshot.averageRealtimeScore).isEqualTo(6.5)
+        assertThat(snapshot.averageSelectedLatenessPenalty).isEqualTo(0.0)
+        assertThat(snapshot.averageSelectedDeadlineSlack).isEqualTo(3.0)
+        assertThat(snapshot.averageCandidateScoreSpread).isEqualTo(2.5)
+        assertThat(metrics.candidateScoreRecords()).hasSize(4)
     }
 
     @Test
@@ -120,4 +150,34 @@ class RealtimeBrokerStateTest {
             setUtilizationModelBw(utilizationModel)
         }
     }
+
+    private fun candidateScore(
+        candidateVmIndex: Int,
+        selected: Boolean,
+        totalScore: Double,
+        slack: Double,
+    ): RealtimeCandidateScoreRecord =
+        RealtimeCandidateScoreRecord(
+            cloudletId = 1L,
+            arrivalTime = 0.0,
+            selectedVmIndex = if (selected) candidateVmIndex else -1,
+            candidateVmIndex = candidateVmIndex,
+            accepted = true,
+            selected = selected,
+            breakdown =
+                RealtimeScoreBreakdown(
+                    totalScore = totalScore,
+                    projectedFinishTime = 1.0,
+                    estimatedRuntime = 1.0,
+                    deadlineSlack = slack,
+                    latenessPenalty = (-slack).coerceAtLeast(0.0),
+                    priorityPressure = 0.0,
+                    preemptionCost = 0.0,
+                    resourcePressure = 0.0,
+                    topologyLatency = 0.0,
+                    topologyCost = 0.0,
+                    tenantFairnessPressure = 0.0,
+                    queuePressure = 0.0,
+                ),
+        )
 }

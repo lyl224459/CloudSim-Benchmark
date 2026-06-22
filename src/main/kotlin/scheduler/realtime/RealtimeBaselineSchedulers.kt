@@ -12,14 +12,16 @@ class RealtimeEdfScheduler(
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
         selectAcceptedOrFallback(context, comparatorFor(context))
 
-    private fun comparatorFor(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> =
-        if (context.taskMetadata.deadline == null) {
-            earliestFinishComparator(context)
+    private fun comparatorFor(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> {
+        val scoresByVmIndex = scoreByVmIndex(context)
+        return if (context.taskMetadata.deadline == null) {
+            earliestFinishComparator(scoresByVmIndex)
         } else {
-            compareBy<RealtimeNodeState> { deadlineLateness(context, it) }
-                .thenBy { projectedFinishTime(context, it) }
+            compareBy<RealtimeNodeState> { scoresByVmIndex[it.vmIndex]?.breakdown?.latenessPenalty ?: 0.0 }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
                 .then(stableCandidateTieBreaker())
         }
+    }
 }
 
 /**
@@ -31,15 +33,17 @@ class RealtimeLlfScheduler(
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
         selectAcceptedOrFallback(context, comparatorFor(context))
 
-    private fun comparatorFor(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> =
-        if (context.taskMetadata.deadline == null) {
-            earliestFinishComparator(context)
+    private fun comparatorFor(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> {
+        val scoresByVmIndex = scoreByVmIndex(context)
+        return if (context.taskMetadata.deadline == null) {
+            earliestFinishComparator(scoresByVmIndex)
         } else {
-            compareBy<RealtimeNodeState> { (deadlineSlack(context, it) ?: 0.0) < 0.0 }
-                .thenBy { abs(deadlineSlack(context, it) ?: 0.0) }
-                .thenBy { projectedFinishTime(context, it) }
+            compareBy<RealtimeNodeState> { (scoresByVmIndex[it.vmIndex]?.breakdown?.deadlineSlack ?: 0.0) < 0.0 }
+                .thenBy { abs(scoresByVmIndex[it.vmIndex]?.breakdown?.deadlineSlack ?: 0.0) }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
                 .then(stableCandidateTieBreaker())
         }
+    }
 }
 
 /**
@@ -49,7 +53,7 @@ class RealtimeEftScheduler(
     vmList: List<Vm>,
 ) : RealtimeSchedulerBase(vmList) {
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
-        selectAcceptedOrFallback(context, earliestFinishComparator(context))
+        selectAcceptedOrFallback(context, earliestFinishComparator(scoreByVmIndex(context)))
 }
 
 /**
@@ -58,13 +62,17 @@ class RealtimeEftScheduler(
 class RealtimeSrptScheduler(
     vmList: List<Vm>,
 ) : RealtimeSchedulerBase(vmList) {
-    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
-        selectAcceptedOrFallback(
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
+        val scoresByVmIndex = scoreByVmIndex(context)
+        return selectAcceptedOrFallback(
             context,
-            compareBy<RealtimeNodeState> { estimatedRuntime(context, it) }
-                .thenBy { projectedFinishTime(context, it) }
+            compareBy<RealtimeNodeState> {
+                scoresByVmIndex[it.vmIndex]?.breakdown?.estimatedRuntime ?: Double.POSITIVE_INFINITY
+            }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
                 .then(stableCandidateTieBreaker()),
         )
+    }
 }
 
 /**
@@ -75,14 +83,22 @@ class RealtimePriorityDeadlineScheduler(
 ) : RealtimeSchedulerBase(vmList) {
     override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int {
         val preemptableVmIndexes = context.preemptionCandidates.map { it.victimVmIndex.value }.toSet()
+        val scoresByVmIndex = scoreByVmIndex(context)
         return selectAcceptedOrFallback(
             context,
             compareBy<RealtimeNodeState> { it.vmIndex !in preemptableVmIndexes }
-                .thenBy { deadlineLateness(context, it) }
-                .thenBy { projectedFinishTime(context, it) }
-                .thenBy { it.queueDepth }
-                .thenBy { it.resourcePressure }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.totalScore ?: Double.POSITIVE_INFINITY }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.latenessPenalty ?: 0.0 }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
                 .then(stableCandidateTieBreaker()),
         )
     }
 }
+
+private fun earliestFinishComparator(scoresByVmIndex: Map<Int, RealtimeCandidateScore>): Comparator<RealtimeNodeState> =
+    compareBy<RealtimeNodeState> {
+        scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY
+    }
+        .thenBy { scoresByVmIndex[it.vmIndex]?.totalScore ?: Double.POSITIVE_INFINITY }
+        .thenBy { it.queueDepth }
+        .thenBy { it.vmIndex }

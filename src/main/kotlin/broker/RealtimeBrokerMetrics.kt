@@ -1,5 +1,7 @@
 package broker
 
+import scheduler.RealtimeCandidateScoreRecord
+
 data class RealtimeBrokerMetricsSnapshot(
     val rejectedCount: Int,
     val capacityRejectedCount: Int,
@@ -26,6 +28,10 @@ data class RealtimeBrokerMetricsSnapshot(
     val averageDecisionDelay: Double,
     val averageQueueDepth: Double,
     val maxQueueDepth: Int,
+    val averageRealtimeScore: Double,
+    val averageSelectedLatenessPenalty: Double,
+    val averageSelectedDeadlineSlack: Double,
+    val averageCandidateScoreSpread: Double,
 )
 
 @Suppress("TooManyFunctions") // Metrics facade keeps stable scalar and snapshot accessors in one type.
@@ -77,6 +83,12 @@ class RealtimeBrokerMetrics {
     private var queueDepthSampleCount = 0
     var maxQueueDepth: Int = 0
         private set
+    private var realtimeScoreTotal = 0.0
+    private var selectedLatenessPenaltyTotal = 0.0
+    private var selectedDeadlineSlackTotal = 0.0
+    private var candidateScoreSpreadTotal = 0.0
+    private var candidateScoreDecisionCount = 0
+    private val candidateScoreRecords = mutableListOf<RealtimeCandidateScoreRecord>()
 
     val averageDecisionDelay: Double
         get() = if (decisionCount > 0) decisionDelayTotal / decisionCount else 0.0
@@ -88,6 +100,29 @@ class RealtimeBrokerMetrics {
     val checkpointLoss: Long get() = checkpointLossTotal
     val retrySuccessRate: Double
         get() = if (retryCount > 0) retrySuccessCount.toDouble() / retryCount else 0.0
+    val averageRealtimeScore: Double
+        get() = if (candidateScoreDecisionCount > 0) realtimeScoreTotal / candidateScoreDecisionCount else 0.0
+    val averageSelectedLatenessPenalty: Double
+        get() =
+            if (candidateScoreDecisionCount > 0) {
+                selectedLatenessPenaltyTotal / candidateScoreDecisionCount
+            } else {
+                0.0
+            }
+    val averageSelectedDeadlineSlack: Double
+        get() =
+            if (candidateScoreDecisionCount > 0) {
+                selectedDeadlineSlackTotal / candidateScoreDecisionCount
+            } else {
+                0.0
+            }
+    val averageCandidateScoreSpread: Double
+        get() =
+            if (candidateScoreDecisionCount > 0) {
+                candidateScoreSpreadTotal / candidateScoreDecisionCount
+            } else {
+                0.0
+            }
 
     fun recordRejected(reason: RealtimeRejectReason) {
         rejectedCount++
@@ -161,6 +196,26 @@ class RealtimeBrokerMetrics {
         maxQueueDepth = maxOf(maxQueueDepth, depth)
     }
 
+    fun recordCandidateScores(records: List<RealtimeCandidateScoreRecord>) {
+        if (records.isEmpty()) return
+        candidateScoreRecords += records
+        val selected = records.firstOrNull { it.selected && it.accepted } ?: return
+        val acceptedScores = records.filter { it.accepted }.map { it.totalScore }
+        val scoreSpread =
+            if (acceptedScores.isNotEmpty()) {
+                (acceptedScores.maxOrNull() ?: 0.0) - (acceptedScores.minOrNull() ?: 0.0)
+            } else {
+                0.0
+            }
+        realtimeScoreTotal += selected.totalScore
+        selectedLatenessPenaltyTotal += selected.breakdown.latenessPenalty
+        selectedDeadlineSlackTotal += selected.breakdown.deadlineSlack
+        candidateScoreSpreadTotal += scoreSpread
+        candidateScoreDecisionCount++
+    }
+
+    fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = candidateScoreRecords.toList()
+
     fun recordTopologyFailure(domain: RealtimeFailureDomain) {
         when (domain) {
             RealtimeFailureDomain.HOST -> hostFailureCount++
@@ -196,6 +251,10 @@ class RealtimeBrokerMetrics {
             averageDecisionDelay,
             averageQueueDepth,
             maxQueueDepth,
+            averageRealtimeScore,
+            averageSelectedLatenessPenalty,
+            averageSelectedDeadlineSlack,
+            averageCandidateScoreSpread,
         )
 }
 

@@ -2,6 +2,7 @@ package broker
 
 import config.RealtimeSchedulingConfig
 import org.cloudsimplus.cloudlets.Cloudlet
+import scheduler.RealtimeCandidateScoreCalculator
 import scheduler.RealtimeScheduler
 import scheduler.RealtimeSchedulingContext
 
@@ -32,6 +33,8 @@ internal class RealtimeVmSelectionFacade(
     private val lifecycleService: RealtimeBrokerLifecycleService,
     private val policies: RealtimeVmSelectionPolicies,
 ) {
+    private val scoreCalculator = RealtimeCandidateScoreCalculator()
+
     fun selectVm(
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
@@ -179,7 +182,10 @@ internal class RealtimeVmSelectionFacade(
         return when {
             context.nodeCandidates.isNotEmpty() && placementState == null -> null
             selectedState != null && !selectedState.acceptingWork -> null
-            else -> bounded to (selectedState?.failurePressure ?: 0.0)
+            else -> {
+                state.metrics.recordCandidateScores(scoreCalculator.scoreRecords(context, bounded))
+                bounded to (selectedState?.failurePressure ?: 0.0)
+            }
         }
     }
 

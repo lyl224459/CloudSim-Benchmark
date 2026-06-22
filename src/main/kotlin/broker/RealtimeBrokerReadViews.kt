@@ -1,6 +1,7 @@
 package broker
 
 import org.cloudsimplus.cloudlets.Cloudlet
+import scheduler.RealtimeCandidateScoreRecord
 import scheduler.RealtimeTaskMetadata
 import scheduler.RealtimeTopologyMetrics
 import scheduler.RealtimeVmLifecycleManager
@@ -92,6 +93,16 @@ internal class RealtimeBrokerScalarMetricsView(
     fun averageQueueDepth(): Double = metrics.averageQueueDepth
 
     fun maxQueueDepth(): Int = metrics.maxQueueDepth
+
+    fun averageRealtimeScore(): Double = metrics.averageRealtimeScore
+
+    fun averageSelectedLatenessPenalty(): Double = metrics.averageSelectedLatenessPenalty
+
+    fun averageSelectedDeadlineSlack(): Double = metrics.averageSelectedDeadlineSlack
+
+    fun averageCandidateScoreSpread(): Double = metrics.averageCandidateScoreSpread
+
+    fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = metrics.candidateScoreRecords()
 
     fun retrySuccessRate(): Double = metrics.retrySuccessRate
 

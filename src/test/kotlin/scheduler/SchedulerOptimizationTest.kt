@@ -223,6 +223,31 @@ class SchedulerOptimizationTest {
     }
 
     @Test
+    fun `realtime objective prefers lower realtime score candidate`() {
+        val vms = createVms(2)
+        val context =
+            RealtimeSchedulingContext(
+                newCloudlet = createCloudlets(1).first(),
+                activeCloudlets = createCloudlets(2),
+                vmList = vms,
+                currentTime = 0.0,
+                nodeStates =
+                    listOf(
+                        nodeState(vmIndex = 0, acceptingWork = true, availableTime = 20.0, queueDepth = 8),
+                        nodeState(vmIndex = 1, acceptingWork = true, availableTime = 0.0, queueDepth = 0),
+                    ),
+            )
+        val candidateStates = context.nodeStates.filter { it.acceptingWork }
+        val objective = RealtimeSchedulingObjectiveFunction(context, candidateStates, cloudletCount = 3)
+
+        assertThat(objective.calculate(intArrayOf(1, 1, 1)))
+            .isLessThan(objective.calculate(intArrayOf(0, 0, 0)))
+        assertThatThrownBy { objective.calculate(intArrayOf(1, 1)) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("映射数量")
+    }
+
+    @Test
     fun `realtime optimizer factories pass objective weights`() {
         val weights = ObjectiveWeightsConfig(cost = 0.1, totalTime = 0.2, loadBalance = 0.3, makespan = 0.4)
         val settings = ResolvedAlgorithmSettings(population = 3, maxIter = 2)
@@ -319,6 +344,42 @@ class SchedulerOptimizationTest {
     }
 
     @Test
+    fun `realtime optimizers prefer lower realtime score candidate`() {
+        val vms = createVms(2)
+        val context =
+            RealtimeSchedulingContext(
+                newCloudlet = createCloudlets(1).first(),
+                activeCloudlets = createCloudlets(2),
+                vmList = vms,
+                currentTime = 0.0,
+                nodeStates =
+                    listOf(
+                        nodeState(vmIndex = 0, acceptingWork = true, availableTime = 100.0, queueDepth = 20),
+                        nodeState(vmIndex = 1, acceptingWork = true, availableTime = 0.0, queueDepth = 0),
+                    ),
+            )
+        val schedulers =
+            listOf(
+                RealtimePSOScheduler(
+                    vms,
+                    population = 20,
+                    maxIter = 20,
+                    objectiveWeights = ObjectiveWeightsConfig(),
+                    random = Random(42),
+                ),
+                RealtimeWOAScheduler(
+                    vms,
+                    population = 20,
+                    maxIter = 20,
+                    objectiveWeights = ObjectiveWeightsConfig(),
+                    random = Random(42),
+                ),
+            )
+
+        assertThat(schedulers.map { it.scheduleOnArrival(context) }).containsExactly(1, 1)
+    }
+
+    @Test
     fun `metaheuristic schedulers return valid allocations`() {
         val cloudlets = createCloudlets(6)
         val vms = createVms(3)
@@ -376,17 +437,19 @@ class SchedulerOptimizationTest {
     private fun nodeState(
         vmIndex: Int,
         acceptingWork: Boolean,
+        availableTime: Double = 0.0,
+        queueDepth: Int = 0,
     ): RealtimeNodeState =
         RealtimeNodeState(
             vmIndex = vmIndex,
             vmId = vmIndex.toLong(),
             runningCount = 0,
-            pendingCount = 0,
-            queueDepth = 0,
+            pendingCount = queueDepth,
+            queueDepth = queueDepth,
             availableSlots = if (acceptingWork) Int.MAX_VALUE else 0,
             acceptingWork = acceptingWork,
-            estimatedLoad = 0.0,
-            availableTime = 0.0,
+            estimatedLoad = queueDepth.toDouble(),
+            availableTime = availableTime,
             failurePressure = 0.0,
         )
 }

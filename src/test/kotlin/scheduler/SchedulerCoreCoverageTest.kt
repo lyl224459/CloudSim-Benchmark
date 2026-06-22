@@ -174,6 +174,93 @@ class SchedulerCoreCoverageTest {
     }
 
     @Test
+    fun `realtime score calculator records finite accepted and rejected candidate components`() {
+        val vms = vms(2)
+        val context =
+            context(
+                vms,
+                states =
+                    listOf(
+                        nodeState(
+                            0,
+                            accepting = true,
+                            NodeStateOverrides(
+                                queueDepth = 2,
+                                availableTime = 2.0,
+                                latency = 0.2,
+                                topologyCost = 0.3,
+                                resourcePressure = 1.5,
+                                networkDelay = 0.4,
+                                imageDelay = 0.6,
+                            ),
+                        ),
+                        nodeState(
+                            1,
+                            accepting = false,
+                            NodeStateOverrides(queueDepth = 4, availableTime = 1.0),
+                        ),
+                    ),
+                taskMetadata =
+                    RealtimeTaskRecord(
+                        cloudletId = 100L,
+                        originalArrivalTime = 3.0,
+                        priority = 3,
+                        deadline = 4.0,
+                        tenantId = TenantId(7),
+                    ),
+                preemptionCandidates =
+                    listOf(
+                        RealtimePreemptionCandidate(
+                            victimCloudletId = CloudletId(99L),
+                            victimVmIndex = VmIndex(0),
+                            victimPriority = 1,
+                            victimDeadline = 10.0,
+                            preemptedCount = 0,
+                        ),
+                    ),
+            ).copy(
+                tenantSnapshots =
+                    listOf(
+                        RealtimeTenantFairnessSnapshot(
+                            tenantId = TenantId(7),
+                            activeCount = 1,
+                            completedCount = 2,
+                            quota = null,
+                            weight = 1.0,
+                            fairnessScore = 0.8,
+                            dominantResourceShare = 0.2,
+                            budgetUsed = 0.0,
+                            budgetLimit = null,
+                            slaPenalty = 0.0,
+                            fairnessPressure = 0.7,
+                        ),
+                    ),
+            )
+
+        val calculator = RealtimeCandidateScoreCalculator()
+        val accepted = calculator.scoreAccepted(context).single()
+        val records = calculator.scoreRecords(context, selectedVmIndex = 0)
+
+        assertThat(accepted.vmIndex).isEqualTo(0)
+        assertThat(accepted.breakdown.projectedFinishTime).isEqualTo(4.0)
+        assertThat(accepted.breakdown.estimatedRuntime).isEqualTo(1.0)
+        assertThat(accepted.breakdown.deadlineSlack).isEqualTo(0.0)
+        assertThat(accepted.breakdown.latenessPenalty).isEqualTo(0.0)
+        assertThat(accepted.breakdown.priorityPressure).isEqualTo(0.25)
+        assertThat(accepted.breakdown.preemptionCost).isEqualTo(0.0)
+        assertThat(accepted.breakdown.resourcePressure).isEqualTo(1.5)
+        assertThat(accepted.breakdown.topologyLatency).isEqualTo(0.2)
+        assertThat(accepted.breakdown.topologyCost).isEqualTo(0.3)
+        assertThat(accepted.breakdown.tenantFairnessPressure).isEqualTo(0.7)
+        assertThat(accepted.breakdown.queuePressure).isEqualTo(2.0)
+        assertThat(accepted.totalScore).isBetween(8.94, 8.96)
+        assertThat(records).hasSize(2)
+        assertThat(records.map { it.accepted }).containsExactly(true, false)
+        assertThat(records.single { it.selected }.candidateVmIndex).isZero()
+        assertThat(records.map { it.totalScore }).allSatisfy { score -> assertThat(score.isFinite()).isTrue() }
+    }
+
+    @Test
     fun `realtime base covers threshold repair fallback and noncontinuous vm ids`() {
         val vms = vms(2).onEachIndexed { index, vm -> vm.setId((10 + index).toLong()) }
         val probe = RealtimeSchedulerProbe(vms)
@@ -298,6 +385,8 @@ class SchedulerCoreCoverageTest {
             topologyLatency = overrides.latency,
             topologyCost = overrides.topologyCost,
             failureDomainLoad = overrides.domainLoad,
+            networkTransferDelay = overrides.networkDelay,
+            imagePullDelay = overrides.imageDelay,
         )
 
     private data class NodeStateOverrides(
@@ -309,6 +398,8 @@ class SchedulerCoreCoverageTest {
         val topologyCost: Double = 0.0,
         val domainLoad: Int = 0,
         val resourcePressure: Double = 0.0,
+        val networkDelay: Double = 0.0,
+        val imageDelay: Double = 0.0,
     )
 }
 

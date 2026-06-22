@@ -11,6 +11,11 @@ typealias ImprovedRLScheduler = scheduler.batch.ImprovedRLScheduler
 
 typealias RealtimeScheduler = scheduler.realtime.RealtimeScheduler
 typealias RealtimeSchedulerBase = scheduler.realtime.RealtimeSchedulerBase
+typealias RealtimeCandidateScore = scheduler.realtime.RealtimeCandidateScore
+typealias RealtimeCandidateScoreCalculator = scheduler.realtime.RealtimeCandidateScoreCalculator
+typealias RealtimeCandidateScoreRecord = scheduler.realtime.RealtimeCandidateScoreRecord
+typealias RealtimeSchedulingObjectiveFunction = scheduler.realtime.RealtimeSchedulingObjectiveFunction
+typealias RealtimeScoreBreakdown = scheduler.realtime.RealtimeScoreBreakdown
 typealias RealtimeRandomScheduler = scheduler.realtime.RealtimeRandomScheduler
 typealias RealtimeMinLoadScheduler = scheduler.realtime.RealtimeMinLoadScheduler
 typealias RealtimeEdfScheduler = scheduler.realtime.RealtimeEdfScheduler

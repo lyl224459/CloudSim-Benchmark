@@ -9,6 +9,10 @@
 | Cost | cost | 越低越好 | 根据 VM 价格估算的总执行成本。 |
 | TotalTime | seconds | 越低越好 | 按调度结果估算的总执行时间。 |
 | Fitness | score | 越低越好 | 多目标权重计算出的调度适应度。 |
+| AvgRealtimeScore | score | 越低越好 | 被选中候选 VM 的 realtime 专用评分平均值。 |
+| AvgSelectedLatenessPenalty | score | 越低越好 | 被选中候选 VM 的 deadline lateness penalty 平均值。 |
+| AvgSelectedDeadlineSlack | seconds | 越高越好 | 被选中候选 VM 的 deadline slack 平均值；无 deadline 时为 0。 |
+| AvgCandidateScoreSpread | score | 越低越好 | 每次调度 accepted candidate 最高与最低 realtime score 差值的平均值。 |
 | AvgWaitingTime | seconds | 越低越好 | 任务从到达到开始执行的平均等待时间。 |
 | AvgResponseTime | seconds | 越低越好 | 任务从到达到完成的平均响应时间。 |
 | RejectedCount | count | 越低越好 | 被实时准入或资源策略拒绝的任务数。 |

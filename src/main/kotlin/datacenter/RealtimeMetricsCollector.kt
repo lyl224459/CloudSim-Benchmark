@@ -50,6 +50,7 @@ internal class RealtimeMetricsCollector(
         return RealtimeAlgorithmResult(
             algorithmName = request.algorithmName,
             metrics = metrics,
+            candidateScores = request.broker.getCandidateScoreRecords(),
         )
     }
 
@@ -218,6 +219,10 @@ private fun brokerMetricPairs(context: BrokerMetricContext): List<MetricPair> =
         RealtimeMetricKey.CAPACITY_REJECTED_COUNT to context.broker.getCapacityRejectedCount(),
         RealtimeMetricKey.AVERAGE_QUEUE_DEPTH to context.broker.getAverageQueueDepth(),
         RealtimeMetricKey.MAX_QUEUE_DEPTH to context.broker.getMaxQueueDepth(),
+        RealtimeMetricKey.AVERAGE_REALTIME_SCORE to context.broker.getAverageRealtimeScore(),
+        RealtimeMetricKey.AVERAGE_SELECTED_LATENESS_PENALTY to context.broker.getAverageSelectedLatenessPenalty(),
+        RealtimeMetricKey.AVERAGE_SELECTED_DEADLINE_SLACK to context.broker.getAverageSelectedDeadlineSlack(),
+        RealtimeMetricKey.AVERAGE_CANDIDATE_SCORE_SPREAD to context.broker.getAverageCandidateScoreSpread(),
         RealtimeMetricKey.SCALE_OUT_COUNT to context.broker.getScaleOutCount(),
         RealtimeMetricKey.SCALE_IN_COUNT to context.broker.getScaleInCount(),
         RealtimeMetricKey.ACTIVE_VM_PEAK to context.broker.getActiveVmPeak(),

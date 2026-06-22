@@ -49,9 +49,9 @@ Batch scheduler 统一约束：
 | `LLF_REALTIME` | `LLF`, `LLF-Realtime`, `LLF Realtime` | Baseline | none | 在可按期候选中选择最小非负 slack；全部 miss 时选择 lateness 最小；无 deadline 时退化为 EFT。 |
 | `EFT_REALTIME` | `EFT`, `EFT-Realtime`, `EFT Realtime` | Baseline | none | 选择 projected finish time 最早的 accepted candidate。 |
 | `SRPT_REALTIME` | `SRPT`, `SRPT-Realtime`, `SRPT Realtime` | Baseline | none | 选择 incoming task 在候选 VM 上 estimated runtime 最短的 accepted candidate。 |
-| `PRIORITY_DEADLINE_REALTIME` | `PRIORITY_DEADLINE`, `PRIORITY-DEADLINE`, `PRIORITY DEADLINE` | Baseline | none | 优先可抢占候选，再按 deadline miss、finish time、队列和资源压力排序。 |
-| `PSO_REALTIME` | `PSO`, `PSO-Realtime`, `PSO Realtime` | Metaheuristic | `population`, `maxIter` | 达到阈值后对 accepted candidates 优化。 |
-| `WOA_REALTIME` | `WOA`, `WOA-Realtime`, `WOA Realtime` | Metaheuristic | `population`, `maxIter` | 达到阈值后对 accepted candidates 优化。 |
+| `PRIORITY_DEADLINE_REALTIME` | `PRIORITY_DEADLINE`, `PRIORITY-DEADLINE`, `PRIORITY DEADLINE` | Baseline | none | 优先可抢占候选，再按 realtime score、deadline miss、finish time 排序。 |
+| `PSO_REALTIME` | `PSO`, `PSO-Realtime`, `PSO Realtime` | Metaheuristic | `population`, `maxIter` | 达到阈值后对 accepted candidates 使用 realtime score 优化。 |
+| `WOA_REALTIME` | `WOA`, `WOA-Realtime`, `WOA Realtime` | Metaheuristic | `population`, `maxIter` | 达到阈值后对 accepted candidates 使用 realtime score 优化。 |
 
 Realtime scheduler 返回单个 VM 下标。候选为空、优化结果非法或候选被资源/拓扑/租户策略拒绝时，会走 fallback。
 
@@ -79,13 +79,13 @@ Realtime scheduler 返回单个 VM 下标。候选为空、优化结果非法或
 | `population` | PSO/WOA/GWO/HHO/Realtime PSO/WOA | 搜索种群规模。越大通常搜索更充分，耗时也更高。 |
 | `maxIter` | PSO/WOA/GWO/HHO/Realtime PSO/WOA | 最大迭代次数。越大通常结果更稳定，耗时也更高。 |
 | `seed` | All stochastic algorithms | 控制随机序列，保证可复现。 |
-| `objectiveWeights` | Batch and optimized realtime | 控制 makespan、load balance、cost、total time 的综合权重。 |
+| `objectiveWeights` | Batch; realtime result reporting | 控制 batch makespan、load balance、cost、total time 的综合权重；realtime 优化调度不再用它做候选 VM 决策。 |
 
 `population` 和 `maxIter` 可以在全局 optimizer、algorithm config、batch/realtime profile 中出现。实际合并顺序见 [configuration.md](configuration.md)。
 
 ## Objective Function
 
-Batch 和优化型 realtime 算法使用 `SchedulerObjectiveFunction`。它综合：
+Batch 算法使用 `SchedulerObjectiveFunction`。它综合：
 
 - makespan；
 - load balance；
@@ -93,6 +93,8 @@ Batch 和优化型 realtime 算法使用 `SchedulerObjectiveFunction`。它综�
 - total time。
 
 目标函数内部缓存 cloudlet length、VM MIPS、成本和归一化边界。单 VM、同质 VM 或归一化分母为 0 时返回有限值。
+
+Realtime 优化型算法使用 `RealtimeSchedulingObjectiveFunction`。它按 accepted candidate 的 realtime score 求和，score 越低越好。score 分量包括 projected finish time、estimated runtime、deadline slack/lateness、priority pressure、preemption cost、resource pressure、topology latency/cost、tenant fairness pressure 和 queue pressure。`Fitness` 仍会按历史 batch objective 口径输出，便于旧结果比较，但不再作为 realtime 优化器的调度目标。
 
 ## Result Interpretation
 

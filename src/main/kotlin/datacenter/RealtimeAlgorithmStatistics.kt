@@ -16,6 +16,11 @@ data class RealtimeAlgorithmStatistics(
     val cost: StatisticalValue get() = metric(RealtimeMetricKey.COST)
     val totalTime: StatisticalValue get() = metric(RealtimeMetricKey.TOTAL_TIME)
     val fitness: StatisticalValue get() = metric(RealtimeMetricKey.FITNESS)
+    val averageRealtimeScore: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_REALTIME_SCORE)
+    val averageSelectedLatenessPenalty: StatisticalValue
+        get() = metric(RealtimeMetricKey.AVERAGE_SELECTED_LATENESS_PENALTY)
+    val averageSelectedDeadlineSlack: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_SELECTED_DEADLINE_SLACK)
+    val averageCandidateScoreSpread: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_CANDIDATE_SCORE_SPREAD)
     val averageWaitingTime: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_WAITING_TIME)
     val averageResponseTime: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_RESPONSE_TIME)
     val rejectedCount: StatisticalValue get() = metric(RealtimeMetricKey.REJECTED_COUNT)

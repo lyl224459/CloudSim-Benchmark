@@ -23,6 +23,9 @@ class RealtimeVmSelectionFacadeTest {
         assertThat(facade.selectVm(incoming, emptyList(), 0.0)?.first).isEqualTo(1)
         assertThat(facade.activeVmIndexes(listOf(active))).containsExactly(1)
         assertThat(facade.tryPreemptFor(incoming, listOf(active)).applied).isFalse()
+        assertThat(broker.getCandidateScoreRecords()).hasSize(2)
+        assertThat(broker.getCandidateScoreRecords().single { it.selected }.candidateVmIndex).isEqualTo(1)
+        assertThat(broker.getAverageRealtimeScore()).isGreaterThan(0.0)
     }
 
     @Test

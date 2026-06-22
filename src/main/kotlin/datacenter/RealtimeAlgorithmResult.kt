@@ -1,9 +1,12 @@
 package datacenter
 
+import scheduler.RealtimeCandidateScoreRecord
+
 @Suppress("TooManyFunctions") // Compatibility facade keeps existing metric getter names stable.
 data class RealtimeAlgorithmResult(
     val algorithmName: String,
     val metrics: RealtimeMetricValues,
+    val candidateScores: List<RealtimeCandidateScoreRecord> = emptyList(),
 ) {
     operator fun get(key: RealtimeMetricKey): Double = metrics[key]
 
@@ -12,6 +15,10 @@ data class RealtimeAlgorithmResult(
     val cost: Double get() = metrics[RealtimeMetricKey.COST]
     val totalTime: Double get() = metrics[RealtimeMetricKey.TOTAL_TIME]
     val fitness: Double get() = metrics[RealtimeMetricKey.FITNESS]
+    val averageRealtimeScore: Double get() = metrics[RealtimeMetricKey.AVERAGE_REALTIME_SCORE]
+    val averageSelectedLatenessPenalty: Double get() = metrics[RealtimeMetricKey.AVERAGE_SELECTED_LATENESS_PENALTY]
+    val averageSelectedDeadlineSlack: Double get() = metrics[RealtimeMetricKey.AVERAGE_SELECTED_DEADLINE_SLACK]
+    val averageCandidateScoreSpread: Double get() = metrics[RealtimeMetricKey.AVERAGE_CANDIDATE_SCORE_SPREAD]
     val averageWaitingTime: Double get() = metrics[RealtimeMetricKey.AVERAGE_WAITING_TIME]
     val averageResponseTime: Double get() = metrics[RealtimeMetricKey.AVERAGE_RESPONSE_TIME]
     val rejectedCount: Int get() = metrics.intValue(RealtimeMetricKey.REJECTED_COUNT)

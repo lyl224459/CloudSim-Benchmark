@@ -26,6 +26,7 @@ runs/
       experiment_info.txt
       resolved_config.json
       MIN_LOAD.csv
+      realtime_candidate_scores.csv
       realtime_comparison_20260621_153501.csv
       summary_avg.csv
 ```
@@ -42,6 +43,7 @@ runs/
 | `summary_avg.csv` | exporter | 每个算法的 summary 结果。 |
 | `batch_comparison_*.csv` | batch exporter | batch 算法对比结果，包含均值和标准差。 |
 | `realtime_comparison_*.csv` | realtime exporter | realtime 算法对比结果，包含均值和标准差。 |
+| `realtime_candidate_scores.csv` | realtime exporter | 每次实时调度的候选 VM score 明细；仅 realtime 成功 trial 且 CSV 开启时写入。 |
 
 `summary_avg.csv` 是固定文件名，每个实验目录只保留该实验的一份 summary。`*_comparison_*.csv` 使用时间戳，适合从同一个目录多次手动导出时保留历史。
 
@@ -108,6 +110,35 @@ Algorithm,Status,ErrorType,ErrorMessage,Runs,SuccessfulRuns,FailedRuns,...
 - topology/failure-domain：拓扑成本、延迟、跨域放置、故障域。
 
 完整字段见 [realtime-metrics.md](realtime-metrics.md)。
+
+## Realtime Candidate Score CSV
+
+`realtime_candidate_scores.csv` 是窄表，不把候选 VM 的逐项分量塞进 trial/summary 宽表。每行对应一次 cloudlet 到达时的一个候选 VM，适合排查为什么某个 VM 被选中或被拒绝。
+
+字段：
+
+| Field | Meaning |
+| :--- | :--- |
+| `Algorithm` | 算法名。 |
+| `Run` | trial 序号。 |
+| `CloudletId` | 到达任务 ID。 |
+| `ArrivalTime` | 任务原始到达时间。 |
+| `SelectedVmIndex` | 本次调度最终选择的 VM 下标。 |
+| `CandidateVmIndex` | 当前候选 VM 下标。 |
+| `Accepted` | 候选是否通过容量、资源、拓扑和租户过滤。 |
+| `Selected` | 当前候选是否为最终选择。 |
+| `TotalScore` | realtime score 总分，越低越好。 |
+| `ProjectedFinishTime` | 估算完成时间。 |
+| `EstimatedRuntime` | 当前任务在该 VM 上的估算运行时间。 |
+| `DeadlineSlack` | deadline 减 projected finish time；无 deadline 时为 0。 |
+| `LatenessPenalty` | deadline miss 惩罚；无 deadline 时为 0。 |
+| `PriorityPressure` | 优先级压力分量。 |
+| `PreemptionCost` | 未命中可抢占候选时的额外成本。 |
+| `ResourcePressure` | RAM/BW/IO 等资源压力分量。 |
+| `TopologyLatency` | 拓扑延迟分量。 |
+| `TopologyCost` | 拓扑成本分量。 |
+| `TenantFairnessPressure` | 多租户公平压力分量。 |
+| `QueuePressure` | 队列深度压力分量。 |
 
 ## Multi-Count Output
 

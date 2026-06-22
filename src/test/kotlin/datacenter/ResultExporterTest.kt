@@ -5,6 +5,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
+import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeScoreBreakdown
 import util.ExperimentOutputContext
 import java.io.File
 
@@ -46,6 +48,23 @@ class ResultExporterTest {
         }
 
     @Test
+    fun `realtime exporter writes candidate score detail csv for successful trials`(): Unit =
+        runBlocking {
+            val exporter = RealtimeResultExporter(ExperimentOutputContext(tempDir))
+            val summary = successfulRealtimeSummary()
+
+            exporter.saveTrialOutcome(summary.outcomes.single())
+
+            val lines = File(tempDir, REALTIME_CANDIDATE_SCORE_FILE).readLines()
+            assertThat(lines.first()).isEqualTo(realtimeCandidateScoreCsvHeaders.joinToString(","))
+            assertThat(lines).hasSize(3)
+            assertThat(lines[1].split(",").take(8))
+                .containsExactly("MIN_LOAD", "1", "42", "3.000000", "1", "0", "true", "false")
+            assertThat(lines[2].split(",").take(8))
+                .containsExactly("MIN_LOAD", "1", "42", "3.000000", "1", "1", "true", "true")
+        }
+
+    @Test
     fun `csv disabled exporters do not create files`(): Unit =
         runBlocking {
             val disabled = ExperimentOutputContext(tempDir, csvEnabled = false)
@@ -56,9 +75,9 @@ class ResultExporterTest {
                 saveSummary(listOf(partialBatchSummary()))
             }
             RealtimeResultExporter(disabled).apply {
-                saveTrialOutcome(failedRealtimeSummary().outcomes.single())
-                exportRealtimeToCSV(listOf(failedRealtimeSummary()))
-                saveSummaryResults(listOf(failedRealtimeSummary()))
+                saveTrialOutcome(successfulRealtimeSummary().outcomes.single())
+                exportRealtimeToCSV(listOf(successfulRealtimeSummary()))
+                saveSummaryResults(listOf(successfulRealtimeSummary()))
             }
             BatchCloudletCountResultExporter(disabled).export(emptyMap())
             RealtimeCloudletCountResultExporter(disabled).export(emptyMap())
@@ -123,6 +142,58 @@ class ResultExporterTest {
                         errorType = "IllegalStateException",
                         errorMessage = "runtime failure",
                     ),
+                ),
+        )
+
+    private fun successfulRealtimeSummary(): RealtimeRunSummary {
+        val result =
+            RealtimeAlgorithmResult(
+                algorithmName = "MIN_LOAD",
+                metrics =
+                    RealtimeMetricValues.of(
+                        RealtimeMetricKey.MAKESPAN to 1.0,
+                        RealtimeMetricKey.AVERAGE_REALTIME_SCORE to 6.0,
+                    ),
+                candidateScores =
+                    listOf(
+                        candidateScore(candidateVmIndex = 0, selected = false),
+                        candidateScore(candidateVmIndex = 1, selected = true),
+                    ),
+            )
+        return RealtimeRunSummary(
+            algorithmName = "MIN_LOAD",
+            status = RealtimeRunStatus.SUCCESS,
+            average = result,
+            statistics = null,
+            outcomes = listOf(RealtimeRunOutcome.Success(result, run = 1)),
+        )
+    }
+
+    private fun candidateScore(
+        candidateVmIndex: Int,
+        selected: Boolean,
+    ): RealtimeCandidateScoreRecord =
+        RealtimeCandidateScoreRecord(
+            cloudletId = 42L,
+            arrivalTime = 3.0,
+            selectedVmIndex = 1,
+            candidateVmIndex = candidateVmIndex,
+            accepted = true,
+            selected = selected,
+            breakdown =
+                RealtimeScoreBreakdown(
+                    totalScore = if (selected) 6.0 else 9.0,
+                    projectedFinishTime = if (selected) 4.0 else 7.0,
+                    estimatedRuntime = 1.0,
+                    deadlineSlack = if (selected) 2.0 else -1.0,
+                    latenessPenalty = if (selected) 0.0 else 1.0,
+                    priorityPressure = 0.5,
+                    preemptionCost = 0.0,
+                    resourcePressure = 0.0,
+                    topologyLatency = 0.0,
+                    topologyCost = 0.0,
+                    tenantFairnessPressure = 0.0,
+                    queuePressure = 0.0,
                 ),
         )
 }

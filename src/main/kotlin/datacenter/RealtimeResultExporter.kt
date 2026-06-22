@@ -21,6 +21,16 @@ internal class RealtimeResultExporter(
             headers = realtimeTrialCsvHeaders,
             row = outcome.toTrialCsvRow(),
         )
+        if (outcome is RealtimeRunOutcome.Success) {
+            outputContext.appendCsvRows(
+                fileName = REALTIME_CANDIDATE_SCORE_FILE,
+                headers = realtimeCandidateScoreCsvHeaders,
+                rows =
+                    outcome.result.candidateScores.map { record ->
+                        record.toCsvRow(outcome.algorithmName, outcome.run)
+                    },
+            )
+        }
     }
 
     override fun printComparisonResults(summaries: List<RealtimeRunSummary>) {

@@ -46,6 +46,36 @@ class ExperimentOutputContextTest {
         }
 
     @Test
+    fun `concurrent appended csv rows keep a single header and complete rows`(): Unit =
+        runBlocking {
+            val tempDir = Files.createTempDirectory("experiment-output-append-concurrent").toFile()
+            try {
+                val context = ExperimentOutputContext(tempDir)
+
+                (1..50)
+                    .map { value ->
+                        async(Dispatchers.Default) {
+                            context.appendCsvRows(
+                                fileName = "realtime_candidate_scores.csv",
+                                headers = listOf("A", "B"),
+                                rows = listOf(listOf(value, value * 2)),
+                            )
+                        }
+                    }.awaitAll()
+
+                val lines = tempDir.resolve("realtime_candidate_scores.csv").readLines()
+                assertThat(lines).hasSize(51)
+                assertThat(lines.first()).isEqualTo("A,B")
+                assertThat(lines.drop(1)).allSatisfy { line ->
+                    assertThat(line.split(",")).hasSize(2)
+                }
+                assertThat(lines.count { it == "A,B" }).isEqualTo(1)
+            } finally {
+                tempDir.deleteRecursively()
+            }
+        }
+
+    @Test
     fun `child output context inherits csv settings and writes into child directory`(): Unit =
         runBlocking {
             val tempDir = Files.createTempDirectory("experiment-output-child").toFile()

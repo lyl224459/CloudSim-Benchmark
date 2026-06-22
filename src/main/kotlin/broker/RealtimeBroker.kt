@@ -10,6 +10,7 @@ import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.core.events.SimEvent
 import org.cloudsimplus.vms.Vm
 import scheduler.RealtimeScheduler
+import scheduler.RealtimeCandidateScoreRecord
 import scheduler.RealtimeTaskMetadata
 import scheduler.RealtimeTopologyMetrics
 
@@ -273,6 +274,16 @@ class RealtimeBroker(
     fun getAverageQueueDepth(): Double = readModel.averageQueueDepth()
 
     fun getMaxQueueDepth(): Int = readModel.maxQueueDepth()
+
+    fun getAverageRealtimeScore(): Double = readModel.averageRealtimeScore()
+
+    fun getAverageSelectedLatenessPenalty(): Double = readModel.averageSelectedLatenessPenalty()
+
+    fun getAverageSelectedDeadlineSlack(): Double = readModel.averageSelectedDeadlineSlack()
+
+    fun getAverageCandidateScoreSpread(): Double = readModel.averageCandidateScoreSpread()
+
+    fun getCandidateScoreRecords(): List<RealtimeCandidateScoreRecord> = readModel.candidateScoreRecords()
 
     fun getTaskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = readModel.taskMetadata(cloudlet)
 

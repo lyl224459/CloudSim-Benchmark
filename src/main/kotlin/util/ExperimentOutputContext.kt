@@ -87,6 +87,30 @@ data class ExperimentOutputContext(
         }
     }
 
+    suspend fun appendCsvRows(
+        fileName: String,
+        headers: List<String>,
+        rows: List<List<Any?>>,
+    ) {
+        val dir = experimentDir ?: return
+        if (!csvEnabled || rows.isEmpty()) return
+
+        val file = File(dir, fileName)
+        val lock = writeLocks.computeIfAbsent(file.absolutePath) { Mutex() }
+
+        lock.withLock {
+            val isNew = !file.exists()
+            val schema = CsvTableSchema(headers)
+            val csvWriter = CsvRowWriter(csvDelimiter)
+            java.io.FileOutputStream(file, true).bufferedWriter().use { writer ->
+                if (isNew) {
+                    csvWriter.writeHeader(writer, schema)
+                }
+                rows.forEach { row -> csvWriter.writeRow(writer, schema, row) }
+            }
+        }
+    }
+
     fun saveSummaryRows(
         rows: List<List<Any?>>,
         headers: List<String>,

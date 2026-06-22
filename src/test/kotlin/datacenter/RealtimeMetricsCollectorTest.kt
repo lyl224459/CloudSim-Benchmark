@@ -12,6 +12,8 @@ import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.whenever
+import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeScoreBreakdown
 import scheduler.RealtimeTaskRecord
 import scheduler.RealtimeTopologyMetrics
 
@@ -169,6 +171,11 @@ class RealtimeMetricsCollectorTest {
         assertThat(result.retryCount).isEqualTo(3)
         assertThat(result.permanentFailedCount).isEqualTo(4)
         assertThat(result.averageDecisionDelay).isEqualTo(0.25)
+        assertThat(result.averageRealtimeScore).isEqualTo(6.0)
+        assertThat(result.averageSelectedLatenessPenalty).isEqualTo(0.0)
+        assertThat(result.averageSelectedDeadlineSlack).isEqualTo(2.0)
+        assertThat(result.averageCandidateScoreSpread).isEqualTo(3.0)
+        assertThat(result.candidateScores).hasSize(1)
         assertThat(result.submittedCount).isEqualTo(9)
         assertThat(result.capacityRejectedCount).isEqualTo(10)
         assertThat(result.averageQueueDepth).isEqualTo(2.5)
@@ -224,6 +231,11 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getRetryCount()).thenReturn(3)
         whenever(broker.getPermanentFailedCount()).thenReturn(4)
         whenever(broker.getAverageDecisionDelay()).thenReturn(0.25)
+        whenever(broker.getAverageRealtimeScore()).thenReturn(6.0)
+        whenever(broker.getAverageSelectedLatenessPenalty()).thenReturn(0.0)
+        whenever(broker.getAverageSelectedDeadlineSlack()).thenReturn(2.0)
+        whenever(broker.getAverageCandidateScoreSpread()).thenReturn(3.0)
+        whenever(broker.getCandidateScoreRecords()).thenReturn(listOf(candidateScore()))
         whenever(broker.getCostSlaTradeoffScore(any(), any())).thenReturn(25.0)
     }
 
@@ -296,4 +308,29 @@ class RealtimeMetricsCollectorTest {
             on { getStartTime() } doReturn spec.start
             on { getTotalExecutionTime() } doReturn spec.cpu
         }
+
+    private fun candidateScore(): RealtimeCandidateScoreRecord =
+        RealtimeCandidateScoreRecord(
+            cloudletId = 1L,
+            arrivalTime = 0.0,
+            selectedVmIndex = 0,
+            candidateVmIndex = 0,
+            accepted = true,
+            selected = true,
+            breakdown =
+                RealtimeScoreBreakdown(
+                    totalScore = 6.0,
+                    projectedFinishTime = 4.0,
+                    estimatedRuntime = 1.0,
+                    deadlineSlack = 2.0,
+                    latenessPenalty = 0.0,
+                    priorityPressure = 0.5,
+                    preemptionCost = 0.0,
+                    resourcePressure = 0.0,
+                    topologyLatency = 0.0,
+                    topologyCost = 0.0,
+                    tenantFairnessPressure = 0.0,
+                    queuePressure = 0.0,
+                ),
+        )
 }

@@ -52,6 +52,7 @@ abstract class RealtimeSchedulerBase(
     protected val vmList: List<Vm>,
 ) : RealtimeScheduler {
     protected val vmNum = vmList.size
+    protected val scoreCalculator = RealtimeCandidateScoreCalculator()
 
     private val schedulerName: String
         get() = javaClass.simpleName.ifBlank { "RealtimeScheduler" }
@@ -222,6 +223,22 @@ abstract class RealtimeSchedulerBase(
             ?.vmIndex
             ?: fallbackCandidateVm(context)
 
+    protected fun scoreCandidates(context: RealtimeSchedulingContext): List<RealtimeCandidateScore> =
+        scoreCalculator.scoreAccepted(context)
+
+    protected fun scoreByVmIndex(context: RealtimeSchedulingContext): Map<Int, RealtimeCandidateScore> =
+        scoreCandidates(context).associateBy { it.vmIndex }
+
+    protected fun selectByRealtimeScore(context: RealtimeSchedulingContext): Int {
+        val scoresByVmIndex = scoreByVmIndex(context)
+        val comparator =
+            compareBy<RealtimeNodeState> { scoresByVmIndex[it.vmIndex]?.totalScore ?: Double.POSITIVE_INFINITY }
+                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
+                .thenBy { it.queueDepth }
+                .thenBy { it.vmIndex }
+        return selectAcceptedOrFallback(context, comparator)
+    }
+
     private fun tenantAdjustedCost(
         context: RealtimeSchedulingContext,
         state: RealtimeNodeState,
@@ -281,7 +298,13 @@ class RealtimePSOScheduler(
         allCloudlets: List<Cloudlet>,
     ): Int {
         val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
-        val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
+        val objFunc =
+            RealtimeSchedulingObjectiveFunction(
+                context = context,
+                candidateStates = candidateStates,
+                cloudletCount = allCloudlets.size,
+                scoreCalculator = scoreCalculator,
+            )
         val pso =
             PSO(
                 runtime = OptimizerRuntime(objFunc, population, maxIter, random),
@@ -313,7 +336,13 @@ class RealtimeWOAScheduler(
         allCloudlets: List<Cloudlet>,
     ): Int {
         val candidateVms = candidateStates.map { context.vmList[it.vmIndex] }
-        val objFunc = datacenter.SchedulerObjectiveFunction(allCloudlets, candidateVms, objectiveWeights)
+        val objFunc =
+            RealtimeSchedulingObjectiveFunction(
+                context = context,
+                candidateStates = candidateStates,
+                cloudletCount = allCloudlets.size,
+                scoreCalculator = scoreCalculator,
+            )
         val woa =
             WOA(
                 runtime = OptimizerRuntime(objFunc, population, maxIter, random),

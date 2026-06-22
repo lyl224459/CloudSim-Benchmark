@@ -4,6 +4,10 @@ LoadBalance
 Cost
 TotalTime
 Fitness
+AvgRealtimeScore
+AvgSelectedLatenessPenalty
+AvgSelectedDeadlineSlack
+AvgCandidateScoreSpread
 AvgWaitingTime
 AvgResponseTime
 RejectedCount
@@ -65,6 +69,10 @@ LoadBalance
 Cost
 TotalTime
 Fitness
+AvgRealtimeScore
+AvgSelectedLatenessPenalty
+AvgSelectedDeadlineSlack
+AvgCandidateScoreSpread
 AvgWaitingTime
 AvgResponseTime
 RejectedCount
@@ -129,6 +137,10 @@ LoadBalance_Mean
 Cost_Mean
 TotalTime_Mean
 Fitness_Mean
+AvgRealtimeScore_Mean
+AvgSelectedLatenessPenalty_Mean
+AvgSelectedDeadlineSlack_Mean
+AvgCandidateScoreSpread_Mean
 AvgWaitingTime_Mean
 AvgResponseTime_Mean
 RejectedCount_Mean
@@ -185,6 +197,10 @@ LoadBalance_StdDev
 Cost_StdDev
 TotalTime_StdDev
 Fitness_StdDev
+AvgRealtimeScore_StdDev
+AvgSelectedLatenessPenalty_StdDev
+AvgSelectedDeadlineSlack_StdDev
+AvgCandidateScoreSpread_StdDev
 AvgWaitingTime_StdDev
 AvgResponseTime_StdDev
 RejectedCount_StdDev
@@ -250,6 +266,10 @@ LoadBalance_Mean
 Cost_Mean
 TotalTime_Mean
 Fitness_Mean
+AvgRealtimeScore_Mean
+AvgSelectedLatenessPenalty_Mean
+AvgSelectedDeadlineSlack_Mean
+AvgCandidateScoreSpread_Mean
 AvgWaitingTime_Mean
 AvgResponseTime_Mean
 RejectedCount_Mean
@@ -306,6 +326,10 @@ LoadBalance_StdDev
 Cost_StdDev
 TotalTime_StdDev
 Fitness_StdDev
+AvgRealtimeScore_StdDev
+AvgSelectedLatenessPenalty_StdDev
+AvgSelectedDeadlineSlack_StdDev
+AvgCandidateScoreSpread_StdDev
 AvgWaitingTime_StdDev
 AvgResponseTime_StdDev
 RejectedCount_StdDev
