@@ -61,6 +61,7 @@ internal class RealtimeVmSelectionFacade(
         activeCloudlets: List<Cloudlet>,
         currentTime: Double,
         allowDeadlinePreemption: Boolean = true,
+        recordSelectionMetrics: Boolean = true,
     ): RealtimeVmSelectionOutcome {
         val strategy = schedulingConfig.strategy.lowercase()
         val context = schedulingContext(cloudlet, activeCloudlets, currentTime)
@@ -79,6 +80,7 @@ internal class RealtimeVmSelectionFacade(
                     activeCloudlets = activeCloudlets,
                     context = admission.context,
                     metricAction = admission.metricAction,
+                    recordSelectionMetrics = recordSelectionMetrics,
                 )
             DeadlineAdmissionResult.NeedsPreemption -> RealtimeVmSelectionOutcome.NeedsPreemption
             DeadlineAdmissionResult.Reject -> RealtimeVmSelectionOutcome.Rejected(RealtimeRejectReason.DEADLINE)
@@ -213,10 +215,11 @@ internal class RealtimeVmSelectionFacade(
         activeCloudlets: List<Cloudlet>,
         context: RealtimeSchedulingContext,
         metricAction: DeadlineAdmissionMetricAction?,
+        recordSelectionMetrics: Boolean,
     ): RealtimeVmSelectionOutcome {
         val selected = schedulerSelectedVm(strategy, cloudlet, context)
         return selected
-            ?.let { validatedVmSelection(it, cloudlet, activeCloudlets, context, metricAction) }
+            ?.let { validatedVmSelection(it, cloudlet, activeCloudlets, context, metricAction, recordSelectionMetrics) }
             ?: RealtimeVmSelectionOutcome.NoSelection
     }
 
@@ -226,6 +229,7 @@ internal class RealtimeVmSelectionFacade(
         activeCloudlets: List<Cloudlet>,
         context: RealtimeSchedulingContext,
         metricAction: DeadlineAdmissionMetricAction?,
+        recordSelectionMetrics: Boolean,
     ): RealtimeVmSelectionOutcome.Selected? {
         val reserved = applyReservationPolicy(selectedVmIndex, cloudlet, activeCloudlets)
         val bounded = reserved.coerceIn(environment.vmList.indices)
@@ -235,8 +239,10 @@ internal class RealtimeVmSelectionFacade(
             context.nodeCandidates.isNotEmpty() && placementState == null -> null
             selectedState != null && !selectedState.acceptingWork -> null
             else -> {
-                state.metrics.recordCandidateScores(scoreCalculator.scoreRecords(context, bounded))
-                state.metrics.recordDeadlineAdmission(metricAction)
+                if (recordSelectionMetrics) {
+                    state.metrics.recordCandidateScores(scoreCalculator.scoreRecords(context, bounded))
+                    state.metrics.recordDeadlineAdmission(metricAction)
+                }
                 RealtimeVmSelectionOutcome.Selected(bounded, selectedState?.failurePressure ?: 0.0)
             }
         }

@@ -146,6 +146,10 @@
 | `deadlineAdmissionEnabled` | `true` | 是否在调度前按 projected finish time 做 deadline 可调度性判断。 |
 | `deadlineType` | `soft` | `soft`、`firm`、`hard`；firm/hard 会在可按期候选存在时过滤 late 候选。 |
 | `deadlineMissAction` | `accept` | `accept`、`reject`、`degrade`、`retry_later`；`retry_later` 复用 retry 参数。 |
+| `reschedulingEnabled` | `false` | 是否启用 CloudSim 周期性重调度；默认关闭，保持 arrival-only 行为。 |
+| `reschedulingInterval` | `0.0` | 重调度 tick 间隔，单位秒；启用时必须大于 0。 |
+| `reschedulingPolicy` | `deadline_score` | `deadline_score`、`score_only`、`deadline_only`。 |
+| `maxReschedulesPerTask` | `1` | 单任务最多执行的周期性重调度次数；启用时必须大于 0。 |
 | `vmQueueCapacity` | `0` | 单 VM 队列容量，0 表示不启用。 |
 | `taskTimeout` | `0.0` | 0 表示不启用 timeout。 |
 | `timeoutAction` | `fail` | `fail`、`retry`、`cancel`、`degrade`。 |

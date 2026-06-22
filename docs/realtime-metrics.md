@@ -30,6 +30,10 @@
 | DeadlineDegradedCount | count | 越低越好 | deadline miss 后按降级策略继续提交的任务数。 |
 | DeadlineRetryLaterCount | count | 越低越好 | deadline miss 后被重新排队等待再次 admission 的次数。 |
 | DeadlineMissAcceptedCount | count | 越低越好 | deadline miss 但按 accept 策略继续提交的任务数。 |
+| RescheduleAttemptCount | count | 越低越好 | 周期性重调度检查中尝试重新安排任务的次数。 |
+| RescheduleSuccessCount | count | 越高越好 | 周期性重调度成功迁移或重排到新 VM 的次数。 |
+| RescheduleFailureCount | count | 越低越好 | 周期性重调度尝试后未找到更优 VM 或未执行迁移的次数。 |
+| AvgRescheduleDelay | seconds | 越低越好 | 成功重调度产生的平均决策/迁移延迟。 |
 | AvgQueueDepth | count | 越低越好 | 被选中 VM 的队列深度采样平均值。 |
 | MaxQueueDepth | count | 越低越好 | 队列深度采样最大值。 |
 | P95ResponseTime | seconds | 越低越好 | 响应时间第 95 百分位。 |

@@ -8,11 +8,13 @@ internal data class RealtimePendingSubmission(
     val vmIndex: Int,
     val decisionDelay: Double,
     val failurePressure: Double,
+    val decisionToken: Int,
 )
 
 internal data class RealtimeCloudletEventPayload(
     val cloudlet: Cloudlet,
     val attempt: Int,
+    val runtimeToken: Int,
 )
 
 internal sealed interface RealtimeBrokerCommand {
@@ -37,6 +39,10 @@ internal sealed interface RealtimeBrokerCommand {
     ) : RealtimeBrokerCommand
 
     data class ScheduleAutoscaleTick(
+        val delay: Double,
+    ) : RealtimeBrokerCommand
+
+    data class ScheduleRescheduleTick(
         val delay: Double,
     ) : RealtimeBrokerCommand
 

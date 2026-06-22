@@ -52,6 +52,23 @@ enum class RealtimeDeadlineMissAction(
     }
 }
 
+enum class RealtimeReschedulingPolicy(
+    val configValue: String,
+) {
+    DEADLINE_SCORE("deadline_score"),
+    SCORE_ONLY("score_only"),
+    DEADLINE_ONLY("deadline_only"),
+    ;
+
+    companion object {
+        fun parse(value: String): RealtimeReschedulingPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时重调度策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
 enum class RealtimeTimeoutAction(
     val configValue: String,
 ) {

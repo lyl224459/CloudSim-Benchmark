@@ -10,6 +10,10 @@ data class RealtimeBrokerMetricsSnapshot(
     val deadlineDegradedCount: Int,
     val deadlineRetryLaterCount: Int,
     val deadlineMissAcceptedCount: Int,
+    val rescheduleAttemptCount: Int,
+    val rescheduleSuccessCount: Int,
+    val rescheduleFailureCount: Int,
+    val averageRescheduleDelay: Double,
     val tenantQuotaRejectedCount: Int,
     val tenantBudgetRejectedCount: Int,
     val submittedCount: Int,
@@ -54,6 +58,13 @@ class RealtimeBrokerMetrics {
         private set
     var deadlineMissAcceptedCount: Int = 0
         private set
+    var rescheduleAttemptCount: Int = 0
+        private set
+    var rescheduleSuccessCount: Int = 0
+        private set
+    var rescheduleFailureCount: Int = 0
+        private set
+    private var rescheduleDelayTotal = 0.0
     var tenantQuotaRejectedCount: Int = 0
         private set
     var tenantBudgetRejectedCount: Int = 0
@@ -112,6 +123,8 @@ class RealtimeBrokerMetrics {
     val checkpointLoss: Long get() = checkpointLossTotal
     val retrySuccessRate: Double
         get() = if (retryCount > 0) retrySuccessCount.toDouble() / retryCount else 0.0
+    val averageRescheduleDelay: Double
+        get() = if (rescheduleSuccessCount > 0) rescheduleDelayTotal / rescheduleSuccessCount else 0.0
     val averageRealtimeScore: Double
         get() = if (candidateScoreDecisionCount > 0) realtimeScoreTotal / candidateScoreDecisionCount else 0.0
     val averageSelectedLatenessPenalty: Double
@@ -158,6 +171,19 @@ class RealtimeBrokerMetrics {
 
     fun recordDeadlineRetryLater() {
         deadlineRetryLaterCount++
+    }
+
+    fun recordRescheduleAttempt() {
+        rescheduleAttemptCount++
+    }
+
+    fun recordRescheduleSuccess(delay: Double) {
+        rescheduleSuccessCount++
+        rescheduleDelayTotal += delay
+    }
+
+    fun recordRescheduleFailure() {
+        rescheduleFailureCount++
     }
 
     fun recordSubmitted() {
@@ -258,6 +284,10 @@ class RealtimeBrokerMetrics {
             deadlineDegradedCount,
             deadlineRetryLaterCount,
             deadlineMissAcceptedCount,
+            rescheduleAttemptCount,
+            rescheduleSuccessCount,
+            rescheduleFailureCount,
+            averageRescheduleDelay,
             tenantQuotaRejectedCount,
             tenantBudgetRejectedCount,
             submittedCount,

@@ -56,6 +56,7 @@ internal object RealtimeCoreSchedulingValidator {
             )
         }
         validateQueueAndPriority(scheduling, context)
+        validateRescheduling(scheduling, context)
         validateScalingAndResourceWeights(scheduling, context)
     }
 
@@ -115,6 +116,46 @@ internal object RealtimeCoreSchedulingValidator {
             scheduling.overloadFailureMultiplier,
             "过载失败倍率不能为负数",
         )
+    }
+
+    private fun validateRescheduling(
+        scheduling: RealtimeSchedulingConfig,
+        context: RealtimeValidationContext,
+    ) {
+        enumValue(
+            context,
+            "realtime.scheduling.reschedulingPolicy",
+            scheduling.reschedulingPolicy,
+            RealtimeReschedulingPolicy.valuesForConfig(),
+            "实时重调度策略",
+        )
+        nonNegative(
+            context,
+            "realtime.scheduling.reschedulingInterval",
+            scheduling.reschedulingInterval,
+            "重调度间隔不能为负数",
+        )
+        if (scheduling.maxReschedulesPerTask < 0) {
+            context.addError(
+                "realtime.scheduling.maxReschedulesPerTask",
+                scheduling.maxReschedulesPerTask,
+                "单任务最大重调度次数不能为负数",
+            )
+        }
+        if (scheduling.reschedulingEnabled && scheduling.reschedulingInterval <= 0.0) {
+            context.addError(
+                "realtime.scheduling.reschedulingInterval",
+                scheduling.reschedulingInterval,
+                "启用重调度时重调度间隔必须大于 0",
+            )
+        }
+        if (scheduling.reschedulingEnabled && scheduling.maxReschedulesPerTask <= 0) {
+            context.addError(
+                "realtime.scheduling.maxReschedulesPerTask",
+                scheduling.maxReschedulesPerTask,
+                "启用重调度时单任务最大重调度次数必须大于 0",
+            )
+        }
     }
 
     private fun validateScalingAndResourceWeights(

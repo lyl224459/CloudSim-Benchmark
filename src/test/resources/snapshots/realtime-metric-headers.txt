@@ -25,6 +25,10 @@ DeadlineRejectedCount
 DeadlineDegradedCount
 DeadlineRetryLaterCount
 DeadlineMissAcceptedCount
+RescheduleAttemptCount
+RescheduleSuccessCount
+RescheduleFailureCount
+AvgRescheduleDelay
 AvgQueueDepth
 MaxQueueDepth
 P95ResponseTime
@@ -94,6 +98,10 @@ DeadlineRejectedCount
 DeadlineDegradedCount
 DeadlineRetryLaterCount
 DeadlineMissAcceptedCount
+RescheduleAttemptCount
+RescheduleSuccessCount
+RescheduleFailureCount
+AvgRescheduleDelay
 AvgQueueDepth
 MaxQueueDepth
 P95ResponseTime
@@ -166,6 +174,10 @@ DeadlineRejectedCount_Mean
 DeadlineDegradedCount_Mean
 DeadlineRetryLaterCount_Mean
 DeadlineMissAcceptedCount_Mean
+RescheduleAttemptCount_Mean
+RescheduleSuccessCount_Mean
+RescheduleFailureCount_Mean
+AvgRescheduleDelay_Mean
 AvgQueueDepth_Mean
 MaxQueueDepth_Mean
 P95ResponseTime_Mean
@@ -230,6 +242,10 @@ DeadlineRejectedCount_StdDev
 DeadlineDegradedCount_StdDev
 DeadlineRetryLaterCount_StdDev
 DeadlineMissAcceptedCount_StdDev
+RescheduleAttemptCount_StdDev
+RescheduleSuccessCount_StdDev
+RescheduleFailureCount_StdDev
+AvgRescheduleDelay_StdDev
 AvgQueueDepth_StdDev
 MaxQueueDepth_StdDev
 P95ResponseTime_StdDev
@@ -303,6 +319,10 @@ DeadlineRejectedCount_Mean
 DeadlineDegradedCount_Mean
 DeadlineRetryLaterCount_Mean
 DeadlineMissAcceptedCount_Mean
+RescheduleAttemptCount_Mean
+RescheduleSuccessCount_Mean
+RescheduleFailureCount_Mean
+AvgRescheduleDelay_Mean
 AvgQueueDepth_Mean
 MaxQueueDepth_Mean
 P95ResponseTime_Mean
@@ -367,6 +387,10 @@ DeadlineRejectedCount_StdDev
 DeadlineDegradedCount_StdDev
 DeadlineRetryLaterCount_StdDev
 DeadlineMissAcceptedCount_StdDev
+RescheduleAttemptCount_StdDev
+RescheduleSuccessCount_StdDev
+RescheduleFailureCount_StdDev
+AvgRescheduleDelay_StdDev
 AvgQueueDepth_StdDev
 MaxQueueDepth_StdDev
 P95ResponseTime_StdDev

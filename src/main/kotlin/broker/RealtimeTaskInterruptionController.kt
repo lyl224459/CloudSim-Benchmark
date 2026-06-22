@@ -35,8 +35,9 @@ internal class RealtimeTaskInterruptionController(
     fun onTimeout(
         cloudlet: Cloudlet,
         attempt: Int,
+        runtimeToken: Int,
     ): List<RealtimeBrokerCommand> =
-        if (shouldIgnoreInterruption(cloudlet, attempt)) {
+        if (shouldIgnoreInterruption(cloudlet, attempt, runtimeToken)) {
             emptyList()
         } else {
             handleTimeout(cloudlet)
@@ -45,8 +46,9 @@ internal class RealtimeTaskInterruptionController(
     fun onRuntimeFailure(
         cloudlet: Cloudlet,
         attempt: Int,
+        runtimeToken: Int,
     ): List<RealtimeBrokerCommand> =
-        if (shouldIgnoreInterruption(cloudlet, attempt)) {
+        if (shouldIgnoreInterruption(cloudlet, attempt, runtimeToken)) {
             emptyList()
         } else {
             state.metrics.recordRuntimeFailure()
@@ -99,7 +101,11 @@ internal class RealtimeTaskInterruptionController(
     private fun shouldIgnoreInterruption(
         cloudlet: Cloudlet,
         attempt: Int,
-    ): Boolean = attempt != state.arrival.attemptOf(cloudlet) || cloudlet.isTerminalRealtimeCloudlet()
+        runtimeToken: Int,
+    ): Boolean =
+        attempt != state.arrival.attemptOf(cloudlet) ||
+            !state.arrival.isCurrentRuntimeToken(cloudlet, runtimeToken) ||
+            cloudlet.isTerminalRealtimeCloudlet()
 }
 
 internal class RealtimeInterruptedCloudletRetryHandler(

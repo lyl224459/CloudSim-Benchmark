@@ -126,7 +126,8 @@ internal class RealtimeArrivalWorkflowAdapter(
 internal class RealtimeSubmissionWorkflowAdapter(
     private val submissionService: RealtimeSubmissionService,
 ) : RealtimeSubmissionWorkflowContext {
-    override fun isPendingDecision(cloudlet: Cloudlet): Boolean = submissionService.isPendingDecision(cloudlet)
+    override fun isCurrentPendingDecision(submission: RealtimePendingSubmission): Boolean =
+        submissionService.isCurrentPendingDecision(submission)
 
     override fun discardPending(cloudlet: Cloudlet) {
         submissionService.discardPending(cloudlet)

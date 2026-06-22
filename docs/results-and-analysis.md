@@ -104,6 +104,7 @@ Algorithm,Status,ErrorType,ErrorMessage,Runs,SuccessfulRuns,FailedRuns,...
 
 - performance：`Makespan`、`LoadBalance`、`Cost`、`TotalTime`。
 - admission/SLA：`RejectedCount`、`DeadlineRejectedCount`、`DeadlineDegradedCount`、`DeadlineRetryLaterCount`、`DeadlineMissAcceptedCount`、`TimeoutCount`、`SlaViolationCount`。
+- rescheduling：`RescheduleAttemptCount`、`RescheduleSuccessCount`、`RescheduleFailureCount`、`AvgRescheduleDelay`。
 - resource/autoscaling：队列深度、动态 VM、冷启动、伸缩成本。
 - reliability：失败、重试、迁移和 checkpoint。
 - tenant/fairness：Jain index、quota、tenant SLA penalty。

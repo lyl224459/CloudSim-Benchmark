@@ -11,6 +11,9 @@ data class RealtimeArrivalSnapshot(
     val arrivalTimes: Map<CloudletId, Double>,
     val preassignedVmIndexes: Map<CloudletId, VmIndex>,
     val attempts: Map<CloudletId, Int>,
+    val decisionTokens: Map<CloudletId, Int>,
+    val runtimeTokens: Map<CloudletId, Int>,
+    val rescheduleCounts: Map<CloudletId, Int>,
 )
 
 @Suppress("TooManyFunctions") // State facade owns the complete arrival lifecycle transition API.
@@ -21,6 +24,9 @@ class RealtimeArrivalState {
     private val arrivalTimes = mutableMapOf<CloudletId, Double>()
     private val preassignedVmIndexes = mutableMapOf<CloudletId, VmIndex>()
     private val attempts = mutableMapOf<CloudletId, Int>()
+    private val decisionTokens = mutableMapOf<CloudletId, Int>()
+    private val runtimeTokens = mutableMapOf<CloudletId, Int>()
+    private val rescheduleCounts = mutableMapOf<CloudletId, Int>()
 
     fun recordArrival(cloudlet: Cloudlet) {
         arrivalTimes[cloudlet.cloudletId] = cloudlet.submissionDelay
@@ -53,10 +59,12 @@ class RealtimeArrivalState {
 
     fun removePending(cloudletId: CloudletId) {
         pendingCloudlets.removeIf { it.cloudletId == cloudletId }
+        invalidateDecisionToken(cloudletId)
     }
 
     fun removeWaiting(cloudletId: CloudletId) {
         waitingCloudlets.removeIf { it.cloudletId == cloudletId }
+        invalidateRuntimeToken(cloudletId)
     }
 
     fun preassign(
@@ -83,6 +91,46 @@ class RealtimeArrivalState {
         return next
     }
 
+    fun issueDecisionToken(cloudlet: Cloudlet): Int {
+        val id = cloudlet.cloudletId
+        val token = (decisionTokens[id] ?: 0) + 1
+        decisionTokens[id] = token
+        return token
+    }
+
+    fun isCurrentDecisionToken(
+        cloudlet: Cloudlet,
+        token: Int,
+    ): Boolean = decisionTokens[cloudlet.cloudletId] == token
+
+    fun issueRuntimeToken(cloudlet: Cloudlet): Int {
+        val id = cloudlet.cloudletId
+        val token = (runtimeTokens[id] ?: 0) + 1
+        runtimeTokens[id] = token
+        return token
+    }
+
+    fun isCurrentRuntimeToken(
+        cloudlet: Cloudlet,
+        token: Int,
+    ): Boolean = runtimeTokens[cloudlet.cloudletId] == token
+
+    fun rescheduleCountOf(cloudlet: Cloudlet): Int = rescheduleCounts[cloudlet.cloudletId] ?: 0
+
+    fun incrementRescheduleCount(cloudlet: Cloudlet): Int {
+        val next = rescheduleCountOf(cloudlet) + 1
+        rescheduleCounts[cloudlet.cloudletId] = next
+        return next
+    }
+
+    private fun invalidateDecisionToken(cloudletId: CloudletId) {
+        decisionTokens[cloudletId] = (decisionTokens[cloudletId] ?: 0) + 1
+    }
+
+    private fun invalidateRuntimeToken(cloudletId: CloudletId) {
+        runtimeTokens[cloudletId] = (runtimeTokens[cloudletId] ?: 0) + 1
+    }
+
     fun snapshot(): RealtimeArrivalSnapshot =
         RealtimeArrivalSnapshot(
             waitingCloudletIds = waitingCloudlets.map { it.cloudletId },
@@ -91,6 +139,9 @@ class RealtimeArrivalState {
             arrivalTimes = arrivalTimes.toMap(),
             preassignedVmIndexes = preassignedVmIndexes.toMap(),
             attempts = attempts.toMap(),
+            decisionTokens = decisionTokens.toMap(),
+            runtimeTokens = runtimeTokens.toMap(),
+            rescheduleCounts = rescheduleCounts.toMap(),
         )
 
     private val Cloudlet.cloudletId: CloudletId get() = CloudletId(id)

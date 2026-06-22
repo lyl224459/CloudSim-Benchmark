@@ -29,6 +29,7 @@ internal class RealtimeSubmissionService(
     fun preparePendingSubmission(request: RealtimePendingSubmissionRequest): RealtimePendingSubmission {
         val cloudlet = request.cloudlet
         val boundedIndex = request.selectedVmIndex.coerceIn(environment.vmList.indices)
+        val decisionToken = state.arrival.issueDecisionToken(cloudlet)
         cloudlet.setVm(environment.vmList[boundedIndex])
         state.reservation.reserve(cloudlet, boundedIndex)
         state.arrival.addPending(cloudlet)
@@ -40,7 +41,7 @@ internal class RealtimeSubmissionService(
             )
         }
         sampleQueueDepth(request.activeCloudlets, boundedIndex, request.currentTime)
-        return RealtimePendingSubmission(cloudlet, boundedIndex, request.delay, request.failurePressure)
+        return RealtimePendingSubmission(cloudlet, boundedIndex, request.delay, request.failurePressure, decisionToken)
     }
 
     fun rejectCloudlet(
@@ -53,12 +54,16 @@ internal class RealtimeSubmissionService(
         lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.REJECTED) }
     }
 
-    fun isPendingDecision(cloudlet: Cloudlet): Boolean =
-        state.lifecycleStore.get(cloudlet.id)?.lifecycle == RealtimeTaskLifecycle.PENDING_DECISION
+    fun isCurrentPendingDecision(submission: RealtimePendingSubmission): Boolean =
+        state.lifecycleStore.get(submission.cloudlet.id)?.lifecycle == RealtimeTaskLifecycle.PENDING_DECISION &&
+            state.arrival.isCurrentDecisionToken(submission.cloudlet, submission.decisionToken)
 
     fun discardPending(cloudlet: Cloudlet) {
         state.arrival.removePending(CloudletId(cloudlet.id))
     }
+
+    fun isCurrentRuntimeEvent(payload: RealtimeCloudletEventPayload): Boolean =
+        state.arrival.isCurrentRuntimeToken(payload.cloudlet, payload.runtimeToken)
 
     fun attemptOf(cloudlet: Cloudlet): Int = state.arrival.attemptOf(cloudlet)
 

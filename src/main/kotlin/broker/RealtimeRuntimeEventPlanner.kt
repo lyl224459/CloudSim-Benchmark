@@ -22,12 +22,14 @@ internal class RealtimeRuntimeEventPlanner(
         submissionFailurePressure: Double,
     ): List<RealtimeBrokerCommand> {
         val attempt = state.arrival.attemptOf(cloudlet)
+        val runtimeToken = state.arrival.issueRuntimeToken(cloudlet)
         val assignedVmIndex = state.lifecycleStore.get(cloudlet.id)?.assignedVmIndex ?: 0
         val pressure = runtimeFailurePressure(assignedVmIndex, submissionFailurePressure)
         val plan =
             runtimeEventController.planRuntimeEvents(
                 cloudlet = cloudlet,
                 attempt = attempt,
+                runtimeToken = runtimeToken,
                 timing =
                     RealtimeRuntimeEventTiming(
                         arrivalTime = state.arrival.arrivalTimeOf(cloudlet),

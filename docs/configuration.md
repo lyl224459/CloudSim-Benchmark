@@ -144,6 +144,10 @@ deadlineFactor = 1.2
 deadlineAdmissionEnabled = true
 deadlineType = "soft"
 deadlineMissAction = "accept"
+reschedulingEnabled = false
+reschedulingInterval = 0.0
+reschedulingPolicy = "deadline_score"
+maxReschedulesPerTask = 1
 taskTimeout = 20.0
 timeoutAction = "retry"
 retryLimit = 1
@@ -156,6 +160,7 @@ checkpointInterval = 5.0
 | Field Group | Examples | Meaning |
 | :--- | :--- | :--- |
 | Queue/deadline | `queuePolicy`、`deadlineFactor`、`deadlineAdmissionEnabled`、`deadlineType`、`deadlineMissAction`、`taskTimeout` | 控制 FIFO、priority、deadline admission 和 timeout。 |
+| Rescheduling | `reschedulingEnabled`、`reschedulingInterval`、`reschedulingPolicy`、`maxReschedulesPerTask` | 控制周期性检查 pending、waiting、running 任务并按内置策略重调度。 |
 | Resource model | `resourceModelEnabled`、`vmQueueCapacity`、`ramWeight`、`bwWeight`、`ioWeight` | 控制资源需求、容量拒绝和候选评分。 |
 | Failure/retry | `runtimeFailureRate`、`nodeFailureRate`、`retryLimit`、`retryDelay` | 控制运行时失败、节点失败和重试。 |
 | Autoscaling | `autoscalingEnabled`、`scaleOutQueueThreshold`、`maxDynamicVms`、`vmColdStartDelay` | 控制动态 VM 扩缩容。 |

@@ -149,6 +149,10 @@ data class RealtimeSchedulingConfig(
     val deadlineAdmissionEnabled: Boolean = true,
     val deadlineType: String = "soft",
     val deadlineMissAction: String = "accept",
+    val reschedulingEnabled: Boolean = false,
+    val reschedulingInterval: Double = 0.0,
+    val reschedulingPolicy: String = "deadline_score",
+    val maxReschedulesPerTask: Int = 1,
     val vmQueueCapacity: Int = 0,
     val overloadFailureMultiplier: Double = 0.0,
     val autoscalingEnabled: Boolean = false,
@@ -227,6 +231,9 @@ data class RealtimeSchedulingConfig(
 
     fun normalizedDeadlineMissAction(): RealtimeDeadlineMissAction =
         RealtimeDeadlineMissAction.parse(deadlineMissAction)
+
+    fun normalizedReschedulingPolicy(): RealtimeReschedulingPolicy =
+        RealtimeReschedulingPolicy.parse(reschedulingPolicy)
 }
 
 @Serializable

@@ -19,8 +19,15 @@ class RealtimeBrokerEventRoutingTest {
     fun `router maps CloudSim events to typed broker events`() {
         val router = RealtimeBrokerEventRouter()
         val cloudlet = createCloudlet(1)
-        val submission = RealtimePendingSubmission(cloudlet, vmIndex = 0, decisionDelay = 0.25, failurePressure = 0.1)
-        val payload = RealtimeCloudletEventPayload(cloudlet, attempt = 2)
+        val submission =
+            RealtimePendingSubmission(
+                cloudlet,
+                vmIndex = 0,
+                decisionDelay = 0.25,
+                failurePressure = 0.1,
+                decisionToken = 3,
+            )
+        val payload = RealtimeCloudletEventPayload(cloudlet, attempt = 2, runtimeToken = 4)
 
         val routed =
             listOf(
@@ -29,6 +36,7 @@ class RealtimeBrokerEventRoutingTest {
                 router.route(simEvent(3.0, RealtimeBrokerEventTags.TIMEOUT, payload)),
                 router.route(simEvent(4.0, RealtimeBrokerEventTags.RUNTIME_FAILURE, payload)),
                 router.route(simEvent(5.0, RealtimeBrokerEventTags.AUTOSCALE_TICK, Unit)),
+                router.route(simEvent(6.0, RealtimeBrokerEventTags.RESCHEDULE_TICK, Unit)),
             )
 
         assertThat(routed[0]).isEqualTo(RealtimeBrokerEvent.Arrival(cloudlet, time = 1.0))
@@ -36,12 +44,20 @@ class RealtimeBrokerEventRoutingTest {
         assertThat(routed[2]).isEqualTo(RealtimeBrokerEvent.Timeout(payload))
         assertThat(routed[3]).isEqualTo(RealtimeBrokerEvent.RuntimeFailure(payload))
         assertThat(routed[4]).isEqualTo(RealtimeBrokerEvent.AutoscaleTick(time = 5.0))
+        assertThat(routed[5]).isEqualTo(RealtimeBrokerEvent.RescheduleTick(time = 6.0))
     }
 
     @Test
     fun `command executor applies scheduling and vm side effects`() {
         val cloudlet = createCloudlet(7)
-        val submission = RealtimePendingSubmission(cloudlet, vmIndex = 0, decisionDelay = 0.5, failurePressure = 0.0)
+        val submission =
+            RealtimePendingSubmission(
+                cloudlet,
+                vmIndex = 0,
+                decisionDelay = 0.5,
+                failurePressure = 0.0,
+                decisionToken = 1,
+            )
         val vm = createVm(3)
         val scheduled = mutableListOf<ScheduledCommand>()
         val submittedVms = mutableListOf<Pair<List<Vm>, Double>>()
@@ -56,6 +72,7 @@ class RealtimeBrokerEventRoutingTest {
                 RealtimeBrokerCommand.ScheduleArrival(1.0, cloudlet),
                 RealtimeBrokerCommand.ScheduleSubmit(2.0, submission),
                 RealtimeBrokerCommand.ScheduleAutoscaleTick(3.0),
+                RealtimeBrokerCommand.ScheduleRescheduleTick(4.0),
                 RealtimeBrokerCommand.SubmitVms(listOf(vm), delay = 0.75),
             ),
         )
@@ -64,6 +81,7 @@ class RealtimeBrokerEventRoutingTest {
             ScheduledCommand(1.0, RealtimeBrokerEventTags.ARRIVAL, cloudlet),
             ScheduledCommand(2.0, RealtimeBrokerEventTags.SUBMIT, submission),
             ScheduledCommand(3.0, RealtimeBrokerEventTags.AUTOSCALE_TICK, Unit),
+            ScheduledCommand(4.0, RealtimeBrokerEventTags.RESCHEDULE_TICK, Unit),
         )
         assertThat(submittedVms).containsExactly(listOf(vm) to 0.75)
     }

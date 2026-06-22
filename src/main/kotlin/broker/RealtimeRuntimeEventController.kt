@@ -36,16 +36,17 @@ internal class RealtimeRuntimeEventController(
     fun planRuntimeEvents(
         cloudlet: Cloudlet,
         attempt: Int,
+        runtimeToken: Int,
         timing: RealtimeRuntimeEventTiming,
         assignment: RealtimeRuntimeEventAssignment,
     ): RealtimeRuntimeEventPlan {
         var topologyFailureDomain: RealtimeFailureDomain? = null
         val commands =
             buildList {
-                timeoutCommand(cloudlet, attempt, timing)?.let(::add)
+                timeoutCommand(cloudlet, attempt, runtimeToken, timing)?.let(::add)
                 if (shouldScheduleRuntimeFailure(cloudlet, attempt, assignment)) {
                     topologyFailureDomain = topologyFailureDomain(cloudlet, attempt, assignment.vmIndex)
-                    add(runtimeFailureCommand(cloudlet, attempt))
+                    add(runtimeFailureCommand(cloudlet, attempt, runtimeToken))
                 }
             }
         return RealtimeRuntimeEventPlan(commands, topologyFailureDomain)
@@ -65,12 +66,13 @@ internal class RealtimeRuntimeEventController(
     private fun timeoutCommand(
         cloudlet: Cloudlet,
         attempt: Int,
+        runtimeToken: Int,
         timing: RealtimeRuntimeEventTiming,
     ): RealtimeBrokerCommand.ScheduleTimeout? =
         if (scheduling.taskTimeout > 0.0) {
             RealtimeBrokerCommand.ScheduleTimeout(
                 delay = (timing.arrivalTime + scheduling.taskTimeout - timing.currentTime).coerceAtLeast(0.0),
-                payload = RealtimeCloudletEventPayload(cloudlet, attempt),
+                payload = RealtimeCloudletEventPayload(cloudlet, attempt, runtimeToken),
             )
         } else {
             null
@@ -89,6 +91,7 @@ internal class RealtimeRuntimeEventController(
     private fun runtimeFailureCommand(
         cloudlet: Cloudlet,
         attempt: Int,
+        runtimeToken: Int,
     ): RealtimeBrokerCommand.ScheduleRuntimeFailure {
         val runtime = runtimeEstimator(cloudlet)
         val delayRatio =
@@ -97,7 +100,7 @@ internal class RealtimeRuntimeEventController(
                 FAILURE_DELAY_JITTER_RATIO
         return RealtimeBrokerCommand.ScheduleRuntimeFailure(
             delay = (runtime * delayRatio).coerceAtLeast(MIN_RUNTIME_FAILURE_DELAY),
-            payload = RealtimeCloudletEventPayload(cloudlet, attempt),
+            payload = RealtimeCloudletEventPayload(cloudlet, attempt, runtimeToken),
         )
     }
 

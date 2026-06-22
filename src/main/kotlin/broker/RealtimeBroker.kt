@@ -165,6 +165,16 @@ class RealtimeBroker(
                 ),
             callbacks = brokerCallbacks,
         )
+    private val reschedulingController =
+        RealtimeReschedulingController(
+            scheduling = schedulingConfig,
+            state = brokerState,
+            environment = environment,
+            lifecycleService = lifecycleService,
+            vmSelectionFacade = vmSelectionFacade,
+            submissionService = submissionService,
+            recoveryEstimator = recoveryEstimator,
+        )
     private val readModel =
         RealtimeBrokerReadModel(
             RealtimeBrokerReadDependencies(
@@ -246,6 +256,14 @@ class RealtimeBroker(
     fun getDeadlineRetryLaterCount(): Int = readModel.deadlineRetryLaterCount()
 
     fun getDeadlineMissAcceptedCount(): Int = readModel.deadlineMissAcceptedCount()
+
+    fun getRescheduleAttemptCount(): Int = readModel.rescheduleAttemptCount()
+
+    fun getRescheduleSuccessCount(): Int = readModel.rescheduleSuccessCount()
+
+    fun getRescheduleFailureCount(): Int = readModel.rescheduleFailureCount()
+
+    fun getAverageRescheduleDelay(): Double = readModel.averageRescheduleDelay()
 
     fun getTenantQuotaRejectedCount(): Int = readModel.tenantQuotaRejectedCount()
 
@@ -346,11 +364,19 @@ class RealtimeBroker(
                 applyCommands(submissionWorkflow.onSubmit(brokerEvent.submission))
             is RealtimeBrokerEvent.Timeout ->
                 applyCommands(
-                    interruptionController.onTimeout(brokerEvent.payload.cloudlet, brokerEvent.payload.attempt),
+                    interruptionController.onTimeout(
+                        brokerEvent.payload.cloudlet,
+                        brokerEvent.payload.attempt,
+                        brokerEvent.payload.runtimeToken,
+                    ),
                 )
             is RealtimeBrokerEvent.RuntimeFailure ->
                 applyCommands(
-                    interruptionController.onRuntimeFailure(brokerEvent.payload.cloudlet, brokerEvent.payload.attempt),
+                    interruptionController.onRuntimeFailure(
+                        brokerEvent.payload.cloudlet,
+                        brokerEvent.payload.attempt,
+                        brokerEvent.payload.runtimeToken,
+                    ),
                 )
             is RealtimeBrokerEvent.AutoscaleTick ->
                 applyCommands(
@@ -359,6 +385,8 @@ class RealtimeBroker(
                         vmSelectionFacade.activeVmIndexes(getActiveCloudlets()),
                     ),
                 )
+            is RealtimeBrokerEvent.RescheduleTick ->
+                applyCommands(reschedulingController.tickCommands(brokerEvent.time))
             is RealtimeBrokerEvent.Unknown ->
                 super.processEvent(brokerEvent.event)
         }
@@ -379,6 +407,9 @@ class RealtimeBroker(
         }
         if (schedulingConfig.autoscalingEnabled && schedulingConfig.scaleInIdleTime > 0.0) {
             applyCommand(RealtimeBrokerCommand.ScheduleAutoscaleTick(schedulingConfig.scaleInIdleTime))
+        }
+        if (schedulingConfig.reschedulingEnabled && schedulingConfig.reschedulingInterval > 0.0) {
+            applyCommand(RealtimeBrokerCommand.ScheduleRescheduleTick(schedulingConfig.reschedulingInterval))
         }
     }
 }

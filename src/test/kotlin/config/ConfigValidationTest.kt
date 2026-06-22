@@ -169,6 +169,25 @@ class ConfigValidationTest {
     }
 
     @Test
+    fun `should validate realtime rescheduling parameters`() {
+        assertInvalidRealtimeFields(
+            scheduling =
+                RealtimeSchedulingConfig(
+                    reschedulingEnabled = true,
+                    reschedulingInterval = 0.0,
+                    reschedulingPolicy = "aggressive",
+                    maxReschedulesPerTask = 0,
+                ),
+            expectedFields =
+                listOf(
+                    "reschedulingPolicy",
+                    "reschedulingInterval",
+                    "maxReschedulesPerTask",
+                ),
+        )
+    }
+
+    @Test
     fun `should validate realtime reliability parameters`() {
         assertInvalidRealtimeFields(
             scheduling =

@@ -36,6 +36,10 @@ data class RealtimeAlgorithmResult(
     val deadlineDegradedCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_DEGRADED_COUNT)
     val deadlineRetryLaterCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_RETRY_LATER_COUNT)
     val deadlineMissAcceptedCount: Int get() = metrics.intValue(RealtimeMetricKey.DEADLINE_MISS_ACCEPTED_COUNT)
+    val rescheduleAttemptCount: Int get() = metrics.intValue(RealtimeMetricKey.RESCHEDULE_ATTEMPT_COUNT)
+    val rescheduleSuccessCount: Int get() = metrics.intValue(RealtimeMetricKey.RESCHEDULE_SUCCESS_COUNT)
+    val rescheduleFailureCount: Int get() = metrics.intValue(RealtimeMetricKey.RESCHEDULE_FAILURE_COUNT)
+    val averageRescheduleDelay: Double get() = metrics[RealtimeMetricKey.AVERAGE_RESCHEDULE_DELAY]
     val averageQueueDepth: Double get() = metrics[RealtimeMetricKey.AVERAGE_QUEUE_DEPTH]
     val maxQueueDepth: Int get() = metrics.intValue(RealtimeMetricKey.MAX_QUEUE_DEPTH)
     val p95ResponseTime: Double get() = metrics[RealtimeMetricKey.P95_RESPONSE_TIME]

@@ -149,6 +149,70 @@ class RealtimeBrokerCloudSemanticsTest {
     }
 
     @Test
+    fun `pending rescheduling replaces stale submit decision`() {
+        val fixture =
+            multiVmBrokerFixture(
+                RealtimeSchedulingConfig(
+                    decisionDelay = 10.0,
+                    reschedulingEnabled = true,
+                    reschedulingInterval = 0.5,
+                    reschedulingPolicy = "score_only",
+                ),
+            )
+        val cloudlet = createCloudlet(length = 1_000, submissionDelay = 0.0)
+        fixture.broker.submitCloudletListRealtime(listOf(cloudlet))
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getRescheduleSuccessCount()).isEqualTo(1)
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(1)
+        assertThat(fixture.broker.getTaskMetadata(cloudlet)?.assignedVmIndex).isEqualTo(1)
+    }
+
+    @Test
+    fun `running rescheduling migrates without retry accounting`() {
+        val fixture =
+            multiVmBrokerFixture(
+                RealtimeSchedulingConfig(
+                    reschedulingEnabled = true,
+                    reschedulingInterval = 0.1,
+                    reschedulingPolicy = "score_only",
+                    maxReschedulesPerTask = 1,
+                    migrationDelay = 0.2,
+                    checkpointInterval = 0.05,
+                ),
+            )
+        val cloudlet = createCloudlet(length = 20_000, submissionDelay = 0.0)
+        fixture.broker.submitCloudletListRealtime(listOf(cloudlet))
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getRescheduleSuccessCount()).isEqualTo(1)
+        assertThat(fixture.broker.getMigrationCount()).isEqualTo(1)
+        assertThat(fixture.broker.getRetryCount()).isZero()
+        assertThat(fixture.broker.getSubmittedCount()).isEqualTo(2)
+    }
+
+    @Test
+    fun `deadline only rescheduling skips tasks without deadline pressure`() {
+        val fixture =
+            multiVmBrokerFixture(
+                RealtimeSchedulingConfig(
+                    decisionDelay = 2.0,
+                    reschedulingEnabled = true,
+                    reschedulingInterval = 0.5,
+                    reschedulingPolicy = "deadline_only",
+                ),
+            )
+        fixture.broker.submitCloudletListRealtime(listOf(createCloudlet(length = 1_000, submissionDelay = 0.0)))
+
+        fixture.simulation.start()
+
+        assertThat(fixture.broker.getRescheduleSuccessCount()).isZero()
+        assertThat(fixture.broker.getRescheduleFailureCount()).isGreaterThanOrEqualTo(1)
+    }
+
+    @Test
     fun `priority queue policy orders same-time arrivals before scheduling`() {
         val simulation = CloudSimPlus()
         DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
@@ -685,7 +749,14 @@ class RealtimeBrokerCloudSemanticsTest {
 }
 
 private fun createVm(): Vm =
-    VmSimple(1000.0, 1)
+    createVm(id = 0, mips = 1000.0)
+
+private fun createVm(
+    id: Int,
+    mips: Double,
+): Vm =
+    VmSimple(mips, 1)
+        .also { it.setId(id.toLong()) }
         .setRam(1024)
         .setBw(1000)
         .setSize(10000)
@@ -702,10 +773,32 @@ private fun brokerFixture(
     return BrokerFixture(simulation, broker)
 }
 
+private fun multiVmBrokerFixture(config: RealtimeSchedulingConfig): BrokerFixture {
+    val simulation = CloudSimPlus()
+    DatacenterCreator.createDatacenter(simulation, "test-dc", DatacenterType.LOW)
+    val vms = listOf(createVm(id = 0, mips = 1000.0), createVm(id = 1, mips = 2000.0))
+    val broker = RealtimeBroker(simulation, SwitchingRealtimeScheduler(vms), vms, config)
+    broker.submitVmList(vms)
+    return BrokerFixture(simulation, broker)
+}
+
 private data class BrokerFixture(
     val simulation: CloudSimPlus,
     val broker: RealtimeBroker,
 )
+
+private class SwitchingRealtimeScheduler(
+    vms: List<Vm>,
+) : RealtimeSchedulerBase(vms) {
+    private var calls = 0
+
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
+        if (calls++ == 0) {
+            0
+        } else {
+            1
+        }
+}
 
 private fun createCloudlet(
     id: Int = 0,

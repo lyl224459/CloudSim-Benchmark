@@ -10,6 +10,7 @@ internal object RealtimeBrokerEventTags {
     const val TIMEOUT = 9003
     const val RUNTIME_FAILURE = 9004
     const val AUTOSCALE_TICK = 9005
+    const val RESCHEDULE_TICK = 9006
 }
 
 internal sealed interface RealtimeBrokerEvent {
@@ -34,6 +35,10 @@ internal sealed interface RealtimeBrokerEvent {
         val time: Double,
     ) : RealtimeBrokerEvent
 
+    data class RescheduleTick(
+        val time: Double,
+    ) : RealtimeBrokerEvent
+
     data class Unknown(
         val event: SimEvent,
     ) : RealtimeBrokerEvent
@@ -48,6 +53,7 @@ internal class RealtimeBrokerEventRouter {
             RealtimeBrokerEventTags.RUNTIME_FAILURE ->
                 RealtimeBrokerEvent.RuntimeFailure(event.data as RealtimeCloudletEventPayload)
             RealtimeBrokerEventTags.AUTOSCALE_TICK -> RealtimeBrokerEvent.AutoscaleTick(event.time)
+            RealtimeBrokerEventTags.RESCHEDULE_TICK -> RealtimeBrokerEvent.RescheduleTick(event.time)
             else -> RealtimeBrokerEvent.Unknown(event)
         }
 }
@@ -72,6 +78,8 @@ internal class RealtimeBrokerCommandExecutor(
                 schedule(command.delay, RealtimeBrokerEventTags.RUNTIME_FAILURE, command.payload)
             is RealtimeBrokerCommand.ScheduleAutoscaleTick ->
                 schedule(command.delay, RealtimeBrokerEventTags.AUTOSCALE_TICK, Unit)
+            is RealtimeBrokerCommand.ScheduleRescheduleTick ->
+                schedule(command.delay, RealtimeBrokerEventTags.RESCHEDULE_TICK, Unit)
             is RealtimeBrokerCommand.SubmitVms ->
                 submitVms(command.vms, command.delay)
         }

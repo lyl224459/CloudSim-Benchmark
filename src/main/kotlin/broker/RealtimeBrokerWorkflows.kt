@@ -275,7 +275,7 @@ internal class RealtimeArrivalWorkflow(
 }
 
 internal interface RealtimeSubmissionWorkflowContext {
-    fun isPendingDecision(cloudlet: Cloudlet): Boolean
+    fun isCurrentPendingDecision(submission: RealtimePendingSubmission): Boolean
 
     fun discardPending(cloudlet: Cloudlet)
 
@@ -303,8 +303,7 @@ internal class RealtimeSubmissionWorkflow(
 ) {
     fun onSubmit(submission: RealtimePendingSubmission): List<RealtimeBrokerCommand> {
         val cloudlet = submission.cloudlet
-        if (!context.isPendingDecision(cloudlet)) {
-            context.discardPending(cloudlet)
+        if (!context.isCurrentPendingDecision(submission)) {
             return emptyList()
         }
 

@@ -143,6 +143,7 @@ data class RealtimeTaskRecord(
     val timeoutActionTaken: String? = null,
     val migratedCount: Int = 0,
     val preemptedCount: Int = 0,
+    val rescheduleCount: Int = 0,
     val preemptionDelayTotal: Double = 0.0,
     val checkpointLossTotal: Long = 0L,
     val tenantId: TenantId = TenantId(0),

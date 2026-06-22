@@ -16,8 +16,15 @@ class RealtimeTaskInterruptionControllerBranchTest {
         val terminalCloudlet = cloudlet().apply { setStatus(Cloudlet.Status.FAILED) }
         val terminal = harness(RealtimeSchedulingConfig(), terminalCloudlet)
 
-        assertThat(stale.controller.onRuntimeFailure(stale.cloudlet, attempt = 1)).isEmpty()
-        assertThat(terminal.controller.onTimeout(terminal.cloudlet, attempt = 0)).isEmpty()
+        assertThat(
+            stale.controller.onRuntimeFailure(stale.cloudlet, attempt = 1, runtimeToken = stale.runtimeToken),
+        ).isEmpty()
+        assertThat(
+            stale.controller.onRuntimeFailure(stale.cloudlet, attempt = 0, runtimeToken = stale.runtimeToken + 1),
+        ).isEmpty()
+        assertThat(
+            terminal.controller.onTimeout(terminal.cloudlet, attempt = 0, runtimeToken = terminal.runtimeToken),
+        ).isEmpty()
         assertThat(stale.metrics.snapshot().runtimeFailureCount).isZero()
         assertThat(terminal.metadata.lifecycle).isEqualTo(RealtimeTaskLifecycle.ARRIVED)
     }
@@ -28,9 +35,9 @@ class RealtimeTaskInterruptionControllerBranchTest {
         val cancelled = harness(RealtimeSchedulingConfig(timeoutAction = "cancel"), cloudlet())
         val degraded = harness(RealtimeSchedulingConfig(timeoutAction = "degrade"), cloudlet())
 
-        failed.controller.onTimeout(failed.cloudlet, attempt = 0)
-        cancelled.controller.onTimeout(cancelled.cloudlet, attempt = 0)
-        degraded.controller.onTimeout(degraded.cloudlet, attempt = 0)
+        failed.controller.onTimeout(failed.cloudlet, attempt = 0, runtimeToken = failed.runtimeToken)
+        cancelled.controller.onTimeout(cancelled.cloudlet, attempt = 0, runtimeToken = cancelled.runtimeToken)
+        degraded.controller.onTimeout(degraded.cloudlet, attempt = 0, runtimeToken = degraded.runtimeToken)
 
         assertThat(failed.metadata.lifecycle).isEqualTo(RealtimeTaskLifecycle.FAILED)
         assertThat(failed.metrics.snapshot().permanentFailedCount).isEqualTo(1)
@@ -44,7 +51,8 @@ class RealtimeTaskInterruptionControllerBranchTest {
     fun `runtime failure stops at retry limit`() {
         val harness = harness(RealtimeSchedulingConfig(retryLimit = 0), cloudlet())
 
-        val commands = harness.controller.onRuntimeFailure(harness.cloudlet, attempt = 0)
+        val commands =
+            harness.controller.onRuntimeFailure(harness.cloudlet, attempt = 0, runtimeToken = harness.runtimeToken)
 
         assertThat(commands).isEmpty()
         assertThat(harness.metadata.lifecycle).isEqualTo(RealtimeTaskLifecycle.FAILED)
@@ -63,7 +71,8 @@ class RealtimeTaskInterruptionControllerBranchTest {
             )
         val harness = harness(scheduling, cloudlet(), clock = 2.0)
 
-        val commands = harness.controller.onRuntimeFailure(harness.cloudlet, attempt = 0)
+        val commands =
+            harness.controller.onRuntimeFailure(harness.cloudlet, attempt = 0, runtimeToken = harness.runtimeToken)
         val snapshot = harness.metrics.snapshot()
 
         assertThat(commands).containsExactly(
@@ -83,6 +92,7 @@ class RealtimeTaskInterruptionControllerBranchTest {
         val harness = InterruptionHarness(cloudlet)
         val state = RealtimeTaskInterruptionState(harness.arrival, RealtimeReservationState(), harness.metrics)
         harness.arrival.recordArrival(cloudlet)
+        harness.runtimeToken = harness.arrival.issueRuntimeToken(cloudlet)
         harness.controller =
             RealtimeTaskInterruptionController(
                 scheduling,
@@ -108,6 +118,7 @@ class RealtimeTaskInterruptionControllerBranchTest {
         val cloudlet: Cloudlet,
         val arrival: RealtimeArrivalState = RealtimeArrivalState(),
         val metrics: RealtimeBrokerMetrics = RealtimeBrokerMetrics(),
+        var runtimeToken: Int = 0,
         var metadata: RealtimeTaskRecord =
             RealtimeTaskRecord(
                 cloudletId = cloudlet.id,

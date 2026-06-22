@@ -39,6 +39,7 @@ class RealtimeBrokerEventControllersTest {
             controller.planRuntimeEvents(
                 cloudlet = cloudlet,
                 attempt = 0,
+                runtimeToken = 7,
                 timing = RealtimeRuntimeEventTiming(arrivalTime = 0.0, currentTime = 1.0),
                 assignment = RealtimeRuntimeEventAssignment(vmIndex = 0, nodeFailurePressure = 0.0),
             )
@@ -65,6 +66,7 @@ class RealtimeBrokerEventControllersTest {
         var metadata = taskRecord(cloudlet)
         arrivalState.recordArrival(cloudlet)
         arrivalState.addWaiting(cloudlet)
+        val runtimeToken = arrivalState.issueRuntimeToken(cloudlet)
 
         val controller =
             RealtimeTaskInterruptionController(
@@ -79,7 +81,7 @@ class RealtimeBrokerEventControllersTest {
                     ),
             )
 
-        val commands = controller.onTimeout(cloudlet, attempt = 0)
+        val commands = controller.onTimeout(cloudlet, attempt = 0, runtimeToken = runtimeToken)
 
         assertThat(metrics.snapshot().timeoutCancelledCount).isEqualTo(1)
         assertThat(metrics.snapshot().retryCount).isEqualTo(1)

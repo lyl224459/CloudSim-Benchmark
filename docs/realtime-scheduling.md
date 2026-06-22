@@ -11,6 +11,7 @@ RealtimeCloudletGenerator
   -> admission / metadata / candidate snapshot
   -> RealtimeScheduler.scheduleOnArrival
   -> accepted VM index or rejection
+  -> optional reschedule tick for pending / waiting / running tasks
   -> runtime event planning
   -> metrics and read model
 ```
@@ -30,7 +31,7 @@ RealtimeCloudletGenerator
 | `arrival.burstIntensity` | burst 到达强度。 |
 | `arrival.burstDuration` | burst 持续时间。 |
 
-到达模型决定任务何时进入 broker。调度器只在任务到达时做单次选择，不会像 batch 一样一次性看到全部未来任务。
+到达模型决定任务何时进入 broker。默认情况下调度器只在任务到达时做选择，不会像 batch 一样一次性看到全部未来任务；启用周期性重调度后，broker 会在后续 tick 中重新评估未终止任务。
 
 ## Queue Policy
 
@@ -75,6 +76,29 @@ deadline admission 在 scheduler 选择 VM 前使用 realtime score 中的 proje
 | `reject` | 拒绝任务，原因计为 `DEADLINE`，指标计入 `DeadlineRejectedCount`。 |
 | `degrade` | 继续提交最优候选，计入 `DeadlineDegradedCount`，不放宽 deadline。 |
 | `retry_later` | 使用 `retryDelay`、`retryBackoffMultiplier`、`retryLimit` 重新排队；耗尽后按 deadline 拒绝。 |
+
+## Periodic Rescheduling
+
+周期性重调度默认关闭。启用后，broker 会按 CloudSim tick 定期刷新 VM lifecycle，并检查 pending、waiting、running 的非终态任务；重调度仍复用现有资源、拓扑、租户、deadline admission 和 realtime score，不绕过候选过滤链路。
+
+字段：
+
+- `reschedulingEnabled`
+- `reschedulingInterval`
+- `reschedulingPolicy`
+- `maxReschedulesPerTask`
+- `migrationDelay`
+- `checkpointInterval`
+
+`reschedulingPolicy` 可选值：
+
+| Value | Behavior |
+| :--- | :--- |
+| `deadline_score` | deadline slack 为负且新候选改善 slack，或 realtime total score 更低时重调度。 |
+| `score_only` | 仅当新候选 realtime total score 更低时重调度。 |
+| `deadline_only` | 仅当任务已 miss deadline 且新候选改善 slack 时重调度。 |
+
+pending 任务会废弃旧 pending reservation 和旧 submit token，再按新的 `decisionDelay + decisionJitter` 安排提交。waiting/running 任务会先中断当前执行片段，按 checkpoint 估算剩余长度；如果 `migrationDelay > 0`，该延迟会叠加到新的 pending submission，并计入 migration 指标。重调度不增加 `RetryCount`，而是使用 `RescheduleAttemptCount`、`RescheduleSuccessCount`、`RescheduleFailureCount` 和 `AvgRescheduleDelay` 单独观测。
 
 ## Admission And Rejection
 

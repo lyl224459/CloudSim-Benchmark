@@ -46,6 +46,14 @@ internal class RealtimeBrokerReadModel(
 
     fun deadlineMissAcceptedCount(): Int = scalarMetrics.deadlineMissAcceptedCount()
 
+    fun rescheduleAttemptCount(): Int = scalarMetrics.rescheduleAttemptCount()
+
+    fun rescheduleSuccessCount(): Int = scalarMetrics.rescheduleSuccessCount()
+
+    fun rescheduleFailureCount(): Int = scalarMetrics.rescheduleFailureCount()
+
+    fun averageRescheduleDelay(): Double = scalarMetrics.averageRescheduleDelay()
+
     fun tenantQuotaRejectedCount(): Int = scalarMetrics.tenantQuotaRejectedCount()
 
     fun tenantBudgetRejectedCount(): Int = scalarMetrics.tenantBudgetRejectedCount()
