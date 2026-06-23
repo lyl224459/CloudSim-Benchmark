@@ -6,7 +6,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.junit.jupiter.api.io.TempDir
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeObservationEventDraft
+import scheduler.RealtimeObservationEventRecord
+import scheduler.RealtimeObservationEventScope
+import scheduler.RealtimeObservationEventType
+import scheduler.RealtimeObservationRecorder
 import scheduler.RealtimeScoreBreakdown
+import scheduler.RealtimeTaskLifecycle
 import util.ExperimentOutputContext
 import java.io.File
 
@@ -45,6 +51,7 @@ class ResultExporterTest {
             assertThat(File(tempDir, "MIN_LOAD.csv").readText()).contains("FAILED", "runtime failure")
             assertThat(File(tempDir, "realtime_comparison.csv").readLines()).hasSize(2)
             assertThat(File(tempDir, "summary_avg.csv").readLines()).hasSize(2)
+            assertThat(File(tempDir, REALTIME_OBSERVATION_EVENT_FILE)).doesNotExist()
         }
 
     @Test
@@ -63,6 +70,78 @@ class ResultExporterTest {
             assertThat(lines[2].split(",").take(8))
                 .containsExactly("MIN_LOAD", "1", "42", "3.000000", "1", "1", "true", "true")
         }
+
+    @Test
+    fun `realtime exporter writes observation event csv for successful trials`(): Unit =
+        runBlocking {
+            val exporter = RealtimeResultExporter(ExperimentOutputContext(tempDir))
+            val summary = successfulRealtimeSummary()
+
+            exporter.saveTrialOutcome(summary.outcomes.single())
+
+            val lines = File(tempDir, REALTIME_OBSERVATION_EVENT_FILE).readLines()
+            assertThat(lines.first()).isEqualTo(realtimeObservationEventCsvHeaders.joinToString(","))
+            assertThat(lines).hasSize(2)
+            assertThat(lines[1].split(",").take(11))
+                .containsExactly(
+                    "MIN_LOAD",
+                    "1",
+                    "1",
+                    "3.000000",
+                    "CLOUDLET",
+                    "VM_SELECTED",
+                    "42",
+                    "2",
+                    "3",
+                    "ARRIVED",
+                    "PENDING_DECISION",
+                )
+        }
+
+    @Test
+    fun `realtime observation recorder assigns stable event ids`() {
+        val recorder = RealtimeObservationRecorder(enabled = true)
+
+        val first =
+            recorder.record(
+                RealtimeObservationEventDraft(
+                    eventTime = 1.0,
+                    eventScope = RealtimeObservationEventScope.BROKER,
+                    eventType = RealtimeObservationEventType.AUTOSCALING_EVALUATED,
+                ),
+            )
+        val second =
+            recorder.record(
+                RealtimeObservationEventDraft(
+                    eventTime = 2.0,
+                    eventScope = RealtimeObservationEventScope.CLOUDLET,
+                    eventType = RealtimeObservationEventType.ARRIVAL,
+                    cloudletId = 7L,
+                ),
+            )
+
+        assertThat(first?.eventId).isEqualTo(1L)
+        assertThat(second?.eventId).isEqualTo(2L)
+        assertThat(recorder.snapshot().map { it.eventId }).containsExactly(1L, 2L)
+    }
+
+    @Test
+    fun `disabled realtime observation recorder stores no events`() {
+        val recorder = RealtimeObservationRecorder(enabled = false)
+
+        val recorded =
+            recorder.record(
+                RealtimeObservationEventDraft(
+                    eventTime = 1.0,
+                    eventScope = RealtimeObservationEventScope.CLOUDLET,
+                    eventType = RealtimeObservationEventType.ARRIVAL,
+                    cloudletId = 7L,
+                ),
+            )
+
+        assertThat(recorded).isNull()
+        assertThat(recorder.snapshot()).isEmpty()
+    }
 
     @Test
     fun `csv disabled exporters do not create files`(): Unit =
@@ -159,6 +238,7 @@ class ResultExporterTest {
                         candidateScore(candidateVmIndex = 0, selected = false),
                         candidateScore(candidateVmIndex = 1, selected = true),
                     ),
+                observationEvents = listOf(observationEvent()),
             )
         return RealtimeRunSummary(
             algorithmName = "MIN_LOAD",
@@ -195,5 +275,23 @@ class ResultExporterTest {
                     tenantFairnessPressure = 0.0,
                     queuePressure = 0.0,
                 ),
+        )
+
+    private fun observationEvent(): RealtimeObservationEventRecord =
+        RealtimeObservationEventRecord(
+            eventId = 1L,
+            eventTime = 3.0,
+            eventScope = RealtimeObservationEventScope.CLOUDLET,
+            eventType = RealtimeObservationEventType.VM_SELECTED,
+            cloudletId = 42L,
+            tenantId = 2,
+            priority = 3,
+            lifecycleFrom = RealtimeTaskLifecycle.ARRIVED,
+            lifecycleTo = RealtimeTaskLifecycle.PENDING_DECISION,
+            vmIndex = 1,
+            selectedVmIndex = 1,
+            deadline = 5.0,
+            deadlineSlack = 2.0,
+            latenessPenalty = 0.0,
         )
 }

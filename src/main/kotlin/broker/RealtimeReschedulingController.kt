@@ -6,6 +6,7 @@ import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.CloudletId
 import scheduler.RealtimeCandidateScore
 import scheduler.RealtimeCandidateScoreCalculator
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskRecord
 
@@ -27,6 +28,7 @@ internal class RealtimeReschedulingController(
     private val recoveryEstimator: RealtimeCloudletRecoveryEstimator,
 ) {
     private val scoreCalculator = RealtimeCandidateScoreCalculator()
+    private val rescheduleAttemptCounts = mutableMapOf<CloudletId, Int>()
 
     fun tickCommands(currentTime: Double): List<RealtimeBrokerCommand> {
         if (!scheduling.reschedulingEnabled) return emptyList()
@@ -45,8 +47,8 @@ internal class RealtimeReschedulingController(
         currentTime: Double,
     ): RealtimeBrokerCommand? {
         val record = lifecycleService.taskRecord(cloudlet)
-        if (record.rescheduleCount >= scheduling.maxReschedulesPerTask) return null
         val currentVmIndex = currentVmIndex(cloudlet, record) ?: return null
+        if (!tryConsumeRescheduleAttempt(record.id)) return null
         val activeWithoutSelf = activeCloudlets.filterNot { it.id == cloudlet.id }
         val context = vmSelectionFacade.schedulingContext(cloudlet, activeWithoutSelf, currentTime)
         val outcome =
@@ -58,9 +60,27 @@ internal class RealtimeReschedulingController(
                 recordSelectionMetrics = false,
             )
         state.metrics.recordRescheduleAttempt()
+        state.metrics.recordTaskObservation(
+            eventTime = currentTime,
+            eventType = RealtimeObservationEventType.RESCHEDULE_ATTEMPT,
+            record = record,
+            vmIndex = currentVmIndex,
+            previousVmIndex = currentVmIndex,
+            decision = scheduling.reschedulingPolicy,
+            activeVmCount = context.nodeStates.count { it.acceptingWork },
+        )
         val selected = outcome as? RealtimeVmSelectionOutcome.Selected
         if (selected == null || selected.vmIndex == currentVmIndex) {
             state.metrics.recordRescheduleFailure()
+            state.metrics.recordTaskObservation(
+                eventTime = currentTime,
+                eventType = RealtimeObservationEventType.RESCHEDULE_FAILURE,
+                record = record,
+                vmIndex = currentVmIndex,
+                previousVmIndex = currentVmIndex,
+                reason = "no_better_vm",
+                decision = scheduling.reschedulingPolicy,
+            )
             return null
         }
         val scores = scoreCalculator.scoreAccepted(context)
@@ -68,6 +88,17 @@ internal class RealtimeReschedulingController(
         val selectedScore = scores.firstOrNull { it.vmIndex == selected.vmIndex }
         if (selectedScore == null || !shouldReschedule(record.deadline != null, currentScore, selectedScore)) {
             state.metrics.recordRescheduleFailure()
+            state.metrics.recordTaskObservation(
+                eventTime = currentTime,
+                eventType = RealtimeObservationEventType.RESCHEDULE_FAILURE,
+                record = record,
+                vmIndex = currentVmIndex,
+                previousVmIndex = currentVmIndex,
+                selectedVmIndex = selected.vmIndex,
+                reason = "policy_noop",
+                decision = scheduling.reschedulingPolicy,
+                score = selectedScore?.breakdown,
+            )
             return null
         }
         return executeReschedule(cloudlet, activeWithoutSelf, currentTime, selected)
@@ -110,16 +141,29 @@ internal class RealtimeReschedulingController(
         val decisionDelay = vmSelectionFacade.decisionDelay(cloudlet)
         val totalDelay = migrationDelay + decisionDelay
         val rescheduleCount = state.arrival.incrementRescheduleCount(cloudlet)
+        val before = lifecycleService.taskRecord(cloudlet)
         lifecycleService.updateMetadata(cloudlet) {
             it.copy(
                 rescheduleCount = rescheduleCount,
                 migratedCount = it.migratedCount + if (migrationDelay > 0.0) 1 else 0,
             )
         }
+        val after = lifecycleService.taskRecord(cloudlet)
         if (migrationDelay > 0.0) {
             state.metrics.recordMigration()
         }
         state.metrics.recordRescheduleSuccess(totalDelay)
+        state.metrics.recordTaskObservation(
+            eventTime = currentTime,
+            eventType = RealtimeObservationEventType.RESCHEDULE_SUCCESS,
+            record = after,
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = after.lifecycle,
+            vmIndex = selected.vmIndex,
+            previousVmIndex = before.assignedVmIndex,
+            selectedVmIndex = selected.vmIndex,
+            decision = "delay=$totalDelay",
+        )
         val submission =
             submissionService.preparePendingSubmission(
                 RealtimePendingSubmissionRequest(
@@ -201,11 +245,22 @@ internal class RealtimeReschedulingController(
 
     private fun hasEligibleActiveCandidate(): Boolean =
         activeCloudlets().any { cloudlet ->
-            lifecycleService.taskRecord(cloudlet).rescheduleCount < scheduling.maxReschedulesPerTask
+            val record = lifecycleService.taskRecord(cloudlet)
+            rescheduleAttemptCounts.getValueOrZero(record.id) < scheduling.maxReschedulesPerTask &&
+                currentVmIndex(cloudlet, record) != null
         }
 
     private fun hasFutureRealtimeArrival(currentTime: Double): Boolean =
         state.arrival.realtimeCloudletsSnapshot().any { cloudlet ->
             !cloudlet.isTerminalRealtimeCloudlet() && state.arrival.arrivalTimeOf(cloudlet) > currentTime
         }
+
+    private fun tryConsumeRescheduleAttempt(cloudletId: CloudletId): Boolean {
+        val current = rescheduleAttemptCounts.getValueOrZero(cloudletId)
+        if (current >= scheduling.maxReschedulesPerTask) return false
+        rescheduleAttemptCounts[cloudletId] = current + 1
+        return true
+    }
+
+    private fun Map<CloudletId, Int>.getValueOrZero(cloudletId: CloudletId): Int = this[cloudletId] ?: 0
 }

@@ -27,6 +27,7 @@ runs/
       resolved_config.json
       MIN_LOAD.csv
       realtime_candidate_scores.csv
+      realtime_events.csv
       realtime_comparison_20260621_153501.csv
       summary_avg.csv
 ```
@@ -44,6 +45,7 @@ runs/
 | `batch_comparison_*.csv` | batch exporter | batch 算法对比结果，包含均值和标准差。 |
 | `realtime_comparison_*.csv` | realtime exporter | realtime 算法对比结果，包含均值和标准差。 |
 | `realtime_candidate_scores.csv` | realtime exporter | 每次实时调度的候选 VM score 明细；仅 realtime 成功 trial 且 CSV 开启时写入。 |
+| `realtime_events.csv` | realtime exporter | 事件级观测窄表；仅 `eventObservationEnabled=true`、CSV 开启且 realtime trial 成功时写入。 |
 
 `summary_avg.csv` 是固定文件名，每个实验目录只保留该实验的一份 summary。`*_comparison_*.csv` 使用时间戳，适合从同一个目录多次手动导出时保留历史。
 
@@ -140,6 +142,33 @@ Algorithm,Status,ErrorType,ErrorMessage,Runs,SuccessfulRuns,FailedRuns,...
 | `TopologyCost` | 拓扑成本分量。 |
 | `TenantFairnessPressure` | 多租户公平压力分量。 |
 | `QueuePressure` | 队列深度压力分量。 |
+
+## Realtime Event Observation CSV
+
+`realtime_events.csv` 记录 broker 控制面和 cloudlet 生命周期事件，默认不生成。开启 `realtime.scheduling.eventObservationEnabled = true` 且 `csv.enabled=true` 后，成功 trial 会追加该文件。
+
+字段：
+
+| Field | Meaning |
+| :--- | :--- |
+| `Algorithm` | 算法名。 |
+| `Run` | trial 序号。 |
+| `EventId` | run 内递增事件 ID，可用于稳定排序。 |
+| `EventTime` | CloudSim 仿真时间。 |
+| `EventScope` | `BROKER`、`CLOUDLET`、`VM` 或 `AUTOSCALING`。 |
+| `EventType` | 事件类型，例如 `ARRIVAL`、`VM_SELECTED`、`SUBMITTED`、`RESCHEDULE_SUCCESS`。 |
+| `CloudletId` | 任务 ID；broker/autoscaling 事件可为空。 |
+| `TenantId` | 租户 ID。 |
+| `Priority` | 任务优先级。 |
+| `LifecycleFrom` / `LifecycleTo` | 事件前后的任务生命周期。 |
+| `VmIndex`、`PreviousVmIndex`、`SelectedVmIndex` | 当前、原始和最终选择 VM 下标。 |
+| `Reason` / `Decision` | 拒绝原因、动作或策略说明。 |
+| `Deadline`、`DeadlineSlack`、`LatenessPenalty` | deadline 相关解释字段。 |
+| `QueueDepth`、`ActiveVmCount` | 事件发生时的队列和 VM 上下文。 |
+| `HostUtilization`、`TenantFairnessPressure`、`AutoscalingPressure` | 资源、租户和 autoscaling 压力上下文。 |
+| `RetryCount`、`RescheduleCount`、`PreemptionCount`、`MigrationCount` | 当前任务累计控制面次数。 |
+
+与 `realtime_candidate_scores.csv` 联合查看时，先按 `Algorithm`、`Run`、`CloudletId` 找到 `VM_SELECTED` 或 rejection 事件，再用同一任务的候选 score 行解释为什么某个 VM 被选中或拒绝。
 
 ## Multi-Count Output
 

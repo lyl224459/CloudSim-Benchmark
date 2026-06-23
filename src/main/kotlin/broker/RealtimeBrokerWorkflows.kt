@@ -42,6 +42,11 @@ private sealed interface ArrivalSelectionAttempt {
 internal interface RealtimeArrivalLifecycleContext {
     fun lifecycleOf(cloudlet: Cloudlet): RealtimeTaskLifecycle?
 
+    fun recordArrivalEvent(
+        cloudlet: Cloudlet,
+        arrivalTime: Double,
+    )
+
     fun markArrivedAfterInterruption(cloudlet: Cloudlet)
 
     fun decideDependencyAdmission(cloudlet: Cloudlet): RealtimeDependencyArrivalDecision
@@ -138,6 +143,7 @@ internal class RealtimeArrivalWorkflow(
             if (currentLifecycle.isTerminalArrivalLifecycle()) {
                 return@buildList
             }
+            context.recordArrivalEvent(cloudlet, arrivalTime)
             val arrivedAfterInterruption =
                 currentLifecycle == RealtimeTaskLifecycle.RETRYING ||
                     currentLifecycle == RealtimeTaskLifecycle.MIGRATING

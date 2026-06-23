@@ -3,8 +3,10 @@ package broker
 import config.RealtimeSchedulingConfig
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.RealtimeCandidateScoreCalculator
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeScheduler
 import scheduler.RealtimeSchedulingContext
+import scheduler.RealtimeScoreBreakdown
 
 private const val DECISION_JITTER_SALT = 11
 
@@ -243,12 +245,55 @@ internal class RealtimeVmSelectionFacade(
             else -> {
                 if (recordSelectionMetrics) {
                     placementState?.let(state.metrics::recordPlacement)
-                    state.metrics.recordCandidateScores(scoreCalculator.scoreRecords(context, bounded))
+                    val scoreRecords = scoreCalculator.scoreRecords(context, bounded)
+                    state.metrics.recordCandidateScores(scoreRecords)
                     state.metrics.recordDeadlineAdmission(metricAction)
+                    val selectedScore = scoreRecords.firstOrNull { it.selected }?.breakdown
+                    state.metrics.recordTaskObservation(
+                        eventTime = context.currentTime,
+                        eventType = RealtimeObservationEventType.VM_SELECTED,
+                        record = context.taskMetadata,
+                        lifecycleFrom = context.taskMetadata.lifecycle,
+                        lifecycleTo = context.taskMetadata.lifecycle,
+                        vmIndex = bounded,
+                        selectedVmIndex = bounded,
+                        decision = schedulingConfig.strategy,
+                        score = selectedScore,
+                        queueDepth = selectedState?.queueDepth,
+                        activeVmCount = context.nodeStates.count { it.acceptingWork },
+                        nodeState = selectedState,
+                        tenantFairnessPressure = context.tenantFairnessPressure,
+                    )
+                    recordDeadlineObservation(metricAction, context, bounded, selectedScore)
                 }
                 RealtimeVmSelectionOutcome.Selected(bounded, selectedState?.failurePressure ?: 0.0)
             }
         }
+    }
+
+    private fun recordDeadlineObservation(
+        metricAction: DeadlineAdmissionMetricAction?,
+        context: RealtimeSchedulingContext,
+        selectedVmIndex: Int,
+        selectedScore: RealtimeScoreBreakdown?,
+    ) {
+        val eventType =
+            when (metricAction) {
+                DeadlineAdmissionMetricAction.MISS_ACCEPTED -> RealtimeObservationEventType.DEADLINE_MISS_ACCEPTED
+                DeadlineAdmissionMetricAction.DEGRADED -> RealtimeObservationEventType.DEADLINE_DEGRADED
+                null -> return
+            }
+        state.metrics.recordTaskObservation(
+            eventTime = context.currentTime,
+            eventType = eventType,
+            record = context.taskMetadata,
+            vmIndex = selectedVmIndex,
+            selectedVmIndex = selectedVmIndex,
+            reason = "deadline_miss",
+            decision = metricAction.name.lowercase(),
+            score = selectedScore,
+            activeVmCount = context.nodeStates.count { it.acceptingWork },
+        )
     }
 
     private fun applyReservationPolicy(

@@ -10,7 +10,10 @@ import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.core.events.SimEvent
 import org.cloudsimplus.vms.Vm
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeObservationEventRecord
+import scheduler.RealtimeObservationRecorder
 import scheduler.RealtimeScheduler
+import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskMetadata
 import scheduler.RealtimeTopologyMetrics
 
@@ -30,7 +33,10 @@ class RealtimeBroker(
     private val arrivalState = RealtimeArrivalState()
     private val lifecycleStore = RealtimeTaskLifecycleStore()
     private val reservationState = RealtimeReservationState()
-    private val brokerMetrics = RealtimeBrokerMetrics()
+    private val brokerMetrics =
+        RealtimeBrokerMetrics(
+            RealtimeObservationRecorder(enabled = schedulingConfig.eventObservationEnabled),
+        )
     private val brokerState =
         RealtimeBrokerStateBundle(
             arrival = arrivalState,
@@ -73,6 +79,7 @@ class RealtimeBroker(
             scheduling = schedulingConfig,
             state = brokerState,
             lifecycleService = lifecycleService,
+            clock = { cloudSim.clock() },
         )
     private val tenantFairnessContextBuilder = TenantFairnessContextBuilder(tenantController)
     private val vmReservationPolicy = RealtimeVmReservationPolicy(schedulingConfig)
@@ -92,7 +99,7 @@ class RealtimeBroker(
     private val topologyAccountingController =
         RealtimeTopologyAccountingController(environment.topologyModel, brokerMetrics)
     private val autoscalingController =
-        RealtimeAutoscalingController(schedulingConfig, environment.vmLifecycleManager)
+        RealtimeAutoscalingController(schedulingConfig, environment.vmLifecycleManager, brokerMetrics)
     private val interruptionController =
         RealtimeTaskInterruptionController(
             schedulingConfig,
@@ -103,6 +110,8 @@ class RealtimeBroker(
                 recoveryEstimator,
                 lifecycleService::updateMetadata,
                 dependencyController::onTerminalFailure,
+                lifecycleService::taskRecord,
+                { cloudSim.clock() },
             ),
         )
     private val preemptionExecutor =
@@ -113,6 +122,8 @@ class RealtimeBroker(
                 failureController,
                 recoveryEstimator,
                 lifecycleService::updateMetadata,
+                lifecycleService::taskRecord,
+                { cloudSim.clock() },
             ),
         )
     private val eventRouter = RealtimeBrokerEventRouter()
@@ -354,6 +365,8 @@ class RealtimeBroker(
 
     fun getCandidateScoreRecords(): List<RealtimeCandidateScoreRecord> = readModel.candidateScoreRecords()
 
+    fun getObservationEventRecords(): List<RealtimeObservationEventRecord> = readModel.observationEventRecords()
+
     fun getTaskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = readModel.taskMetadata(cloudlet)
 
     fun getSlaViolationCount(cloudlets: List<Cloudlet>): Int = readModel.slaViolationCount(cloudlets)
@@ -427,7 +440,8 @@ class RealtimeBroker(
                     autoscalingController.tickCommands(
                         brokerEvent.time,
                         vmSelectionFacade.activeVmIndexes(activeCloudlets),
-                        activeCloudlets.size,
+                        arrivalState.pendingCloudletsSnapshot().size,
+                        hasRealtimeWorkAfter(brokerEvent.time),
                     ),
                 )
             }
@@ -458,4 +472,21 @@ class RealtimeBroker(
             applyCommand(RealtimeBrokerCommand.ScheduleRescheduleTick(schedulingConfig.reschedulingInterval))
         }
     }
+
+    private fun hasRealtimeWorkAfter(currentTime: Double): Boolean =
+        lifecycleStore.snapshot().any { record ->
+            record.lifecycle.isActiveRealtimeLifecycle()
+        } ||
+            arrivalState.realtimeCloudletsSnapshot().any { cloudlet ->
+                !cloudlet.isTerminalRealtimeCloudlet() && arrivalState.arrivalTimeOf(cloudlet) > currentTime
+            }
 }
+
+private fun RealtimeTaskLifecycle.isActiveRealtimeLifecycle(): Boolean =
+    this == RealtimeTaskLifecycle.DEPENDENCY_BLOCKED ||
+        this == RealtimeTaskLifecycle.PENDING_DECISION ||
+        this == RealtimeTaskLifecycle.SUBMITTED ||
+        this == RealtimeTaskLifecycle.RUNNING ||
+        this == RealtimeTaskLifecycle.PREEMPTED ||
+        this == RealtimeTaskLifecycle.MIGRATING ||
+        this == RealtimeTaskLifecycle.RETRYING

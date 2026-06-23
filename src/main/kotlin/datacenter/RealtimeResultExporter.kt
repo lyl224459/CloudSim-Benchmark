@@ -30,6 +30,14 @@ internal class RealtimeResultExporter(
                         record.toCsvRow(outcome.algorithmName, outcome.run)
                     },
             )
+            outputContext.appendCsvRows(
+                fileName = REALTIME_OBSERVATION_EVENT_FILE,
+                headers = realtimeObservationEventCsvHeaders,
+                rows =
+                    outcome.result.observationEvents.map { record ->
+                        record.toCsvRow(outcome.algorithmName, outcome.run)
+                    },
+            )
         }
     }
 

@@ -3,6 +3,8 @@ package broker
 import config.RealtimeAutoscalingPolicy
 import config.RealtimeSchedulingConfig
 import scheduler.RealtimeCandidateScoreCalculator
+import scheduler.RealtimeObservationEventScope
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeSchedulingContext
 import scheduler.RealtimeVmLifecycleManager
 import kotlin.math.ceil
@@ -21,6 +23,7 @@ internal data class RealtimeAutoscalingPressure(
 internal class RealtimeAutoscalingController(
     private val scheduling: RealtimeSchedulingConfig,
     private val vmLifecycleManager: RealtimeVmLifecycleManager,
+    private val metrics: RealtimeBrokerMetrics? = null,
     private val scoreCalculator: RealtimeCandidateScoreCalculator = RealtimeCandidateScoreCalculator(),
 ) {
     private val arrivalTimes = ArrayDeque<Double>()
@@ -47,7 +50,7 @@ internal class RealtimeAutoscalingController(
         if (!scheduling.autoscalingEnabled) return emptyList()
         return when (scheduling.normalizedAutoscalingPolicy()) {
             RealtimeAutoscalingPolicy.QUEUE_THRESHOLD ->
-                scaleOutCommandsFor(vmLifecycleManager.maybeScaleOut(queueDepth, currentTime, activeVmIndexes))
+                queueThresholdScaleOutCommands(queueDepth, currentTime, activeVmIndexes)
             RealtimeAutoscalingPolicy.DEADLINE_PREDICTIVE ->
                 advancedScaleOutCommands(queueDepth, currentTime, activeVmIndexes, context)
         }
@@ -57,19 +60,44 @@ internal class RealtimeAutoscalingController(
         currentTime: Double,
         activeVmIndexes: Set<Int>,
         queueDepth: Int = 0,
+        continueEvaluating: Boolean = true,
     ): List<RealtimeBrokerCommand> {
         vmLifecycleManager.refresh(currentTime, activeVmIndexes)
         val scaleOutCommands =
-            if (usesEvaluationLoop()) {
+            if (continueEvaluating && usesEvaluationLoop()) {
                 advancedScaleOutCommands(queueDepth, currentTime, activeVmIndexes, context = null)
             } else {
                 emptyList()
             }
+        val scaleInBefore = vmLifecycleManager.getScaleInCount()
+        val drainBefore = vmLifecycleManager.getScaleInDrainCount()
         vmLifecycleManager.maybeScaleIn(currentTime, activeVmIndexes)
-        return scaleOutCommands + nextTickCommands()
+        recordScaleInObservations(
+            currentTime = currentTime,
+            queueDepth = queueDepth,
+            scaleInDelta = vmLifecycleManager.getScaleInCount() - scaleInBefore,
+            drainDelta = vmLifecycleManager.getScaleInDrainCount() - drainBefore,
+        )
+        return scaleOutCommands + nextTickCommands(continueEvaluating)
     }
 
     fun initialTickDelay(): Double? = autoscalingTickDelay().takeIf { it > 0.0 }
+
+    private fun queueThresholdScaleOutCommands(
+        queueDepth: Int,
+        currentTime: Double,
+        activeVmIndexes: Set<Int>,
+    ): List<RealtimeBrokerCommand> {
+        val newVms = vmLifecycleManager.maybeScaleOut(queueDepth, currentTime, activeVmIndexes)
+        recordAutoscalingEvaluation(
+            currentTime = currentTime,
+            queueDepth = queueDepth,
+            pressure = null,
+            decision = "queue_threshold",
+        )
+        recordScaleOutObservation(currentTime, queueDepth, newVms.size)
+        return scaleOutCommandsFor(newVms)
+    }
 
     private fun advancedScaleOutCommands(
         queueDepth: Int,
@@ -83,16 +111,23 @@ internal class RealtimeAutoscalingController(
             deadlineSlackPressure = pressure.deadlineSlackPressure,
             arrivalRatePressure = pressure.arrivalRatePressure,
         )
-        recordWarmPoolAvailability(activeVmIndexes)
+        recordAutoscalingEvaluation(
+            currentTime = currentTime,
+            queueDepth = queueDepth,
+            pressure = pressure,
+            decision = scheduling.autoscalingPolicy,
+        )
+        recordWarmPoolAvailability(currentTime, activeVmIndexes)
 
         val minActiveNeed = minActiveScaleOutNeed()
-        val pressureNeed = pressureScaleOutNeed(pressure, currentTime)
+        val pressureNeed = pressureScaleOutNeed(pressure, currentTime).takeIf { queueDepth > 0 || context != null } ?: 0
         val warmPoolNeed = warmPoolScaleOutNeed(activeVmIndexes)
         val requested = scaleOutRequest(minActiveNeed, pressureNeed, warmPoolNeed)
         val newVms = vmLifecycleManager.scaleOut(requested, currentTime, activeVmIndexes)
         if (newVms.isNotEmpty()) {
             lastScaleOutAt = currentTime
         }
+        recordScaleOutObservation(currentTime, queueDepth, newVms.size)
         return scaleOutCommandsFor(newVms)
     }
 
@@ -147,6 +182,13 @@ internal class RealtimeAutoscalingController(
             pressure.total < threshold -> 0
             isInCooldown(currentTime) -> {
                 vmLifecycleManager.recordScaleCooldownSkipped()
+                metrics?.recordBrokerObservation(
+                    eventTime = currentTime,
+                    eventType = RealtimeObservationEventType.AUTOSCALING_COOLDOWN_SKIPPED,
+                    eventScope = RealtimeObservationEventScope.AUTOSCALING,
+                    decision = "cooldown",
+                    autoscalingPressure = pressure.total,
+                )
                 0
             }
             else -> ceil(pressure.total / threshold).toInt().coerceAtLeast(1)
@@ -174,10 +216,21 @@ internal class RealtimeAutoscalingController(
         return scheduling.scaleCooldown > 0.0 && currentTime - last < scheduling.scaleCooldown
     }
 
-    private fun recordWarmPoolAvailability(activeVmIndexes: Set<Int>) {
+    private fun recordWarmPoolAvailability(
+        currentTime: Double,
+        activeVmIndexes: Set<Int>,
+    ) {
         if (scheduling.warmPoolSize <= 0) return
+        val hit = vmLifecycleManager.idleWarmDynamicVmCount(activeVmIndexes) >= scheduling.warmPoolSize
         vmLifecycleManager.recordWarmPoolEvaluation(
-            vmLifecycleManager.idleWarmDynamicVmCount(activeVmIndexes) >= scheduling.warmPoolSize,
+            hit,
+        )
+        metrics?.recordBrokerObservation(
+            eventTime = currentTime,
+            eventType = RealtimeObservationEventType.AUTOSCALING_WARM_POOL,
+            eventScope = RealtimeObservationEventScope.AUTOSCALING,
+            decision = if (hit) "hit" else "miss",
+            activeVmCount = vmLifecycleManager.activeOrStartingVmCount(),
         )
     }
 
@@ -191,15 +244,15 @@ internal class RealtimeAutoscalingController(
             }
         }
 
-    private fun nextTickCommands(): List<RealtimeBrokerCommand> =
+    private fun nextTickCommands(continueEvaluating: Boolean): List<RealtimeBrokerCommand> =
         autoscalingTickDelay()
-            .takeIf { it > 0.0 && shouldScheduleNextTick() }
+            .takeIf { it > 0.0 && shouldScheduleNextTick(continueEvaluating) }
             ?.let { listOf(RealtimeBrokerCommand.ScheduleAutoscaleTick(it)) }
             ?: emptyList()
 
-    private fun shouldScheduleNextTick(): Boolean =
+    private fun shouldScheduleNextTick(continueEvaluating: Boolean): Boolean =
         scheduling.autoscalingEnabled &&
-            (usesEvaluationLoop() || vmLifecycleManager.hasLiveDynamicVms())
+            ((continueEvaluating && usesEvaluationLoop()) || vmLifecycleManager.hasLiveDynamicVms())
 
     private fun autoscalingTickDelay(): Double {
         if (!scheduling.autoscalingEnabled) return 0.0
@@ -223,6 +276,67 @@ internal class RealtimeAutoscalingController(
         val earliest = currentTime - scheduling.arrivalRateWindow.coerceAtLeast(0.0)
         while (arrivalTimes.isNotEmpty() && arrivalTimes.first() < earliest) {
             arrivalTimes.removeFirst()
+        }
+    }
+
+    private fun recordAutoscalingEvaluation(
+        currentTime: Double,
+        queueDepth: Int,
+        pressure: RealtimeAutoscalingPressure?,
+        decision: String,
+    ) {
+        metrics?.recordBrokerObservation(
+            eventTime = currentTime,
+            eventType = RealtimeObservationEventType.AUTOSCALING_EVALUATED,
+            eventScope = RealtimeObservationEventScope.AUTOSCALING,
+            decision = decision,
+            queueDepth = queueDepth,
+            activeVmCount = vmLifecycleManager.activeOrStartingVmCount(),
+            autoscalingPressure = pressure?.total,
+        )
+    }
+
+    private fun recordScaleOutObservation(
+        currentTime: Double,
+        queueDepth: Int,
+        newVmCount: Int,
+    ) {
+        if (newVmCount <= 0) return
+        metrics?.recordBrokerObservation(
+            eventTime = currentTime,
+            eventType = RealtimeObservationEventType.AUTOSCALING_SCALE_OUT,
+            eventScope = RealtimeObservationEventScope.AUTOSCALING,
+            decision = "count=$newVmCount",
+            queueDepth = queueDepth,
+            activeVmCount = vmLifecycleManager.activeOrStartingVmCount(),
+        )
+    }
+
+    private fun recordScaleInObservations(
+        currentTime: Double,
+        queueDepth: Int,
+        scaleInDelta: Int,
+        drainDelta: Int,
+    ) {
+        if (drainDelta > 0) {
+            metrics?.recordBrokerObservation(
+                eventTime = currentTime,
+                eventType = RealtimeObservationEventType.AUTOSCALING_DRAIN,
+                eventScope = RealtimeObservationEventScope.AUTOSCALING,
+                decision = "count=$drainDelta",
+                queueDepth = queueDepth,
+                activeVmCount = vmLifecycleManager.activeOrStartingVmCount(),
+            )
+        }
+        if (scaleInDelta > 0) {
+            metrics?.recordBrokerObservation(
+                eventTime = currentTime,
+                eventType = RealtimeObservationEventType.AUTOSCALING_SCALE_IN,
+                eventScope = RealtimeObservationEventScope.AUTOSCALING,
+                decision = "count=$scaleInDelta",
+                queueDepth = queueDepth,
+                activeVmCount = vmLifecycleManager.activeOrStartingVmCount(),
+            )
         }
     }
 }

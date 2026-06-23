@@ -84,6 +84,7 @@ class RealtimeCloudletCountRunner internal constructor(
             "优先级层级" to scheduling.priorityLevels,
             "高优先级比例" to scheduling.highPriorityRatio,
             "SLA deadline 系数" to scheduling.deadlineFactor,
+            "事件级观测" to scheduling.eventObservationEnabled,
             "单 VM 队列容量" to scheduling.vmQueueCapacity,
             "过载失败倍率" to scheduling.overloadFailureMultiplier,
             "弹性伸缩" to scheduling.autoscalingEnabled,

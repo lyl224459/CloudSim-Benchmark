@@ -123,6 +123,14 @@ DAG 强约束语义：
 - `DependencyReleasedCount`
 - `DependencyRejectedCount`
 
+## Event-Level Observation
+
+`eventObservationEnabled` 默认关闭，避免普通实验生成过多明细。开启该字段且 `csv.enabled=true` 时，成功的 realtime trial 会额外写出 `realtime_events.csv`。
+
+事件表用于复盘单个 cloudlet 或 autoscaling tick 的关键决策，覆盖 arrival、dependency block/release/reject、VM selection、deadline action、pending submit、submit、completion、timeout/runtime failure、retry/permanent failure、preemption、reschedule 和 autoscaling evaluate/scale-out/scale-in/drain/cooldown/warm-pool。
+
+`realtime_events.csv` 与 `realtime_candidate_scores.csv` 可以通过 `Algorithm`、`Run`、`CloudletId` 和时间字段联合分析：前者解释生命周期和控制面事件，后者解释每次 VM 候选评分。
+
 ## Admission And Rejection
 
 broker 可以因为多种原因拒绝任务或候选 VM：

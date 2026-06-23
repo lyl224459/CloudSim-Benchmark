@@ -9,6 +9,10 @@ import org.junit.jupiter.api.Test
 import scheduler.CloudletId
 import scheduler.RealtimeCandidateScoreRecord
 import scheduler.RealtimeNodeState
+import scheduler.RealtimeObservationEventDraft
+import scheduler.RealtimeObservationEventScope
+import scheduler.RealtimeObservationEventType
+import scheduler.RealtimeObservationRecorder
 import scheduler.RealtimeScoreBreakdown
 import scheduler.RealtimeTaskLifecycle
 import scheduler.VmIndex
@@ -173,6 +177,24 @@ class RealtimeBrokerStateTest {
         assertThat(snapshot.averageSelectedDeadlineSlack).isEqualTo(3.0)
         assertThat(snapshot.averageCandidateScoreSpread).isEqualTo(2.5)
         assertThat(metrics.candidateScoreRecords()).hasSize(4)
+    }
+
+    @Test
+    fun `metrics state exposes observation event records when recorder is enabled`() {
+        val metrics = RealtimeBrokerMetrics(RealtimeObservationRecorder(enabled = true))
+
+        metrics.recordObservation(
+            RealtimeObservationEventDraft(
+                eventTime = 4.0,
+                eventScope = RealtimeObservationEventScope.CLOUDLET,
+                eventType = RealtimeObservationEventType.ARRIVAL,
+                cloudletId = 9L,
+            ),
+        )
+
+        assertThat(metrics.observationEventRecords().map { it.eventId }).containsExactly(1L)
+        assertThat(metrics.observationEventRecords().single().eventType)
+            .isEqualTo(RealtimeObservationEventType.ARRIVAL)
     }
 
     @Test

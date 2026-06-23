@@ -1,0 +1,84 @@
+# Realtime 事件级观测示例：启用 realtime_events.csv，便于复盘单个 cloudlet 的生命周期。
+# 可运行：.\run.cmd run --config configs/examples/realtime_observation.toml --profile realtime_event_observation --runs 1
+
+defaultProfile = "realtime_event_observation"
+
+[output]
+resultsDir = "runs"
+
+[output.csv]
+enabled = true
+delimiter = ","
+
+[logging]
+level = "INFO"
+file = true
+console = true
+
+[experiment]
+autoCreateDirs = true
+nameFormat = "realtime_observation_{timestamp}_{algorithms}"
+maxConcurrent = 1
+
+[random]
+seed = 42
+
+[optimizer]
+population = 10
+maxIter = 10
+
+[profiles.realtime_event_observation]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_observation"
+
+[profiles.realtime_event_observation.realtime]
+cloudletCount = 18
+simulationDuration = 40.0
+arrivalRate = 1.5
+generatorType = "UNIFORM"
+
+[profiles.realtime_event_observation.realtime.arrival]
+distribution = "periodic"
+periodSeconds = 1.6
+arrivalJitter = 0.1
+workloadPattern = "mixed_short_long"
+shortTaskRatio = 0.75
+shortTaskLengthMultiplier = 0.6
+longTaskLengthMultiplier = 1.6
+runtimeReferenceMips = 1000.0
+
+[profiles.realtime_event_observation.realtime.scheduling]
+eventObservationEnabled = true
+deadlineFactor = 1.5
+deadlineAdmissionEnabled = true
+deadlineType = "soft"
+deadlineMissAction = "accept"
+queuePolicy = "deadline"
+priorityLevels = 3
+highPriorityRatio = 0.25
+vmQueueCapacity = 3
+preemptionEnabled = true
+preemptionPolicy = "priority_then_deadline"
+preemptionMinPriorityGap = 1
+preemptionMaxPerTask = 1
+preemptionDelay = 0.2
+preemptionPenalty = 0.1
+reschedulingEnabled = true
+reschedulingInterval = 12.0
+reschedulingPolicy = "deadline_score"
+maxReschedulesPerTask = 1
+autoscalingEnabled = true
+autoscalingPolicy = "queue_threshold"
+autoscalingEvaluationInterval = 0.0
+scaleOutQueueThreshold = 4
+scalePressureThreshold = 1.0
+arrivalRateWindow = 15.0
+predictiveLookahead = 15.0
+scaleOutBatchSize = 1
+scaleCooldown = 8.0
+maxDynamicVms = 0
+vmColdStartDelay = 2.0
+scaleInIdleTime = 0.0
+scaleInDrainEnabled = true

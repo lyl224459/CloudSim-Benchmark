@@ -2,6 +2,9 @@ package broker
 
 import scheduler.RealtimeCandidateScoreRecord
 import scheduler.RealtimeNodeState
+import scheduler.RealtimeObservationEventDraft
+import scheduler.RealtimeObservationEventRecord
+import scheduler.RealtimeObservationRecorder
 
 data class RealtimeBrokerMetricsSnapshot(
     val rejectedCount: Int,
@@ -52,7 +55,9 @@ data class RealtimeBrokerMetricsSnapshot(
 )
 
 @Suppress("TooManyFunctions") // Metrics facade keeps stable scalar and snapshot accessors in one type.
-class RealtimeBrokerMetrics {
+class RealtimeBrokerMetrics(
+    private val observationRecorder: RealtimeObservationRecorder = RealtimeObservationRecorder(enabled = false),
+) {
     var rejectedCount: Int = 0
         private set
     var capacityRejectedCount: Int = 0
@@ -311,6 +316,12 @@ class RealtimeBrokerMetrics {
     }
 
     fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = candidateScoreRecords.toList()
+
+    fun recordObservation(draft: RealtimeObservationEventDraft) {
+        observationRecorder.record(draft)
+    }
+
+    fun observationEventRecords(): List<RealtimeObservationEventRecord> = observationRecorder.snapshot()
 
     fun recordPlacement(state: RealtimeNodeState) {
         placementMetricCount++

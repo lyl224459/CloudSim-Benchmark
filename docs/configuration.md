@@ -176,6 +176,7 @@ reschedulingInterval = 0.0
 reschedulingPolicy = "deadline_score"
 maxReschedulesPerTask = 1
 dependencyEnforcementEnabled = true
+eventObservationEnabled = false
 taskTimeout = 20.0
 timeoutAction = "retry"
 retryLimit = 1
@@ -190,6 +191,7 @@ checkpointInterval = 5.0
 | Queue/deadline | `queuePolicy`、`deadlineFactor`、`deadlineAdmissionEnabled`、`deadlineType`、`deadlineMissAction`、`taskTimeout` | 控制 FIFO、priority、deadline admission 和 timeout。 |
 | Rescheduling | `reschedulingEnabled`、`reschedulingInterval`、`reschedulingPolicy`、`maxReschedulesPerTask` | 控制周期性检查 pending、waiting、running 任务并按内置策略重调度。 |
 | Dependency | `dependencyEnforcementEnabled` | 控制 DAG metadata 存在时是否强制等待前驱成功完成。 |
+| Observation | `eventObservationEnabled` | 控制是否在 CSV 开启时额外写出 `realtime_events.csv` 事件级窄表。 |
 | Resource/topology model | `resourceModelEnabled`、`vmQueueCapacity`、`physicalTopologyEnabled`、`cpuOvercommitRatio`、`networkBandwidthSharingEnabled`、`storageIopsSharingEnabled`、`imagePullQueueEnabled`、`noisyNeighborPenaltyWeight` | 控制资源需求、host 级容量拒绝、共享传输/存储延迟、镜像拉取队列和 noisy-neighbor 候选压力。 |
 | Failure/retry | `runtimeFailureRate`、`nodeFailureRate`、`retryLimit`、`retryDelay` | 控制运行时失败、节点失败和重试。 |
 | Autoscaling | `autoscalingEnabled`、`autoscalingPolicy`、`autoscalingEvaluationInterval`、`scaleOutQueueThreshold`、`scaleCooldown`、`scaleOutBatchSize`、`warmPoolSize`、`minActiveVms`、`scaleInDrainEnabled`、`arrivalRateWindow`、`predictiveLookahead`、`scalePressureThreshold`、`dynamicVmCostPerSecond` | 控制队列阈值扩缩容、deadline/到达率预测扩容、warm pool、drain 和动态 VM 秒级成本。 |

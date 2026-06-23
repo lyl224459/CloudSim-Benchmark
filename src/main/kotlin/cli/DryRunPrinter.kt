@@ -140,6 +140,13 @@ object DryRunPrinter {
             printPhysicalTopology(resolved, output)
         }
         output.result("CSV 输出: enabled={}, delimiter='{}'", resolved.output.csvEnabled, resolved.output.csvDelimiter)
+        if (resolved.mode.startsWith("realtime")) {
+            output.result(
+                "事件观测 CSV: enabled={}, file={}",
+                resolved.output.csvEnabled && resolved.realtime.scheduling.eventObservationEnabled,
+                "realtime_events.csv",
+            )
+        }
     }
 
     fun resolvedJson(

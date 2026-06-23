@@ -102,6 +102,13 @@ private fun JsonObjectBuilder.putCsvConfig(resolved: ResolvedExperimentConfig) {
     putJsonObject("csv") {
         put("enabled", resolved.output.csvEnabled)
         put("delimiter", resolved.output.csvDelimiter)
+        put(
+            "realtimeEventsEnabled",
+            resolved.mode.startsWith("realtime") &&
+                resolved.output.csvEnabled &&
+                resolved.realtime.scheduling.eventObservationEnabled,
+        )
+        put("realtimeEventsFile", "realtime_events.csv")
     }
 }
 

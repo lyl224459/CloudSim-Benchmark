@@ -169,6 +169,7 @@ data class RealtimeSchedulingConfig(
     val reschedulingPolicy: String = "deadline_score",
     val maxReschedulesPerTask: Int = 1,
     val dependencyEnforcementEnabled: Boolean = true,
+    val eventObservationEnabled: Boolean = false,
     val vmQueueCapacity: Int = 0,
     val overloadFailureMultiplier: Double = 0.0,
     val autoscalingEnabled: Boolean = false,

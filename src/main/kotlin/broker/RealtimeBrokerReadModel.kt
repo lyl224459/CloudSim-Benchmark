@@ -3,6 +3,7 @@ package broker
 import config.RealtimeSchedulingConfig
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeObservationEventRecord
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskMetadata
 import scheduler.RealtimeTopologyMetrics
@@ -129,6 +130,8 @@ internal class RealtimeBrokerReadModel(
     fun averageNoisyNeighborPressure(): Double = scalarMetrics.averageNoisyNeighborPressure()
 
     fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = scalarMetrics.candidateScoreRecords()
+
+    fun observationEventRecords(): List<RealtimeObservationEventRecord> = scalarMetrics.observationEventRecords()
 
     fun taskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = tasks.taskMetadata(cloudlet)
 

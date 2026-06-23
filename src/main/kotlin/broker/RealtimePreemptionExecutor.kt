@@ -3,7 +3,9 @@ package broker
 import config.RealtimeSchedulingConfig
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.CloudletId
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeTaskLifecycle
+import scheduler.RealtimeTaskRecord
 
 private const val MIN_PREEMPTED_CLOUDLET_LENGTH = 1L
 
@@ -22,6 +24,8 @@ internal data class RealtimePreemptionServices(
     val failure: RealtimeFailureController,
     val recovery: RealtimeCloudletRecoveryEstimator,
     val updateMetadata: RealtimeMetadataUpdater,
+    val taskRecord: (Cloudlet) -> RealtimeTaskRecord = { cloudlet -> RealtimeTaskRecord(cloudlet.id, 0.0) },
+    val clock: () -> Double = { 0.0 },
 )
 
 internal class RealtimePreemptionExecutor(
@@ -46,6 +50,7 @@ internal class RealtimePreemptionExecutor(
         victim: Cloudlet,
         decision: PreemptionDecision.Preempt,
     ): RealtimePreemptionExecutionResult {
+        val before = services.taskRecord(victim)
         failVictimScheduler(victim)
         val recovery = services.recovery.estimate(victim)
         applyRecovery(victim, recovery)
@@ -54,6 +59,22 @@ internal class RealtimePreemptionExecutor(
             state.metrics.recordMigration()
         }
         updatePreemptedMetadata(victim, decision, recovery)
+        state.metrics.recordTaskObservation(
+            eventTime = services.clock(),
+            eventType = RealtimeObservationEventType.PREEMPTION,
+            record =
+                before.copy(
+                    assignedVmIndex = null,
+                    lifecycle = preemptedLifecycle(decision),
+                    preemptedCount = before.preemptedCount + 1,
+                    migratedCount = before.migratedCount + if (migrates(decision)) 1 else 0,
+                ),
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = preemptedLifecycle(decision),
+            previousVmIndex = before.assignedVmIndex,
+            reason = "preempted_by_priority_deadline",
+            decision = "delay=${decision.delay}",
+        )
         return retryPreemptedVictim(victim, decision)
     }
 

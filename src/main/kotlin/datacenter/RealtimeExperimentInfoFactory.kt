@@ -51,6 +51,7 @@ internal object RealtimeExperimentInfoFactory {
         this["高优先级比例"] = scheduling.highPriorityRatio
         this["SLA deadline 系数"] = scheduling.deadlineFactor
         this["依赖强约束"] = scheduling.dependencyEnforcementEnabled
+        this["事件级观测"] = scheduling.eventObservationEnabled
         this["单 VM 队列容量"] = scheduling.vmQueueCapacity
         this["过载失败倍率"] = scheduling.overloadFailureMultiplier
     }

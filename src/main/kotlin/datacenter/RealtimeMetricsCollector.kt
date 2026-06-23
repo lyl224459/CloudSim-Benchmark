@@ -51,6 +51,7 @@ internal class RealtimeMetricsCollector(
             algorithmName = request.algorithmName,
             metrics = metrics,
             candidateScores = request.broker.getCandidateScoreRecords(),
+            observationEvents = request.broker.getObservationEventRecords(),
         )
     }
 

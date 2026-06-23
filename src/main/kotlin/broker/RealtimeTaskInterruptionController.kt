@@ -4,6 +4,7 @@ import config.RealtimeSchedulingConfig
 import config.RealtimeTimeoutAction
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.CloudletId
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskRecord
 
@@ -24,6 +25,8 @@ internal data class RealtimeTaskInterruptionServices(
     val recovery: RealtimeCloudletRecoveryEstimator,
     val updateMetadata: RealtimeMetadataUpdater,
     val onTerminalFailure: (Cloudlet) -> List<RealtimeBrokerCommand> = { emptyList() },
+    val taskRecord: (Cloudlet) -> RealtimeTaskRecord = { cloudlet -> RealtimeTaskRecord(cloudlet.id, 0.0) },
+    val clock: () -> Double = { 0.0 },
 )
 
 internal class RealtimeTaskInterruptionController(
@@ -41,6 +44,19 @@ internal class RealtimeTaskInterruptionController(
         if (shouldIgnoreInterruption(cloudlet, attempt, runtimeToken)) {
             emptyList()
         } else {
+            val record = services.taskRecord(cloudlet)
+            state.metrics.recordTaskObservation(
+                eventTime = services.clock(),
+                eventType = RealtimeObservationEventType.TIMEOUT,
+                record = record,
+                lifecycleFrom = record.lifecycle,
+                lifecycleTo = record.lifecycle,
+                reason =
+                    services.timeout
+                        .decide()
+                        .action.configValue,
+                vmIndex = record.assignedVmIndex,
+            )
             handleTimeout(cloudlet)
         }
 
@@ -52,6 +68,16 @@ internal class RealtimeTaskInterruptionController(
         if (shouldIgnoreInterruption(cloudlet, attempt, runtimeToken)) {
             emptyList()
         } else {
+            val record = services.taskRecord(cloudlet)
+            state.metrics.recordTaskObservation(
+                eventTime = services.clock(),
+                eventType = RealtimeObservationEventType.RUNTIME_FAILURE,
+                record = record,
+                lifecycleFrom = record.lifecycle,
+                lifecycleTo = record.lifecycle,
+                reason = "runtime_failure",
+                vmIndex = record.assignedVmIndex,
+            )
             state.metrics.recordRuntimeFailure()
             retryHandler.retryInterruptedCloudlet(cloudlet, "runtime_failure")
         }
@@ -140,19 +166,31 @@ internal class RealtimeInterruptedCloudletRetryHandler(
         cloudlet: Cloudlet,
         attempt: Int,
     ): List<RealtimeBrokerCommand> {
+        val before = services.taskRecord(cloudlet)
         state.arrival.incrementAttempt(cloudlet)
         clearQueuedState(cloudlet)
-        services.updateMetadata(cloudlet) {
-            it.copy(
+        val after =
+            before.copy(
                 attempt = attempt + 1,
                 assignedVmIndex = null,
                 lifecycle = RealtimeTaskLifecycle.RETRYING,
             )
-        }
+        services.updateMetadata(cloudlet) { after }
         state.metrics.recordRetry()
+        val delay = services.failure.retryDelay(attempt) + scheduling.migrationDelay
+        state.metrics.recordTaskObservation(
+            eventTime = services.clock(),
+            eventType = RealtimeObservationEventType.RETRY_SCHEDULED,
+            record = after,
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = after.lifecycle,
+            previousVmIndex = before.assignedVmIndex,
+            reason = "interrupted",
+            decision = "delay=$delay",
+        )
         return listOf(
             RealtimeBrokerCommand.ScheduleArrival(
-                delay = services.failure.retryDelay(attempt) + scheduling.migrationDelay,
+                delay = delay,
                 cloudlet = cloudlet,
             ),
         )
@@ -200,10 +238,20 @@ internal class RealtimeInterruptedCloudletRetryHandler(
     }
 
     fun markPermanentFailure(cloudlet: Cloudlet): List<RealtimeBrokerCommand> {
+        val before = services.taskRecord(cloudlet)
         cloudlet.setStatus(Cloudlet.Status.FAILED)
         state.reservation.remove(cloudlet)
         state.metrics.recordPermanentFailure()
         services.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.FAILED) }
+        state.metrics.recordTaskObservation(
+            eventTime = services.clock(),
+            eventType = RealtimeObservationEventType.PERMANENT_FAILURE,
+            record = before.copy(lifecycle = RealtimeTaskLifecycle.FAILED),
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = RealtimeTaskLifecycle.FAILED,
+            reason = "retry_limit",
+            vmIndex = before.assignedVmIndex,
+        )
         return services.onTerminalFailure(cloudlet)
     }
 }

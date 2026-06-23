@@ -3,6 +3,7 @@ package broker
 import config.RealtimeSchedulingConfig
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.CloudletId
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeTaskLifecycle
 
 internal sealed interface RealtimeDependencyArrivalDecision {
@@ -20,6 +21,7 @@ internal class RealtimeDependencyController(
     private val scheduling: RealtimeSchedulingConfig,
     private val state: RealtimeBrokerStateBundle,
     private val lifecycleService: RealtimeBrokerLifecycleService,
+    private val clock: () -> Double = { 0.0 },
 ) {
     private val cloudletsById = linkedMapOf<CloudletId, Cloudlet>()
     private val dependenciesByTask = linkedMapOf<CloudletId, Set<CloudletId>>()
@@ -67,7 +69,16 @@ internal class RealtimeDependencyController(
         blockedTasks.remove(id)
         state.reservation.remove(cloudlet)
         state.arrival.removeWaiting(id)
+        val before = lifecycleService.taskRecord(cloudlet)
         lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.COMPLETED) }
+        state.metrics.recordTaskObservation(
+            eventTime = clock(),
+            eventType = RealtimeObservationEventType.COMPLETED,
+            record = before.copy(lifecycle = RealtimeTaskLifecycle.COMPLETED),
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = RealtimeTaskLifecycle.COMPLETED,
+            vmIndex = before.assignedVmIndex,
+        )
         if (!scheduling.dependencyEnforcementEnabled) return emptyList()
         return dependentsByTask[id].orEmpty().flatMap(::resolveDependent)
     }
@@ -88,7 +99,17 @@ internal class RealtimeDependencyController(
         if (blockedTasks.add(id)) {
             state.metrics.recordDependencyBlocked()
         }
-        lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.DEPENDENCY_BLOCKED) }
+        val before = lifecycleService.taskRecord(cloudlet)
+        val after = before.copy(lifecycle = RealtimeTaskLifecycle.DEPENDENCY_BLOCKED)
+        lifecycleService.updateMetadata(cloudlet) { after }
+        state.metrics.recordTaskObservation(
+            eventTime = clock(),
+            eventType = RealtimeObservationEventType.DEPENDENCY_BLOCKED,
+            record = after,
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = after.lifecycle,
+            reason = "waiting_for_dependencies",
+        )
     }
 
     private fun resolveDependent(id: CloudletId): List<RealtimeBrokerCommand> {
@@ -108,8 +129,18 @@ internal class RealtimeDependencyController(
         cloudlet: Cloudlet,
     ): List<RealtimeBrokerCommand> {
         blockedTasks.remove(id)
-        lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.ARRIVED) }
+        val before = lifecycleService.taskRecord(cloudlet)
+        val after = before.copy(lifecycle = RealtimeTaskLifecycle.ARRIVED)
+        lifecycleService.updateMetadata(cloudlet) { after }
         state.metrics.recordDependencyReleased()
+        state.metrics.recordTaskObservation(
+            eventTime = clock(),
+            eventType = RealtimeObservationEventType.DEPENDENCY_RELEASED,
+            record = after,
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = after.lifecycle,
+            decision = "schedule_arrival",
+        )
         return listOf(RealtimeBrokerCommand.ScheduleArrival(delay = 0.0, cloudlet = cloudlet))
     }
 
@@ -125,7 +156,17 @@ internal class RealtimeDependencyController(
         state.reservation.remove(cloudlet)
         state.metrics.recordRejected(RealtimeRejectReason.DEPENDENCY)
         state.metrics.recordDependencyRejected()
-        lifecycleService.updateMetadata(cloudlet) { it.copy(lifecycle = RealtimeTaskLifecycle.REJECTED) }
+        val before = lifecycleService.taskRecord(cloudlet)
+        val after = before.copy(lifecycle = RealtimeTaskLifecycle.REJECTED)
+        lifecycleService.updateMetadata(cloudlet) { after }
+        state.metrics.recordTaskObservation(
+            eventTime = clock(),
+            eventType = RealtimeObservationEventType.DEPENDENCY_REJECTED,
+            record = after,
+            lifecycleFrom = before.lifecycle,
+            lifecycleTo = after.lifecycle,
+            reason = "dependency_failed",
+        )
         return dependentsByTask[id].orEmpty().flatMap(::rejectDueToDependency)
     }
 

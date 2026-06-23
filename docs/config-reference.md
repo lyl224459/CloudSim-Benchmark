@@ -167,6 +167,7 @@
 | `reschedulingPolicy` | `deadline_score` | `deadline_score`、`score_only`、`deadline_only`。 |
 | `maxReschedulesPerTask` | `1` | 单任务最多执行的周期性重调度次数；启用时必须大于 0。 |
 | `dependencyEnforcementEnabled` | `true` | 存在 DAG dependency metadata 时是否强制等待前驱成功完成。 |
+| `eventObservationEnabled` | `false` | 是否记录 realtime 事件级观测；开启且 `csv.enabled=true` 时写出 `realtime_events.csv`。 |
 | `vmQueueCapacity` | `0` | 单 VM 队列容量，0 表示不启用。 |
 | `taskTimeout` | `0.0` | 0 表示不启用 timeout。 |
 | `timeoutAction` | `fail` | `fail`、`retry`、`cancel`、`degrade`。 |

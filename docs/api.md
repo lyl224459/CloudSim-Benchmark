@@ -415,6 +415,7 @@ Output rules：
 - CSV disabled 时不写 CSV。
 - 写入失败必须显式抛出，不吞异常。
 - trial CSV 和 summary CSV 使用 schema/order，不手写散落字段。
+- `realtime_events.csv` 仅在 realtime 成功 trial、`eventObservationEnabled=true` 且 CSV 开启时写出。
 - release package 和 container context 不应包含运行结果。
 
 ## buildSrc API

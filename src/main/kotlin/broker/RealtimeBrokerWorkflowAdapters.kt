@@ -2,6 +2,7 @@ package broker
 
 import org.cloudsimplus.cloudlets.Cloudlet
 import scheduler.CloudletId
+import scheduler.RealtimeObservationEventType
 import scheduler.RealtimeSchedulingContext
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskRecord
@@ -32,6 +33,20 @@ internal class RealtimeArrivalWorkflowAdapter(
     private val controls: RealtimeArrivalControlServices,
 ) : RealtimeArrivalWorkflowContext {
     override fun lifecycleOf(cloudlet: Cloudlet): RealtimeTaskLifecycle? = core.lifecycleService.lifecycleOf(cloudlet)
+
+    override fun recordArrivalEvent(
+        cloudlet: Cloudlet,
+        arrivalTime: Double,
+    ) {
+        core.metrics.recordTaskObservation(
+            eventTime = arrivalTime,
+            eventType = RealtimeObservationEventType.ARRIVAL,
+            record = core.lifecycleService.taskRecord(cloudlet),
+            lifecycleFrom = core.lifecycleService.lifecycleOf(cloudlet),
+            lifecycleTo = RealtimeTaskLifecycle.ARRIVED,
+            activeVmCount = activeVmIndexes().size,
+        )
+    }
 
     override fun markArrivedAfterInterruption(cloudlet: Cloudlet) {
         core.lifecycleService.markArrivedAfterInterruption(cloudlet)

@@ -22,7 +22,23 @@ class ConfigValidationTest {
         assertThat(config.batch.maxIter).isGreaterThan(0)
         assertThat(config.realtime.cloudletCount).isGreaterThan(0)
         assertThat(config.realtime.simulationDuration).isGreaterThan(0.0)
+        assertThat(config.realtime.scheduling.eventObservationEnabled).isFalse()
         assertThat(config.optimizer.population).isGreaterThan(0)
+    }
+
+    @Test
+    fun `should allow realtime event observation opt in`() {
+        val config =
+            ExperimentConfig.createDefault().copy(
+                realtime =
+                    ExperimentConfig.createDefault().realtime.copy(
+                        scheduling = RealtimeSchedulingConfig(eventObservationEnabled = true),
+                    ),
+            )
+
+        ExperimentConfig.validate(config)
+
+        assertThat(config.realtime.scheduling.eventObservationEnabled).isTrue()
     }
 
     @Test

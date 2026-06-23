@@ -1,12 +1,14 @@
 package datacenter
 
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeObservationEventRecord
 
 @Suppress("TooManyFunctions") // Compatibility facade keeps existing metric getter names stable.
 data class RealtimeAlgorithmResult(
     val algorithmName: String,
     val metrics: RealtimeMetricValues,
     val candidateScores: List<RealtimeCandidateScoreRecord> = emptyList(),
+    val observationEvents: List<RealtimeObservationEventRecord> = emptyList(),
 ) {
     operator fun get(key: RealtimeMetricKey): Double = metrics[key]
 

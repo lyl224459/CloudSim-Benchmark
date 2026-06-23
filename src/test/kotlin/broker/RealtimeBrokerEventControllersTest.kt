@@ -179,6 +179,51 @@ class RealtimeBrokerEventControllersTest {
     }
 
     @Test
+    fun `autoscaling predictive tick stops when realtime work is complete`() {
+        val scheduling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                autoscalingPolicy = "deadline_predictive",
+                autoscalingEvaluationInterval = 1.0,
+                maxDynamicVms = 1,
+            )
+        val manager = RealtimeVmLifecycleManager(listOf(createVm()), scheduling, RealtimeTopologyModel.Disabled)
+        val controller = RealtimeAutoscalingController(scheduling, manager)
+
+        val commands =
+            controller.tickCommands(
+                currentTime = 10.0,
+                activeVmIndexes = emptySet(),
+                queueDepth = 0,
+                continueEvaluating = false,
+            )
+
+        assertThat(commands).isEmpty()
+    }
+
+    @Test
+    fun `autoscaling predictive tick does not scale out from stale arrival rate without queue`() {
+        val scheduling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                autoscalingPolicy = "deadline_predictive",
+                autoscalingEvaluationInterval = 1.0,
+                scaleOutQueueThreshold = 1,
+                arrivalRateWindow = 10.0,
+                predictiveLookahead = 10.0,
+                maxDynamicVms = 1,
+            )
+        val manager = RealtimeVmLifecycleManager(listOf(createVm()), scheduling, RealtimeTopologyModel.Disabled)
+        val controller = RealtimeAutoscalingController(scheduling, manager)
+        repeat(5) { index -> controller.recordArrival(index.toDouble()) }
+
+        val commands = controller.tickCommands(currentTime = 5.0, activeVmIndexes = emptySet(), queueDepth = 0)
+
+        assertThat(commands.filterIsInstance<RealtimeBrokerCommand.SubmitVms>()).isEmpty()
+        assertThat(manager.getScaleOutCount()).isZero()
+    }
+
+    @Test
     fun `autoscaling tick fills warm pool and records warm availability`() {
         val scheduling =
             RealtimeSchedulingConfig(
