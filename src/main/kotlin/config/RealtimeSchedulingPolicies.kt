@@ -69,6 +69,22 @@ enum class RealtimeReschedulingPolicy(
     }
 }
 
+enum class RealtimeAutoscalingPolicy(
+    val configValue: String,
+) {
+    QUEUE_THRESHOLD("queue_threshold"),
+    DEADLINE_PREDICTIVE("deadline_predictive"),
+    ;
+
+    companion object {
+        fun parse(value: String): RealtimeAutoscalingPolicy =
+            entries.firstOrNull { it.configValue.equals(value, ignoreCase = true) }
+                ?: throw IllegalArgumentException("未知实时 autoscaling 策略: $value")
+
+        fun valuesForConfig(): Set<String> = entries.map { it.configValue }.toSet()
+    }
+}
+
 enum class RealtimeTimeoutAction(
     val configValue: String,
 ) {

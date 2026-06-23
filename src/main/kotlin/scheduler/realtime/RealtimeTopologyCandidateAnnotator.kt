@@ -27,6 +27,10 @@ internal data class TopologyCandidateAnnotationConfig(
     val dataLocalityPolicy: DataLocalityPolicy,
 )
 
+@Suppress(
+    "ReturnCount",
+    "TooManyFunctions",
+) // Candidate annotator keeps physical, locality and cache placement features in one scoring boundary.
 internal class TopologyCandidateAnnotator(
     private val config: TopologyCandidateAnnotationConfig,
     private val locationOf: (Int) -> RealtimeTopologyLocation,
@@ -294,8 +298,7 @@ internal class TopologyCandidateAnnotator(
         activeDemand: RealtimeResourceDemand,
         incomingDemand: RealtimeResourceDemand,
         projectedDemand: RealtimeResourceDemand,
-    ): Double =
-        cpuThrottleDelay(projectedDemand) + storageDelay(activeDemand, incomingDemand)
+    ): Double = cpuThrottleDelay(projectedDemand) + storageDelay(activeDemand, incomingDemand)
 
     private fun cpuThrottleDelay(projectedDemand: RealtimeResourceDemand): Double =
         if (config.physicalTopologyEnabled && config.hostCpuCapacity > ZERO_DELAY) {

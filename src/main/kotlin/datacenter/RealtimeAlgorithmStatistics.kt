@@ -54,6 +54,13 @@ data class RealtimeAlgorithmStatistics(
     val activeVmPeak: StatisticalValue get() = metric(RealtimeMetricKey.ACTIVE_VM_PEAK)
     val autoscalingCost: StatisticalValue get() = metric(RealtimeMetricKey.AUTOSCALING_COST)
     val coldStartDelayTotal: StatisticalValue get() = metric(RealtimeMetricKey.COLD_START_DELAY_TOTAL)
+    val averageAutoscalingPressure: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_AUTOSCALING_PRESSURE)
+    val averageDeadlineSlackPressure: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_DEADLINE_SLACK_PRESSURE)
+    val averageArrivalRatePressure: StatisticalValue get() = metric(RealtimeMetricKey.AVERAGE_ARRIVAL_RATE_PRESSURE)
+    val scaleCooldownSkippedCount: StatisticalValue get() = metric(RealtimeMetricKey.SCALE_COOLDOWN_SKIPPED_COUNT)
+    val warmPoolHitRate: StatisticalValue get() = metric(RealtimeMetricKey.WARM_POOL_HIT_RATE)
+    val scaleInDrainCount: StatisticalValue get() = metric(RealtimeMetricKey.SCALE_IN_DRAIN_COUNT)
+    val autoscalingVmSeconds: StatisticalValue get() = metric(RealtimeMetricKey.AUTOSCALING_VM_SECONDS)
     val resourceRejectedCount: StatisticalValue get() = metric(RealtimeMetricKey.RESOURCE_REJECTED_COUNT)
     val averagePhysicalHostUtilization: StatisticalValue
         get() = metric(RealtimeMetricKey.AVERAGE_PHYSICAL_HOST_UTILIZATION)

@@ -204,19 +204,43 @@ runtime failure 可能触发 retry、permanent failure、checkpoint recovery 或
 字段：
 
 - `autoscalingEnabled`
+- `autoscalingPolicy`
+- `autoscalingEvaluationInterval`
 - `scaleOutQueueThreshold`
 - `scaleInIdleTime`
 - `maxDynamicVms`
 - `vmColdStartDelay`
 - `scaleOutCost`
 - `scaleInProtectionTime`
+- `scaleCooldown`
+- `scaleOutBatchSize`
+- `warmPoolSize`
+- `minActiveVms`
+- `scaleInDrainEnabled`
+- `arrivalRateWindow`
+- `predictiveLookahead`
+- `scalePressureThreshold`
+- `dynamicVmCostPerSecond`
 
 Autoscaling 会创建动态 VM。动态 VM 有冷启动延迟和成本，相关指标包括：
 
 - active/dynamic VM count；
 - cold start delay；
 - autoscaling cost；
-- queue depth。
+- queue depth；
+- autoscaling pressure、deadline slack pressure、arrival-rate pressure；
+- warm pool hit rate、scale-in drain count、dynamic VM seconds。
+
+默认 `autoscalingPolicy = "queue_threshold"`，保持旧行为：任务到达时按 `scaleOutQueueThreshold` 和 `maxDynamicVms` 判断是否创建动态 VM，缩容仍按 `scaleInIdleTime` 与 `scaleInProtectionTime` 回收空闲动态 VM。
+
+`autoscalingPolicy = "deadline_predictive"` 会在队列压力之外加入两个信号：
+
+- deadline slack pressure：复用 realtime candidate score 中的 deadline slack/lateness，不维护第二套 finish/slack 公式；
+- arrival-rate pressure：按最近 `arrivalRateWindow` 秒到达数预测 `predictiveLookahead` 秒内需求。
+
+高级策略触发后，单次扩容受 `scaleOutBatchSize`、`maxDynamicVms` 和 `scaleCooldown` 限制。`warmPoolSize` 会维持目标空闲动态 VM 数，`minActiveVms` 会尽量保证 active/starting VM 不低于下限。启用 `scaleInDrainEnabled` 后，动态 VM 缩容先进入 `DRAINING`，不再接受新任务，等 pending/waiting/running/reservation 清空后再终止，不主动中断任务。
+
+`dynamicVmCostPerSecond` 大于 0 时，动态 VM 存活时间按 VM seconds 累加，并叠加到 `AutoscalingCost`；`scaleOutCost` 仍保留一次性扩容成本。
 
 ## Resource Model
 

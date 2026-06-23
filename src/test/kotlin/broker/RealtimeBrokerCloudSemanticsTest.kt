@@ -18,6 +18,7 @@ import scheduler.RealtimeSchedulerBase
 import scheduler.RealtimeSchedulingContext
 import scheduler.RealtimeTaskLifecycle
 
+@Suppress("LargeClass") // Broker cloud semantics tests share one expensive CloudSim fixture vocabulary.
 class RealtimeBrokerCloudSemanticsTest {
     @Test
     fun `decision delay postpones submission and is counted`() {
@@ -807,8 +808,7 @@ class RealtimeBrokerCloudSemanticsTest {
     }
 }
 
-private fun createVm(): Vm =
-    createVm(id = 0, mips = 1000.0)
+private fun createVm(): Vm = createVm(id = 0, mips = 1000.0)
 
 private fun createVm(
     id: Int,

@@ -1,0 +1,154 @@
+# 高级 realtime autoscaling 示例：覆盖预测扩容、warm pool、scale-in drain 和 min active VMs。
+# 可运行：.\run.cmd list profiles --config configs/examples/realtime_autoscaling_advanced.toml
+
+# 默认运行预测扩容场景，便于观察 arrival-rate 和 deadline slack pressure。
+defaultProfile = "realtime_autoscaling_predictive"
+
+# 输出设置。
+[output]
+# 基础结果目录。
+resultsDir = "runs"
+
+[output.csv]
+# 启用 CSV 输出，便于查看 autoscaling 聚合指标。
+enabled = true
+# CSV 分隔符。
+delimiter = ","
+
+# 日志设置。
+[logging]
+# 常规日志级别。
+level = "INFO"
+# 写文件日志。
+file = true
+# 输出控制台日志。
+console = true
+
+# 实验运行设置。
+[experiment]
+# 自动创建输出目录。
+autoCreateDirs = true
+# 高级 autoscaling 实验目录命名模板。
+nameFormat = "realtime_autoscaling_advanced_{timestamp}_{algorithms}"
+# 示例 profile 规模较小，默认单并发即可。
+maxConcurrent = 1
+
+# 随机种子。
+[random]
+# 固定 seed，保证 burst/workload 生成可复现。
+seed = 42
+
+# 优化器参数；本文件使用轻量 baseline，保留默认值以兼容 ALL/优化算法。
+[optimizer]
+# 种群大小。
+population = 12
+# 最大迭代次数。
+maxIter = 12
+
+# 预测扩容场景：按队列、deadline slack 和近期到达率综合触发扩容。
+[profiles.realtime_autoscaling_predictive]
+mode = "realtime"
+algorithms = ["EFT_REALTIME", "PRIORITY_DEADLINE_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_autoscaling_predictive"
+
+[profiles.realtime_autoscaling_predictive.realtime]
+cloudletCount = 160
+simulationDuration = 240.0
+arrivalRate = 8.0
+
+[profiles.realtime_autoscaling_predictive.realtime.arrival]
+distribution = "diurnal_burst"
+diurnalPeakMultiplier = 3.0
+diurnalOffPeakMultiplier = 0.4
+workloadPattern = "mixed_short_long"
+shortTaskRatio = 0.7
+shortTaskLengthMultiplier = 0.6
+longTaskLengthMultiplier = 2.2
+runtimeReferenceMips = 1000.0
+
+[profiles.realtime_autoscaling_predictive.realtime.scheduling]
+autoscalingEnabled = true
+autoscalingPolicy = "deadline_predictive"
+autoscalingEvaluationInterval = 5.0
+scaleOutQueueThreshold = 4
+scalePressureThreshold = 1.0
+arrivalRateWindow = 30.0
+predictiveLookahead = 20.0
+scaleOutBatchSize = 2
+scaleCooldown = 8.0
+maxDynamicVms = 6
+vmColdStartDelay = 3.0
+scaleOutCost = 0.5
+dynamicVmCostPerSecond = 0.02
+deadlineFactor = 1.6
+queuePolicy = "deadline"
+
+# Warm pool 场景：保持一个空闲动态 VM，降低突发冷启动影响。
+[profiles.realtime_autoscaling_warm_pool]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_autoscaling_warm_pool"
+
+[profiles.realtime_autoscaling_warm_pool.realtime]
+cloudletCount = 120
+simulationDuration = 200.0
+arrivalRate = 6.0
+
+[profiles.realtime_autoscaling_warm_pool.realtime.arrival]
+distribution = "burst"
+burstIntensity = 3.0
+burstDuration = 40.0
+workloadPattern = "standard"
+
+[profiles.realtime_autoscaling_warm_pool.realtime.scheduling]
+autoscalingEnabled = true
+autoscalingPolicy = "deadline_predictive"
+autoscalingEvaluationInterval = 4.0
+scaleOutQueueThreshold = 5
+scalePressureThreshold = 1.2
+scaleOutBatchSize = 1
+warmPoolSize = 1
+maxDynamicVms = 4
+vmColdStartDelay = 4.0
+scaleOutCost = 0.4
+dynamicVmCostPerSecond = 0.015
+deadlineFactor = 1.8
+
+# Drain/min-active 场景：保留最低活跃容量，并让缩容先进入 DRAINING。
+[profiles.realtime_autoscaling_drain_min]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_autoscaling_drain_min"
+
+[profiles.realtime_autoscaling_drain_min.realtime]
+cloudletCount = 100
+simulationDuration = 220.0
+arrivalRate = 4.0
+
+[profiles.realtime_autoscaling_drain_min.realtime.arrival]
+distribution = "sporadic"
+sporadicMinInterArrival = 0.3
+sporadicMaxInterArrival = 3.0
+workloadPattern = "mixed_short_long"
+shortTaskRatio = 0.8
+shortTaskLengthMultiplier = 0.5
+longTaskLengthMultiplier = 2.0
+runtimeReferenceMips = 1000.0
+
+[profiles.realtime_autoscaling_drain_min.realtime.scheduling]
+autoscalingEnabled = true
+autoscalingPolicy = "queue_threshold"
+autoscalingEvaluationInterval = 6.0
+scaleOutQueueThreshold = 3
+scaleOutBatchSize = 1
+maxDynamicVms = 5
+minActiveVms = 10
+scaleInIdleTime = 12.0
+scaleInProtectionTime = 15.0
+scaleInDrainEnabled = true
+vmColdStartDelay = 2.0
+scaleOutCost = 0.3
+dynamicVmCostPerSecond = 0.01

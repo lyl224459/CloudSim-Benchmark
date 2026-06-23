@@ -56,6 +56,7 @@ class RealtimeBrokerStateTest {
     }
 
     @Test
+    @Suppress("LongMethod") // Metrics snapshot test intentionally covers every broker counter in one fixture.
     fun `metrics state records reject counters and queue depth samples`() {
         val metrics = RealtimeBrokerMetrics()
 

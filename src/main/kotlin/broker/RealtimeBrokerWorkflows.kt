@@ -52,11 +52,14 @@ internal interface RealtimeArrivalLifecycleContext {
 internal interface RealtimeArrivalCapacityContext {
     fun refreshVmLifecycles(currentTime: Double)
 
+    fun recordAutoscalingArrival(currentTime: Double)
+
     fun activeCloudlets(): List<Cloudlet>
 
     fun scaleOutCommands(
         queueDepth: Int,
         currentTime: Double,
+        context: RealtimeSchedulingContext? = null,
     ): List<RealtimeBrokerCommand>
 
     fun schedulingContext(
@@ -122,7 +125,10 @@ internal interface RealtimeArrivalWorkflowContext :
 internal class RealtimeArrivalWorkflow(
     private val context: RealtimeArrivalWorkflowContext,
 ) {
-    @Suppress("LongMethod") // Arrival handling is the workflow boundary for admission, preemption and submission.
+    @Suppress(
+        "CyclomaticComplexMethod",
+        "LongMethod",
+    ) // Arrival handling is the workflow boundary for admission, preemption and submission.
     fun onArrival(
         cloudlet: Cloudlet,
         arrivalTime: Double,
@@ -149,10 +155,15 @@ internal class RealtimeArrivalWorkflow(
             }
 
             context.refreshVmLifecycles(arrivalTime)
+            context.recordAutoscalingArrival(arrivalTime)
             var activeCloudlets = context.activeCloudlets()
-            addAll(context.scaleOutCommands(activeCloudlets.size, arrivalTime))
-
-            val initialContext = context.schedulingContext(cloudlet, activeCloudlets, arrivalTime)
+            var initialContext = context.schedulingContext(cloudlet, activeCloudlets, arrivalTime)
+            val scaleOutCommands = context.scaleOutCommands(activeCloudlets.size, arrivalTime, initialContext)
+            addAll(scaleOutCommands)
+            if (scaleOutCommands.isNotEmpty()) {
+                activeCloudlets = context.activeCloudlets()
+                initialContext = context.schedulingContext(cloudlet, activeCloudlets, arrivalTime)
+            }
             val incomingRecord = context.taskRecord(cloudlet)
             when (val tenantDecision = context.decideTenantAdmission(incomingRecord)) {
                 TenantAdmissionDecision.Accepted -> Unit

@@ -144,6 +144,7 @@ data class RealtimeArrivalConfig(
     val dagFanOut: Int = 1,
 )
 
+@Suppress("TooManyFunctions") // Parsed scheduling model exposes one normalizer per string-backed policy field.
 @Serializable
 data class RealtimeSchedulingConfig(
     val strategy: String = "dynamic",
@@ -171,12 +172,23 @@ data class RealtimeSchedulingConfig(
     val vmQueueCapacity: Int = 0,
     val overloadFailureMultiplier: Double = 0.0,
     val autoscalingEnabled: Boolean = false,
+    val autoscalingPolicy: String = "queue_threshold",
+    val autoscalingEvaluationInterval: Double = 0.0,
     val scaleOutQueueThreshold: Int = 0,
     val scaleInIdleTime: Double = 0.0,
     val maxDynamicVms: Int = 0,
     val vmColdStartDelay: Double = 0.0,
     val scaleOutCost: Double = 0.0,
     val scaleInProtectionTime: Double = 0.0,
+    val scaleCooldown: Double = 0.0,
+    val scaleOutBatchSize: Int = 1,
+    val warmPoolSize: Int = 0,
+    val minActiveVms: Int = 0,
+    val scaleInDrainEnabled: Boolean = false,
+    val arrivalRateWindow: Double = 30.0,
+    val predictiveLookahead: Double = 30.0,
+    val scalePressureThreshold: Double = 1.0,
+    val dynamicVmCostPerSecond: Double = 0.0,
     val resourceModelEnabled: Boolean = false,
     val networkLatency: Double = 0.0,
     val imagePullDelay: Double = 0.0,
@@ -249,11 +261,13 @@ data class RealtimeSchedulingConfig(
 
     fun normalizedDeadlineType(): RealtimeDeadlineType = RealtimeDeadlineType.parse(deadlineType)
 
-    fun normalizedDeadlineMissAction(): RealtimeDeadlineMissAction =
-        RealtimeDeadlineMissAction.parse(deadlineMissAction)
+    @Suppress("MaxLineLength") // ktlint keeps simple policy parsers as body expressions.
+    fun normalizedDeadlineMissAction(): RealtimeDeadlineMissAction = RealtimeDeadlineMissAction.parse(deadlineMissAction)
 
-    fun normalizedReschedulingPolicy(): RealtimeReschedulingPolicy =
-        RealtimeReschedulingPolicy.parse(reschedulingPolicy)
+    @Suppress("MaxLineLength") // ktlint keeps simple policy parsers as body expressions.
+    fun normalizedReschedulingPolicy(): RealtimeReschedulingPolicy = RealtimeReschedulingPolicy.parse(reschedulingPolicy)
+
+    fun normalizedAutoscalingPolicy(): RealtimeAutoscalingPolicy = RealtimeAutoscalingPolicy.parse(autoscalingPolicy)
 }
 
 @Serializable

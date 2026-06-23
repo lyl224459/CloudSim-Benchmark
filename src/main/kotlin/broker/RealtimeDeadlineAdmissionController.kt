@@ -93,9 +93,8 @@ internal class RealtimeDeadlineAdmissionController(
         }
 }
 
-private fun RealtimeSchedulingContext.restrictDeadlineEligibleCandidates(
-    vmIndexes: Set<Int>,
-): RealtimeSchedulingContext =
+@Suppress("MaxLineLength") // ktlint keeps this context copy helper as a body expression.
+private fun RealtimeSchedulingContext.restrictDeadlineEligibleCandidates(vmIndexes: Set<Int>): RealtimeSchedulingContext =
     copy(
         nodeStates = nodeStates.map { it.withDeadlineEligibility(vmIndexes) },
         nodeCandidates = nodeCandidates.map { it.withDeadlineEligibility(vmIndexes) },

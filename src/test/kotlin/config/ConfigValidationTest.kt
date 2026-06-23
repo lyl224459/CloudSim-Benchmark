@@ -117,12 +117,22 @@ class ConfigValidationTest {
                     deadlineMissAction = "wait",
                     vmQueueCapacity = -1,
                     overloadFailureMultiplier = -0.2,
+                    autoscalingPolicy = "reactive",
+                    autoscalingEvaluationInterval = -1.0,
                     scaleOutQueueThreshold = -1,
                     scaleInIdleTime = -1.0,
                     maxDynamicVms = -1,
                     vmColdStartDelay = -1.0,
                     scaleOutCost = -1.0,
                     scaleInProtectionTime = -1.0,
+                    scaleCooldown = -1.0,
+                    scaleOutBatchSize = 0,
+                    warmPoolSize = -1,
+                    minActiveVms = -1,
+                    arrivalRateWindow = -1.0,
+                    predictiveLookahead = -1.0,
+                    scalePressureThreshold = -1.0,
+                    dynamicVmCostPerSecond = -1.0,
                     networkLatency = -0.1,
                     imagePullDelay = -0.1,
                     ioWeight = -0.1,
@@ -145,12 +155,22 @@ class ConfigValidationTest {
                     "deadlineMissAction",
                     "vmQueueCapacity",
                     "overloadFailureMultiplier",
+                    "autoscalingPolicy",
+                    "autoscalingEvaluationInterval",
                     "scaleOutQueueThreshold",
                     "scaleInIdleTime",
                     "maxDynamicVms",
                     "vmColdStartDelay",
                     "scaleOutCost",
                     "scaleInProtectionTime",
+                    "scaleCooldown",
+                    "scaleOutBatchSize",
+                    "warmPoolSize",
+                    "minActiveVms",
+                    "arrivalRateWindow",
+                    "predictiveLookahead",
+                    "scalePressureThreshold",
+                    "dynamicVmCostPerSecond",
                     "networkLatency",
                     "imagePullDelay",
                     "ioWeight",
@@ -184,6 +204,19 @@ class ConfigValidationTest {
                     "reschedulingInterval",
                     "maxReschedulesPerTask",
                 ),
+        )
+    }
+
+    @Test
+    fun `should require evaluation interval for advanced autoscaling`() {
+        assertInvalidRealtimeFields(
+            scheduling =
+                RealtimeSchedulingConfig(
+                    autoscalingEnabled = true,
+                    autoscalingPolicy = "deadline_predictive",
+                    autoscalingEvaluationInterval = 0.0,
+                ),
+            expectedFields = listOf("autoscalingEvaluationInterval"),
         )
     }
 

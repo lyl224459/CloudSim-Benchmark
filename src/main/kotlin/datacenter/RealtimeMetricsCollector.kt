@@ -206,6 +206,7 @@ private fun executionMetricPairs(execution: RealtimeExecutionSummary): List<Metr
         RealtimeMetricKey.P99_RESPONSE_TIME to execution.p99ResponseTime,
     )
 
+@Suppress("LongMethod") // Broker projection mirrors the realtime metric schema order one-to-one.
 private fun brokerMetricPairs(context: BrokerMetricContext): List<MetricPair> =
     listOf(
         RealtimeMetricKey.REJECTED_COUNT to context.broker.getRejectedCount(),
@@ -239,6 +240,13 @@ private fun brokerMetricPairs(context: BrokerMetricContext): List<MetricPair> =
         RealtimeMetricKey.ACTIVE_VM_PEAK to context.broker.getActiveVmPeak(),
         RealtimeMetricKey.AUTOSCALING_COST to context.broker.getAutoscalingCost(),
         RealtimeMetricKey.COLD_START_DELAY_TOTAL to context.broker.getColdStartDelayTotal(),
+        RealtimeMetricKey.AVERAGE_AUTOSCALING_PRESSURE to context.broker.getAverageAutoscalingPressure(),
+        RealtimeMetricKey.AVERAGE_DEADLINE_SLACK_PRESSURE to context.broker.getAverageDeadlineSlackPressure(),
+        RealtimeMetricKey.AVERAGE_ARRIVAL_RATE_PRESSURE to context.broker.getAverageArrivalRatePressure(),
+        RealtimeMetricKey.SCALE_COOLDOWN_SKIPPED_COUNT to context.broker.getScaleCooldownSkippedCount(),
+        RealtimeMetricKey.WARM_POOL_HIT_RATE to context.broker.getWarmPoolHitRate(),
+        RealtimeMetricKey.SCALE_IN_DRAIN_COUNT to context.broker.getScaleInDrainCount(),
+        RealtimeMetricKey.AUTOSCALING_VM_SECONDS to context.broker.getAutoscalingVmSeconds(),
         RealtimeMetricKey.RESOURCE_REJECTED_COUNT to context.broker.getResourceRejectedCount(),
         RealtimeMetricKey.AVERAGE_PHYSICAL_HOST_UTILIZATION to context.broker.getAveragePhysicalHostUtilization(),
         RealtimeMetricKey.AVERAGE_HOST_RESOURCE_FRAGMENTATION to context.broker.getAverageHostResourceFragmentation(),

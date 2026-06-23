@@ -21,6 +21,7 @@ private const val DAG_WORKFLOW_ID_PREFIX = "workflow"
  * 实时云任务生成器
  * 生成带有到达时间的任务，模拟实时任务调度场景
  */
+@Suppress("TooManyFunctions") // Workload generator keeps synthetic and trace workload variants behind one API.
 class RealtimeCloudletGenerator(
     private val random: Random = Random(config.DatacenterConfig.DEFAULT_RANDOM_SEED),
     private val arrivalRate: Double = 10.0, // 平均每秒到达的任务数（泊松分布）
@@ -129,7 +130,13 @@ class RealtimeCloudletGenerator(
 
     private fun applyDagChain(specs: List<RealtimeCloudletSpec>): List<RealtimeCloudletSpec> =
         specs.mapIndexed { index, spec ->
-            val dependencyIds = specs.getOrNull(index - 1)?.cloudlet?.id?.let(::listOf).orEmpty()
+            val dependencyIds =
+                specs
+                    .getOrNull(index - 1)
+                    ?.cloudlet
+                    ?.id
+                    ?.let(::listOf)
+                    .orEmpty()
             spec.withMetadata {
                 copy(
                     dependencyIds = dependencyIds,
@@ -160,6 +167,7 @@ class RealtimeCloudletGenerator(
         }
     }
 
+    @Suppress("LongParameterList") // DAG dependency indexing needs all workflow coordinates for stable IDs.
     private fun layeredDependencyIds(
         specs: List<RealtimeCloudletSpec>,
         workflowIndex: Int,
@@ -176,9 +184,9 @@ class RealtimeCloudletGenerator(
             .mapNotNull { offset -> specs.getOrNull(previousStageStart + offset)?.cloudlet?.id }
     }
 
-    private fun RealtimeCloudletSpec.withMetadata(
-        transform: RealtimeTraceMetadata.() -> RealtimeTraceMetadata,
-    ): RealtimeCloudletSpec = copy(traceMetadata = (traceMetadata ?: RealtimeTraceMetadata()).transform())
+    @Suppress("MaxLineLength") // ktlint keeps this metadata copy helper as a body expression.
+    private fun RealtimeCloudletSpec.withMetadata(transform: RealtimeTraceMetadata.() -> RealtimeTraceMetadata): RealtimeCloudletSpec =
+        copy(traceMetadata = (traceMetadata ?: RealtimeTraceMetadata()).transform())
 
     private fun Double.toLength(): Long =
         (this * arrivalConfig.runtimeReferenceMips)

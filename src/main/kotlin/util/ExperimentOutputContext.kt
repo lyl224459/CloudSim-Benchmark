@@ -8,6 +8,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentHashMap
 
+@Suppress("TooManyFunctions") // Output context intentionally centralizes file, CSV and lock helpers.
 data class ExperimentOutputContext(
     val experimentDir: File?,
     val baseResultsDir: File = File("runs"),

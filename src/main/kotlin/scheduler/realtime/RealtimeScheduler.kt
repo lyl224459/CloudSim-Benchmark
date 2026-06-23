@@ -48,6 +48,7 @@ interface RealtimeScheduler {
 /**
  * 实时调度器基类
  */
+@Suppress("TooManyFunctions") // Base scheduler exposes reusable realtime candidate scoring helpers to algorithms.
 abstract class RealtimeSchedulerBase(
     protected val vmList: List<Vm>,
 ) : RealtimeScheduler {
@@ -223,8 +224,8 @@ abstract class RealtimeSchedulerBase(
             ?.vmIndex
             ?: fallbackCandidateVm(context)
 
-    protected fun scoreCandidates(context: RealtimeSchedulingContext): List<RealtimeCandidateScore> =
-        scoreCalculator.scoreAccepted(context)
+    @Suppress("MaxLineLength") // ktlint keeps this scorer delegation as a body expression.
+    protected fun scoreCandidates(context: RealtimeSchedulingContext): List<RealtimeCandidateScore> = scoreCalculator.scoreAccepted(context)
 
     protected fun scoreByVmIndex(context: RealtimeSchedulingContext): Map<Int, RealtimeCandidateScore> =
         scoreCandidates(context).associateBy { it.vmIndex }

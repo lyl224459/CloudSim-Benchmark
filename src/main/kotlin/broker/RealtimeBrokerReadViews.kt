@@ -110,6 +110,20 @@ internal class RealtimeBrokerScalarMetricsView(
 
     fun coldStartDelayTotal(): Double = vmLifecycleManager.getColdStartDelayTotal()
 
+    fun averageAutoscalingPressure(): Double = vmLifecycleManager.getAverageAutoscalingPressure()
+
+    fun averageDeadlineSlackPressure(): Double = vmLifecycleManager.getAverageDeadlineSlackPressure()
+
+    fun averageArrivalRatePressure(): Double = vmLifecycleManager.getAverageArrivalRatePressure()
+
+    fun scaleCooldownSkippedCount(): Int = vmLifecycleManager.getScaleCooldownSkippedCount()
+
+    fun warmPoolHitRate(): Double = vmLifecycleManager.getWarmPoolHitRate()
+
+    fun scaleInDrainCount(): Int = vmLifecycleManager.getScaleInDrainCount()
+
+    fun autoscalingVmSeconds(): Double = vmLifecycleManager.getAutoscalingVmSeconds()
+
     fun averageDecisionDelay(): Double = metrics.averageDecisionDelay
 
     fun averageQueueDepth(): Double = metrics.averageQueueDepth

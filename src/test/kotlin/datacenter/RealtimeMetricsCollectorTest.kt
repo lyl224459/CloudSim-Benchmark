@@ -165,6 +165,7 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getTaskMetadata(cloudlets[3])).thenReturn(RealtimeTaskRecord(13, 0.0, deadline = 5.0))
     }
 
+    @Suppress("LongMethod") // Projection assertion mirrors the realtime metric schema surface.
     private fun assertProjectedBrokerMetrics(result: RealtimeAlgorithmResult) {
         assertThat(result.rejectedCount).isEqualTo(1)
         assertThat(result.timeoutCount).isEqualTo(2)
@@ -193,6 +194,13 @@ class RealtimeMetricsCollectorTest {
         assertThat(result.scaleInCount).isEqualTo(13)
         assertThat(result.autoscalingCost).isEqualTo(14.0)
         assertThat(result.coldStartDelayTotal).isEqualTo(15.0)
+        assertThat(result.averageAutoscalingPressure).isEqualTo(1.25)
+        assertThat(result.averageDeadlineSlackPressure).isEqualTo(0.75)
+        assertThat(result.averageArrivalRatePressure).isEqualTo(0.5)
+        assertThat(result.scaleCooldownSkippedCount).isEqualTo(38)
+        assertThat(result.warmPoolHitRate).isEqualTo(0.8)
+        assertThat(result.scaleInDrainCount).isEqualTo(39)
+        assertThat(result.autoscalingVmSeconds).isEqualTo(40.0)
         assertThat(result.resourceRejectedCount).isEqualTo(16)
         assertThat(result.averagePhysicalHostUtilization).isEqualTo(0.6)
         assertThat(result.averageHostResourceFragmentation).isEqualTo(0.3)
@@ -269,6 +277,13 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getScaleInCount()).thenReturn(13)
         whenever(broker.getAutoscalingCost()).thenReturn(14.0)
         whenever(broker.getColdStartDelayTotal()).thenReturn(15.0)
+        whenever(broker.getAverageAutoscalingPressure()).thenReturn(1.25)
+        whenever(broker.getAverageDeadlineSlackPressure()).thenReturn(0.75)
+        whenever(broker.getAverageArrivalRatePressure()).thenReturn(0.5)
+        whenever(broker.getScaleCooldownSkippedCount()).thenReturn(38)
+        whenever(broker.getWarmPoolHitRate()).thenReturn(0.8)
+        whenever(broker.getScaleInDrainCount()).thenReturn(39)
+        whenever(broker.getAutoscalingVmSeconds()).thenReturn(40.0)
         whenever(broker.getResourceRejectedCount()).thenReturn(16)
         whenever(broker.getAveragePhysicalHostUtilization()).thenReturn(0.6)
         whenever(broker.getAverageHostResourceFragmentation()).thenReturn(0.3)

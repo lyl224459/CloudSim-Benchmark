@@ -12,6 +12,11 @@ import scheduler.RealtimeTaskRecord
 private const val SCORE_IMPROVEMENT_EPSILON = 1.0e-9
 private const val MIN_RESCHEDULED_CLOUDLET_LENGTH = 1L
 
+@Suppress(
+    "LongParameterList",
+    "ReturnCount",
+    "TooManyFunctions",
+) // Rescheduling controller coordinates the full broker reschedule transaction boundary.
 internal class RealtimeReschedulingController(
     private val scheduling: RealtimeSchedulingConfig,
     private val state: RealtimeBrokerStateBundle,

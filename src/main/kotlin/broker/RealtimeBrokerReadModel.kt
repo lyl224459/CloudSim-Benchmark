@@ -90,6 +90,20 @@ internal class RealtimeBrokerReadModel(
 
     fun coldStartDelayTotal(): Double = scalarMetrics.coldStartDelayTotal()
 
+    fun averageAutoscalingPressure(): Double = scalarMetrics.averageAutoscalingPressure()
+
+    fun averageDeadlineSlackPressure(): Double = scalarMetrics.averageDeadlineSlackPressure()
+
+    fun averageArrivalRatePressure(): Double = scalarMetrics.averageArrivalRatePressure()
+
+    fun scaleCooldownSkippedCount(): Int = scalarMetrics.scaleCooldownSkippedCount()
+
+    fun warmPoolHitRate(): Double = scalarMetrics.warmPoolHitRate()
+
+    fun scaleInDrainCount(): Int = scalarMetrics.scaleInDrainCount()
+
+    fun autoscalingVmSeconds(): Double = scalarMetrics.autoscalingVmSeconds()
+
     fun averageDecisionDelay(): Double = scalarMetrics.averageDecisionDelay()
 
     fun averageQueueDepth(): Double = scalarMetrics.averageQueueDepth()

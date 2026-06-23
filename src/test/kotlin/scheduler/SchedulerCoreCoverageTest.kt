@@ -174,6 +174,9 @@ class SchedulerCoreCoverageTest {
     }
 
     @Test
+    @Suppress(
+        "LongMethod",
+    ) // Score component test covers accepted and rejected score projections together.
     fun `realtime score calculator records finite accepted and rejected candidate components`() {
         val vms = vms(2)
         val context =
@@ -343,6 +346,7 @@ class SchedulerCoreCoverageTest {
                 .setSize(10_000)
         }
 
+    @Suppress("LongParameterList") // Test builder mirrors realtime scheduling context inputs.
     private fun context(
         vms: List<Vm>,
         active: List<Cloudlet> = emptyList(),

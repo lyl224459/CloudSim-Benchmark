@@ -46,6 +46,13 @@
 | ActiveVmPeak | count | 中性 | 运行过程中活跃 VM 峰值。 |
 | AutoscalingCost | cost | 越低越好 | 自动伸缩带来的额外成本。 |
 | ColdStartDelayTotal | seconds | 越低越好 | VM 冷启动延迟总量。 |
+| AvgAutoscalingPressure | score | 越低越好 | 高级 autoscaling 评估中的扩容总压力平均值。 |
+| AvgDeadlineSlackPressure | score | 越低越好 | 由 deadline slack 不足产生的扩容压力平均值。 |
+| AvgArrivalRatePressure | score | 越低越好 | 由近期到达率预测产生的扩容压力平均值。 |
+| ScaleCooldownSkippedCount | count | 中性 | 扩容压力达到阈值但被 cooldown 跳过的次数。 |
+| WarmPoolHitRate | ratio | 越高越好 | warm pool 评估时可用空闲动态 VM 满足目标的比例。 |
+| ScaleInDrainCount | count | 中性 | 启用 drain 后动态 VM 进入 DRAINING 的次数。 |
+| AutoscalingVmSeconds | vm-seconds | 越低越好 | 动态 VM 存活时间按 VM 数累加后的总秒数。 |
 | ResourceRejectedCount | count | 越低越好 | RAM、带宽或 I/O 资源约束导致的拒绝数。 |
 | AvgPhysicalHostUtilization | ratio | 越低越好 | 被选中 placement 的物理 host 资源利用率平均值。 |
 | AvgHostResourceFragmentation | ratio | 越低越好 | 被选中 placement 的物理 host 资源碎片度平均值。 |

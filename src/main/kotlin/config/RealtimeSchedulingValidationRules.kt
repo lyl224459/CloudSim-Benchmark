@@ -1,6 +1,7 @@
 package config
 
 private const val MIN_RETRY_BACKOFF_MULTIPLIER = 1.0
+private const val DEFAULT_INITIAL_VM_COUNT = DatacenterConfig.L_VM_N + DatacenterConfig.M_VM_N + DatacenterConfig.H_VM_N
 
 internal object RealtimeSchedulingValidator {
     fun validate(
@@ -162,6 +163,31 @@ internal object RealtimeCoreSchedulingValidator {
         scheduling: RealtimeSchedulingConfig,
         context: RealtimeValidationContext,
     ) {
+        validateAutoscaling(scheduling, context)
+        nonNegative(context, "realtime.scheduling.networkLatency", scheduling.networkLatency, "网络延迟不能为负数")
+        nonNegative(context, "realtime.scheduling.imagePullDelay", scheduling.imagePullDelay, "镜像拉取延迟不能为负数")
+        nonNegative(context, "realtime.scheduling.ioWeight", scheduling.ioWeight, "I/O 权重不能为负数")
+        nonNegative(context, "realtime.scheduling.ramWeight", scheduling.ramWeight, "RAM 权重不能为负数")
+        nonNegative(context, "realtime.scheduling.bwWeight", scheduling.bwWeight, "带宽权重不能为负数")
+    }
+
+    private fun validateAutoscaling(
+        scheduling: RealtimeSchedulingConfig,
+        context: RealtimeValidationContext,
+    ) {
+        enumValue(
+            context,
+            "realtime.scheduling.autoscalingPolicy",
+            scheduling.autoscalingPolicy,
+            RealtimeAutoscalingPolicy.valuesForConfig(),
+            "实时 autoscaling 策略",
+        )
+        nonNegative(
+            context,
+            "realtime.scheduling.autoscalingEvaluationInterval",
+            scheduling.autoscalingEvaluationInterval,
+            "autoscaling 评估间隔不能为负数",
+        )
         if (scheduling.scaleOutQueueThreshold < 0) {
             context.addError(
                 "realtime.scheduling.scaleOutQueueThreshold",
@@ -181,10 +207,61 @@ internal object RealtimeCoreSchedulingValidator {
             scheduling.scaleInProtectionTime,
             "缩容保护时间不能为负数",
         )
-        nonNegative(context, "realtime.scheduling.networkLatency", scheduling.networkLatency, "网络延迟不能为负数")
-        nonNegative(context, "realtime.scheduling.imagePullDelay", scheduling.imagePullDelay, "镜像拉取延迟不能为负数")
-        nonNegative(context, "realtime.scheduling.ioWeight", scheduling.ioWeight, "I/O 权重不能为负数")
-        nonNegative(context, "realtime.scheduling.ramWeight", scheduling.ramWeight, "RAM 权重不能为负数")
-        nonNegative(context, "realtime.scheduling.bwWeight", scheduling.bwWeight, "带宽权重不能为负数")
+        validateAdvancedAutoscaling(scheduling, context)
+    }
+
+    private fun validateAdvancedAutoscaling(
+        scheduling: RealtimeSchedulingConfig,
+        context: RealtimeValidationContext,
+    ) {
+        nonNegative(context, "realtime.scheduling.scaleCooldown", scheduling.scaleCooldown, "扩缩容冷却时间不能为负数")
+        if (scheduling.scaleOutBatchSize < 1) {
+            context.addError(
+                "realtime.scheduling.scaleOutBatchSize",
+                scheduling.scaleOutBatchSize,
+                "批量扩容大小必须大于等于 1",
+            )
+        }
+        if (scheduling.warmPoolSize < 0) {
+            context.addError("realtime.scheduling.warmPoolSize", scheduling.warmPoolSize, "warm pool 大小不能为负数")
+        }
+        if (scheduling.minActiveVms < 0) {
+            context.addError("realtime.scheduling.minActiveVms", scheduling.minActiveVms, "最小活跃 VM 数不能为负数")
+        }
+        nonNegative(context, "realtime.scheduling.arrivalRateWindow", scheduling.arrivalRateWindow, "到达率窗口不能为负数")
+        nonNegative(context, "realtime.scheduling.predictiveLookahead", scheduling.predictiveLookahead, "预测前瞻窗口不能为负数")
+        nonNegative(
+            context,
+            "realtime.scheduling.scalePressureThreshold",
+            scheduling.scalePressureThreshold,
+            "扩容压力阈值不能为负数",
+        )
+        nonNegative(
+            context,
+            "realtime.scheduling.dynamicVmCostPerSecond",
+            scheduling.dynamicVmCostPerSecond,
+            "动态 VM 秒级成本不能为负数",
+        )
+        validateAutoscalingEvaluationInterval(scheduling, context)
+    }
+
+    private fun validateAutoscalingEvaluationInterval(
+        scheduling: RealtimeSchedulingConfig,
+        context: RealtimeValidationContext,
+    ) {
+        val usesEvaluationLoop =
+            scheduling.autoscalingPolicy.equals(
+                RealtimeAutoscalingPolicy.DEADLINE_PREDICTIVE.configValue,
+                ignoreCase = true,
+            ) ||
+                scheduling.warmPoolSize > 0 ||
+                scheduling.minActiveVms > DEFAULT_INITIAL_VM_COUNT
+        if (scheduling.autoscalingEnabled && usesEvaluationLoop && scheduling.autoscalingEvaluationInterval <= 0.0) {
+            context.addError(
+                "realtime.scheduling.autoscalingEvaluationInterval",
+                scheduling.autoscalingEvaluationInterval,
+                "启用高级 autoscaling 能力时 autoscalingEvaluationInterval 必须大于 0",
+            )
+        }
     }
 }

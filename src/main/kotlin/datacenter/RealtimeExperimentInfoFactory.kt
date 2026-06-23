@@ -57,12 +57,23 @@ internal object RealtimeExperimentInfoFactory {
 
     private fun MutableMap<String, Any>.putSchedulingReliability(scheduling: config.RealtimeSchedulingConfig) {
         this["弹性伸缩"] = scheduling.autoscalingEnabled
+        this["Autoscaling 策略"] = scheduling.autoscalingPolicy
+        this["Autoscaling 评估间隔"] = scheduling.autoscalingEvaluationInterval
         this["扩容队列阈值"] = scheduling.scaleOutQueueThreshold
         this["缩容空闲时间"] = scheduling.scaleInIdleTime
         this["最大动态 VM 数"] = scheduling.maxDynamicVms
         this["VM 冷启动延迟"] = scheduling.vmColdStartDelay
         this["扩容成本"] = scheduling.scaleOutCost
         this["缩容保护时间"] = scheduling.scaleInProtectionTime
+        this["扩容冷却时间"] = scheduling.scaleCooldown
+        this["批量扩容大小"] = scheduling.scaleOutBatchSize
+        this["Warm pool 大小"] = scheduling.warmPoolSize
+        this["最小活跃 VM 数"] = scheduling.minActiveVms
+        this["缩容 Drain"] = scheduling.scaleInDrainEnabled
+        this["到达率窗口"] = scheduling.arrivalRateWindow
+        this["预测前瞻窗口"] = scheduling.predictiveLookahead
+        this["扩容压力阈值"] = scheduling.scalePressureThreshold
+        this["动态 VM 秒级成本"] = scheduling.dynamicVmCostPerSecond
         this["资源模型"] = scheduling.resourceModelEnabled
         this["网络延迟"] = scheduling.networkLatency
         this["镜像拉取延迟"] = scheduling.imagePullDelay

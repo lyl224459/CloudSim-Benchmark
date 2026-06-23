@@ -9,8 +9,8 @@ import org.cloudsimplus.cloudlets.Cloudlet
 import org.cloudsimplus.core.CloudSimPlus
 import org.cloudsimplus.core.events.SimEvent
 import org.cloudsimplus.vms.Vm
-import scheduler.RealtimeScheduler
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeScheduler
 import scheduler.RealtimeTaskMetadata
 import scheduler.RealtimeTopologyMetrics
 
@@ -314,6 +314,20 @@ class RealtimeBroker(
 
     fun getColdStartDelayTotal(): Double = readModel.coldStartDelayTotal()
 
+    fun getAverageAutoscalingPressure(): Double = readModel.averageAutoscalingPressure()
+
+    fun getAverageDeadlineSlackPressure(): Double = readModel.averageDeadlineSlackPressure()
+
+    fun getAverageArrivalRatePressure(): Double = readModel.averageArrivalRatePressure()
+
+    fun getScaleCooldownSkippedCount(): Int = readModel.scaleCooldownSkippedCount()
+
+    fun getWarmPoolHitRate(): Double = readModel.warmPoolHitRate()
+
+    fun getScaleInDrainCount(): Int = readModel.scaleInDrainCount()
+
+    fun getAutoscalingVmSeconds(): Double = readModel.autoscalingVmSeconds()
+
     fun getAverageDecisionDelay(): Double = readModel.averageDecisionDelay()
 
     fun getAverageQueueDepth(): Double = readModel.averageQueueDepth()
@@ -407,13 +421,16 @@ class RealtimeBroker(
                         brokerEvent.payload.runtimeToken,
                     ),
                 )
-            is RealtimeBrokerEvent.AutoscaleTick ->
+            is RealtimeBrokerEvent.AutoscaleTick -> {
+                val activeCloudlets = getActiveCloudlets()
                 applyCommands(
                     autoscalingController.tickCommands(
                         brokerEvent.time,
-                        vmSelectionFacade.activeVmIndexes(getActiveCloudlets()),
+                        vmSelectionFacade.activeVmIndexes(activeCloudlets),
+                        activeCloudlets.size,
                     ),
                 )
+            }
             is RealtimeBrokerEvent.RescheduleTick ->
                 applyCommands(reschedulingController.tickCommands(brokerEvent.time))
             is RealtimeBrokerEvent.Unknown ->
@@ -434,8 +451,8 @@ class RealtimeBroker(
         for (cloudlet in arrivalState.realtimeCloudletsSnapshot()) {
             schedule(cloudlet.submissionDelay, RealtimeBrokerEventTags.ARRIVAL, cloudlet)
         }
-        if (schedulingConfig.autoscalingEnabled && schedulingConfig.scaleInIdleTime > 0.0) {
-            applyCommand(RealtimeBrokerCommand.ScheduleAutoscaleTick(schedulingConfig.scaleInIdleTime))
+        autoscalingController.initialTickDelay()?.let { delay ->
+            applyCommand(RealtimeBrokerCommand.ScheduleAutoscaleTick(delay))
         }
         if (schedulingConfig.reschedulingEnabled && schedulingConfig.reschedulingInterval > 0.0) {
             applyCommand(RealtimeBrokerCommand.ScheduleRescheduleTick(schedulingConfig.reschedulingInterval))

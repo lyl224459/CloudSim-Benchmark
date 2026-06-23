@@ -180,8 +180,8 @@ class RealtimeVmSelectionFacadeTest {
 
     private fun cloudlet(id: Long): Cloudlet = CloudletSimple(1_000, 1).also { it.setId(id) }
 
-    private fun RealtimeVmSelectionOutcome.selectedVmIndex(): Int? =
-        (this as? RealtimeVmSelectionOutcome.Selected)?.vmIndex
+    @Suppress("MaxLineLength") // ktlint requires this short helper to stay as an expression body.
+    private fun RealtimeVmSelectionOutcome.selectedVmIndex(): Int? = (this as? RealtimeVmSelectionOutcome.Selected)?.vmIndex
 
     private fun RealtimeBroker.selectionFacade(): RealtimeVmSelectionFacade =
         javaClass

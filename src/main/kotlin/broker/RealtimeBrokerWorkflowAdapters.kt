@@ -44,14 +44,19 @@ internal class RealtimeArrivalWorkflowAdapter(
         controls.autoscalingController.refresh(currentTime, activeVmIndexes())
     }
 
+    override fun recordAutoscalingArrival(currentTime: Double) {
+        controls.autoscalingController.recordArrival(currentTime)
+    }
+
     override fun activeCloudlets(): List<Cloudlet> = core.readModel.activeCloudlets()
 
     override fun scaleOutCommands(
         queueDepth: Int,
         currentTime: Double,
+        context: RealtimeSchedulingContext?,
     ): List<RealtimeBrokerCommand> {
         val activeIndexes = activeVmIndexes()
-        return controls.autoscalingController.scaleOutCommands(queueDepth, currentTime, activeIndexes)
+        return controls.autoscalingController.scaleOutCommands(queueDepth, currentTime, activeIndexes, context)
     }
 
     override fun schedulingContext(
@@ -85,13 +90,13 @@ internal class RealtimeArrivalWorkflowAdapter(
         return attempt.applied
     }
 
+    @Suppress("MaxLineLength") // ktlint keeps this delegation as a body expression.
     override fun selectVm(
         cloudlet: Cloudlet,
         activeCloudlets: List<Cloudlet>,
         currentTime: Double,
         allowDeadlinePreemption: Boolean,
-    ): RealtimeVmSelectionOutcome =
-        core.vmSelectionFacade.selectVm(cloudlet, activeCloudlets, currentTime, allowDeadlinePreemption)
+    ): RealtimeVmSelectionOutcome = core.vmSelectionFacade.selectVm(cloudlet, activeCloudlets, currentTime, allowDeadlinePreemption)
 
     override fun latestRejectionReason(
         cloudlet: Cloudlet,

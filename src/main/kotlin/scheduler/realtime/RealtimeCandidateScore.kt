@@ -152,10 +152,12 @@ class RealtimeCandidateScoreCalculator {
     private fun deadlineSlack(
         context: RealtimeSchedulingContext,
         projectedFinishTime: Double,
-    ): Double = context.taskMetadata.deadline?.let { deadline -> deadline - projectedFinishTime }?.finiteOrZero() ?: 0.0
+    ): Double =
+        context.taskMetadata.deadline
+            ?.let { deadline -> deadline - projectedFinishTime }
+            ?.finiteOrZero() ?: 0.0
 
-    private fun priorityPressure(priority: Int): Double =
-        DEFAULT_PRIORITY_PRESSURE / (priority.coerceAtLeast(0) + 1.0)
+    private fun priorityPressure(priority: Int): Double = DEFAULT_PRIORITY_PRESSURE / (priority.coerceAtLeast(0) + 1.0)
 
     private fun preemptionCost(
         context: RealtimeSchedulingContext,
@@ -187,10 +189,11 @@ class RealtimeSchedulingObjectiveFunction(
         require(params.size == cloudletCount) {
             "任务到 VM 的映射数量 ${params.size} 与任务数量 $cloudletCount 不一致"
         }
-        return params.sumOf { candidateIndex ->
-            val bounded = candidateIndex.coerceIn(candidateScores.indices)
-            candidateScores[bounded].totalScore
-        }.finiteOrZero()
+        return params
+            .sumOf { candidateIndex ->
+                val bounded = candidateIndex.coerceIn(candidateScores.indices)
+                candidateScores[bounded].totalScore
+            }.finiteOrZero()
     }
 }
 

@@ -15,6 +15,7 @@ internal sealed interface RealtimeDependencyArrivalDecision {
     ) : RealtimeDependencyArrivalDecision
 }
 
+@Suppress("ReturnCount") // Dependency controller uses guard returns for DAG lifecycle state transitions.
 internal class RealtimeDependencyController(
     private val scheduling: RealtimeSchedulingConfig,
     private val state: RealtimeBrokerStateBundle,

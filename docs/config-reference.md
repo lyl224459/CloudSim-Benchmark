@@ -184,12 +184,23 @@
 | `preemptionDelay` | `0.0` | 抢占延迟。 |
 | `preemptionPenalty` | `0.0` | 抢占惩罚。 |
 | `autoscalingEnabled` | `false` | 是否启用 autoscaling。 |
+| `autoscalingPolicy` | `queue_threshold` | `queue_threshold` 保持旧队列阈值策略；`deadline_predictive` 使用队列、deadline slack 和到达率压力。 |
+| `autoscalingEvaluationInterval` | `0.0` | 高级 autoscaling、warm pool 或 min active 的周期评估间隔。 |
 | `scaleOutQueueThreshold` | `0` | 扩容队列阈值。 |
 | `scaleInIdleTime` | `0.0` | 缩容空闲时间。 |
 | `maxDynamicVms` | `0` | 最大动态 VM 数。 |
 | `vmColdStartDelay` | `0.0` | VM 冷启动延迟。 |
 | `scaleOutCost` | `0.0` | 扩容成本。 |
 | `scaleInProtectionTime` | `0.0` | 缩容保护时间。 |
+| `scaleCooldown` | `0.0` | 高级扩容冷却时间。 |
+| `scaleOutBatchSize` | `1` | 高级策略单次压力扩容的最大批量。 |
+| `warmPoolSize` | `0` | 目标空闲动态 VM 数。 |
+| `minActiveVms` | `0` | autoscaling 尽量维持的最小 active/starting VM 数。 |
+| `scaleInDrainEnabled` | `false` | 缩容时先进入 DRAINING，停止接新任务，空闲后再终止。 |
+| `arrivalRateWindow` | `30.0` | 预测扩容使用的近期到达率窗口。 |
+| `predictiveLookahead` | `30.0` | 到达率预测的前瞻窗口。 |
+| `scalePressureThreshold` | `1.0` | `deadline_predictive` 触发扩容的压力阈值。 |
+| `dynamicVmCostPerSecond` | `0.0` | 动态 VM 存活秒级成本，计入 `AutoscalingCost`。 |
 
 ## Realtime Resource Fields
 

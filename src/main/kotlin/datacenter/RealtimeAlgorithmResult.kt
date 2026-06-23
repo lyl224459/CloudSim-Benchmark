@@ -52,6 +52,13 @@ data class RealtimeAlgorithmResult(
     val activeVmPeak: Int get() = metrics.intValue(RealtimeMetricKey.ACTIVE_VM_PEAK)
     val autoscalingCost: Double get() = metrics[RealtimeMetricKey.AUTOSCALING_COST]
     val coldStartDelayTotal: Double get() = metrics[RealtimeMetricKey.COLD_START_DELAY_TOTAL]
+    val averageAutoscalingPressure: Double get() = metrics[RealtimeMetricKey.AVERAGE_AUTOSCALING_PRESSURE]
+    val averageDeadlineSlackPressure: Double get() = metrics[RealtimeMetricKey.AVERAGE_DEADLINE_SLACK_PRESSURE]
+    val averageArrivalRatePressure: Double get() = metrics[RealtimeMetricKey.AVERAGE_ARRIVAL_RATE_PRESSURE]
+    val scaleCooldownSkippedCount: Int get() = metrics.intValue(RealtimeMetricKey.SCALE_COOLDOWN_SKIPPED_COUNT)
+    val warmPoolHitRate: Double get() = metrics[RealtimeMetricKey.WARM_POOL_HIT_RATE]
+    val scaleInDrainCount: Int get() = metrics.intValue(RealtimeMetricKey.SCALE_IN_DRAIN_COUNT)
+    val autoscalingVmSeconds: Double get() = metrics[RealtimeMetricKey.AUTOSCALING_VM_SECONDS]
     val resourceRejectedCount: Int get() = metrics.intValue(RealtimeMetricKey.RESOURCE_REJECTED_COUNT)
     val averagePhysicalHostUtilization: Double get() = metrics[RealtimeMetricKey.AVERAGE_PHYSICAL_HOST_UTILIZATION]
     val averageHostResourceFragmentation: Double get() = metrics[RealtimeMetricKey.AVERAGE_HOST_RESOURCE_FRAGMENTATION]

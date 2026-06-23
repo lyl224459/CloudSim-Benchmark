@@ -48,7 +48,29 @@ class RealtimeVmLifecycleManager(
 
     fun getColdStartDelayTotal(): Double = state.accounting.coldStartDelayTotal
 
+    fun getAverageAutoscalingPressure(): Double = state.accounting.averageAutoscalingPressure
+
+    fun getAverageDeadlineSlackPressure(): Double = state.accounting.averageDeadlineSlackPressure
+
+    fun getAverageArrivalRatePressure(): Double = state.accounting.averageArrivalRatePressure
+
+    fun getScaleCooldownSkippedCount(): Int = state.accounting.scaleCooldownSkippedCount
+
+    fun getWarmPoolHitRate(): Double = state.accounting.warmPoolHitRate
+
+    fun getScaleInDrainCount(): Int = state.accounting.scaleInDrainCount
+
+    fun getAutoscalingVmSeconds(): Double = state.accounting.autoscalingVmSeconds
+
     fun hasLiveDynamicVms(): Boolean = queries.hasLiveDynamicVms()
+
+    fun liveDynamicVmCount(): Int = queries.liveDynamicVmCount()
+
+    fun activeOrStartingVmCount(): Int = queries.activeOrStartingVmCount()
+
+    fun acceptingVmCount(): Int = queries.acceptingVmCount()
+
+    fun idleWarmDynamicVmCount(activeVmIndexes: Set<Int>): Int = queries.idleWarmDynamicVmCount(activeVmIndexes)
 
     fun maybeScaleOut(
         queueDepth: Int,
@@ -61,6 +83,29 @@ class RealtimeVmLifecycleManager(
         val index = state.addDynamicVm(vm, currentTime)
         topologyModel.registerDynamicVm(index, activeVmIndexes)
         return listOf(vm)
+    }
+
+    fun scaleOut(
+        count: Int,
+        currentTime: Double,
+        activeVmIndexes: Set<Int> = emptySet(),
+    ): List<Vm> {
+        val allowed =
+            if (scheduling.autoscalingEnabled && count > 0) {
+                minOf(count, (scheduling.maxDynamicVms - queries.dynamicVmCount()).coerceAtLeast(0))
+            } else {
+                0
+            }
+        return if (allowed <= 0) {
+            emptyList()
+        } else {
+            List(allowed) {
+                val vm = createDynamicVm()
+                val index = state.addDynamicVm(vm, currentTime)
+                topologyModel.registerDynamicVm(index, activeVmIndexes)
+                vm
+            }
+        }
     }
 
     fun refresh(
@@ -99,4 +144,24 @@ class RealtimeVmLifecycleManager(
             scheduling.maxDynamicVms > queries.dynamicVmCount() &&
             queueDepth >= scheduling.scaleOutQueueThreshold.coerceAtLeast(1) &&
             !queries.hasProvisioningVm()
+
+    fun recordAutoscalingPressure(
+        autoscalingPressure: Double,
+        deadlineSlackPressure: Double,
+        arrivalRatePressure: Double,
+    ) {
+        state.accounting.recordAutoscalingPressure(
+            autoscalingPressure = autoscalingPressure,
+            deadlineSlackPressure = deadlineSlackPressure,
+            arrivalRatePressure = arrivalRatePressure,
+        )
+    }
+
+    fun recordScaleCooldownSkipped() {
+        state.accounting.recordCooldownSkipped()
+    }
+
+    fun recordWarmPoolEvaluation(hit: Boolean) {
+        state.accounting.recordWarmPoolEvaluation(hit)
+    }
 }

@@ -14,6 +14,7 @@ import org.cloudsimplus.vms.VmSimple
 import org.junit.jupiter.api.Test
 import scheduler.realtime.RealtimePlacementDecision
 
+@Suppress("LargeClass") // Resource component tests share builders for topology, cache and host-capacity scenarios.
 class RealtimeCloudResourceComponentsTest {
     @Test
     fun `topology annotator returns empty candidates when no topology feature is enabled`() {
@@ -576,6 +577,7 @@ class RealtimeCloudResourceComponentsTest {
             imageCacheByHost = imageCacheByHost,
         )
 
+    @Suppress("LongParameterList") // Test builder mirrors topology/resource configuration fields.
     private fun annotationConfig(
         physicalTopologyEnabled: Boolean = false,
         dataLocalityEnabled: Boolean = false,

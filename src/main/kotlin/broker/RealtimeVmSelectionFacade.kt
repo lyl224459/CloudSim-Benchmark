@@ -209,6 +209,7 @@ internal class RealtimeVmSelectionFacade(
         }
     }
 
+    @Suppress("LongParameterList") // Selection validation keeps the admitted context and metric flags together.
     private fun selectFromAdmittedContext(
         strategy: String,
         cloudlet: Cloudlet,
@@ -223,6 +224,7 @@ internal class RealtimeVmSelectionFacade(
             ?: RealtimeVmSelectionOutcome.NoSelection
     }
 
+    @Suppress("LongParameterList") // Selection validation keeps the admitted context and metric flags together.
     private fun validatedVmSelection(
         selectedVmIndex: Int,
         cloudlet: Cloudlet,

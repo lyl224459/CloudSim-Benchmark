@@ -105,7 +105,7 @@ Algorithm,Status,ErrorType,ErrorMessage,Runs,SuccessfulRuns,FailedRuns,...
 - performance：`Makespan`、`LoadBalance`、`Cost`、`TotalTime`。
 - admission/SLA：`RejectedCount`、`DeadlineRejectedCount`、`DeadlineDegradedCount`、`DeadlineRetryLaterCount`、`DeadlineMissAcceptedCount`、`DependencyBlockedCount`、`DependencyReleasedCount`、`DependencyRejectedCount`、`TimeoutCount`、`SlaViolationCount`。
 - rescheduling：`RescheduleAttemptCount`、`RescheduleSuccessCount`、`RescheduleFailureCount`、`AvgRescheduleDelay`。
-- resource/autoscaling：队列深度、动态 VM、冷启动、伸缩成本、物理 host 利用率、host 碎片、网络传输延迟、镜像缓存命中率、noisy-neighbor 压力。
+- resource/autoscaling：队列深度、动态 VM、冷启动、伸缩成本、autoscaling pressure、deadline slack pressure、arrival-rate pressure、warm pool 命中、drain、VM seconds、物理 host 利用率、host 碎片、网络传输延迟、镜像缓存命中率、noisy-neighbor 压力。
 - reliability：失败、重试、迁移和 checkpoint。
 - tenant/fairness：Jain index、quota、tenant SLA penalty。
 - topology/failure-domain：拓扑成本、延迟、跨域放置、故障域、物理资源放置质量。
@@ -183,6 +183,7 @@ CloudletCount,Algorithm,Status,...
 - realtime 不能只看 makespan，还要同时看 `RejectedCount`、`TimeoutCount`、`FailedCount`、`SlaPenalty`。
 - 多租户场景必须看 `TenantFairnessIndex` 和 tenant 相关 penalty。
 - 拓扑/资源场景必须看 `TopologyCost`、`AverageTopologyLatency`、failure-domain 指标，以及 `AvgPhysicalHostUtilization`、`AvgHostResourceFragmentation`、`AvgNetworkTransferDelay`、`ImageCacheHitRate`、`AvgNoisyNeighborPressure`。
+- 高级 autoscaling 场景建议同时看 `AvgAutoscalingPressure`、`AvgDeadlineSlackPressure`、`AvgArrivalRatePressure`、`ScaleCooldownSkippedCount`、`WarmPoolHitRate`、`ScaleInDrainCount`、`AutoscalingVmSeconds` 和 `AutoscalingCost`，确认 SLA 改善是否来自合理扩容，而不是过量 VM 成本。
 
 不要跨不同配置、不同随机种子、不同 CloudSim Plus lock 或不同 JVM/GC 参数直接比较性能结果。
 

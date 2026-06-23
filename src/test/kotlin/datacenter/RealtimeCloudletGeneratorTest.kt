@@ -107,7 +107,10 @@ class RealtimeCloudletGeneratorTest {
                     ),
             )
 
-        val arrivals = generator.createRealtimeCloudlets(0, count = 10, simulationDuration = 20.0).map { it.submissionDelay }
+        val arrivals =
+            generator
+                .createRealtimeCloudlets(0, count = 10, simulationDuration = 20.0)
+                .map { it.submissionDelay }
 
         assertThat(arrivals).isSorted
         assertThat(arrivals.zipWithNext { a, b -> b - a }).allSatisfy { interval ->

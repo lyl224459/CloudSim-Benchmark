@@ -13,6 +13,7 @@ import scheduler.CloudletId
 import scheduler.RealtimeTaskLifecycle
 import scheduler.RealtimeTaskRecord
 import scheduler.RealtimeTopologyModel
+import scheduler.RealtimeVmLifecycle
 import scheduler.RealtimeVmLifecycleManager
 import scheduler.VmIndex
 
@@ -151,6 +152,96 @@ class RealtimeBrokerEventControllersTest {
 
         assertThat(controller.tickCommands(currentTime = 0.5, activeVmIndexes = emptySet()))
             .containsExactly(RealtimeBrokerCommand.ScheduleAutoscaleTick(2.0))
+    }
+
+    @Test
+    fun `autoscaling predictive policy batches scale out and records cooldown skips`() {
+        val scheduling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                autoscalingPolicy = "deadline_predictive",
+                autoscalingEvaluationInterval = 1.0,
+                scaleOutQueueThreshold = 1,
+                maxDynamicVms = 5,
+                scaleOutBatchSize = 2,
+                scaleCooldown = 2.0,
+            )
+        val manager = RealtimeVmLifecycleManager(listOf(createVm()), scheduling, RealtimeTopologyModel.Disabled)
+        val controller = RealtimeAutoscalingController(scheduling, manager)
+
+        val first = controller.scaleOutCommands(queueDepth = 3, currentTime = 0.0, activeVmIndexes = emptySet())
+        val second = controller.scaleOutCommands(queueDepth = 3, currentTime = 0.5, activeVmIndexes = emptySet())
+
+        assertThat(first.filterIsInstance<RealtimeBrokerCommand.SubmitVms>().single().vms).hasSize(2)
+        assertThat(second.filterIsInstance<RealtimeBrokerCommand.SubmitVms>()).isEmpty()
+        assertThat(manager.getScaleCooldownSkippedCount()).isEqualTo(1)
+        assertThat(manager.getAverageAutoscalingPressure()).isEqualTo(3.0)
+    }
+
+    @Test
+    fun `autoscaling tick fills warm pool and records warm availability`() {
+        val scheduling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                autoscalingPolicy = "queue_threshold",
+                autoscalingEvaluationInterval = 1.0,
+                maxDynamicVms = 2,
+                warmPoolSize = 1,
+            )
+        val manager = RealtimeVmLifecycleManager(listOf(createVm()), scheduling, RealtimeTopologyModel.Disabled)
+        val controller = RealtimeAutoscalingController(scheduling, manager)
+
+        val first = controller.tickCommands(currentTime = 1.0, activeVmIndexes = emptySet(), queueDepth = 0)
+        manager.refresh(currentTime = 1.0, activeVmIndexes = emptySet())
+        val second = controller.tickCommands(currentTime = 2.0, activeVmIndexes = emptySet(), queueDepth = 0)
+
+        assertThat(first.filterIsInstance<RealtimeBrokerCommand.SubmitVms>().single().vms).hasSize(1)
+        assertThat(second.filterIsInstance<RealtimeBrokerCommand.SubmitVms>()).isEmpty()
+        assertThat(manager.getWarmPoolHitRate()).isEqualTo(0.5)
+    }
+
+    @Test
+    fun `autoscaling min active bypasses batch limit`() {
+        val scheduling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                autoscalingPolicy = "queue_threshold",
+                autoscalingEvaluationInterval = 1.0,
+                maxDynamicVms = 4,
+                minActiveVms = 3,
+                scaleOutBatchSize = 1,
+            )
+        val manager = RealtimeVmLifecycleManager(listOf(createVm()), scheduling, RealtimeTopologyModel.Disabled)
+        val controller = RealtimeAutoscalingController(scheduling, manager)
+
+        val commands = controller.tickCommands(currentTime = 1.0, activeVmIndexes = emptySet(), queueDepth = 0)
+
+        assertThat(commands.filterIsInstance<RealtimeBrokerCommand.SubmitVms>().single().vms).hasSize(2)
+    }
+
+    @Test
+    fun `autoscaling scale in drain stops accepting before termination`() {
+        val scheduling =
+            RealtimeSchedulingConfig(
+                autoscalingEnabled = true,
+                scaleInIdleTime = 1.0,
+                maxDynamicVms = 1,
+                scaleInDrainEnabled = true,
+            )
+        val manager = RealtimeVmLifecycleManager(listOf(createVm()), scheduling, RealtimeTopologyModel.Disabled)
+        manager.scaleOut(count = 1, currentTime = 0.0, activeVmIndexes = emptySet())
+        val controller = RealtimeAutoscalingController(scheduling, manager)
+
+        controller.tickCommands(currentTime = 2.0, activeVmIndexes = emptySet())
+        val draining = manager.snapshots().values.single { it.dynamic }
+        controller.tickCommands(currentTime = 3.0, activeVmIndexes = emptySet())
+        val terminated = manager.snapshots().values.single { it.dynamic }
+
+        assertThat(draining.lifecycle).isEqualTo(RealtimeVmLifecycle.DRAINING)
+        assertThat(draining.acceptingWork).isFalse()
+        assertThat(manager.getScaleInDrainCount()).isEqualTo(1)
+        assertThat(terminated.lifecycle).isEqualTo(RealtimeVmLifecycle.TERMINATED)
+        assertThat(manager.getScaleInCount()).isEqualTo(1)
     }
 
     @Test

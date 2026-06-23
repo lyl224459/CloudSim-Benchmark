@@ -9,8 +9,8 @@ import kotlin.math.abs
 class RealtimeEdfScheduler(
     vmList: List<Vm>,
 ) : RealtimeSchedulerBase(vmList) {
-    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
-        selectAcceptedOrFallback(context, comparatorFor(context))
+    @Suppress("MaxLineLength") // ktlint keeps simple scheduler dispatch as a body expression.
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int = selectAcceptedOrFallback(context, comparatorFor(context))
 
     private fun comparatorFor(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> {
         val scoresByVmIndex = scoreByVmIndex(context)
@@ -30,8 +30,8 @@ class RealtimeEdfScheduler(
 class RealtimeLlfScheduler(
     vmList: List<Vm>,
 ) : RealtimeSchedulerBase(vmList) {
-    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int =
-        selectAcceptedOrFallback(context, comparatorFor(context))
+    @Suppress("MaxLineLength") // ktlint keeps simple scheduler dispatch as a body expression.
+    override fun scheduleOnArrival(context: RealtimeSchedulingContext): Int = selectAcceptedOrFallback(context, comparatorFor(context))
 
     private fun comparatorFor(context: RealtimeSchedulingContext): Comparator<RealtimeNodeState> {
         val scoresByVmIndex = scoreByVmIndex(context)
@@ -68,8 +68,7 @@ class RealtimeSrptScheduler(
             context,
             compareBy<RealtimeNodeState> {
                 scoresByVmIndex[it.vmIndex]?.breakdown?.estimatedRuntime ?: Double.POSITIVE_INFINITY
-            }
-                .thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
+            }.thenBy { scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY }
                 .then(stableCandidateTieBreaker()),
         )
     }
@@ -98,7 +97,6 @@ class RealtimePriorityDeadlineScheduler(
 private fun earliestFinishComparator(scoresByVmIndex: Map<Int, RealtimeCandidateScore>): Comparator<RealtimeNodeState> =
     compareBy<RealtimeNodeState> {
         scoresByVmIndex[it.vmIndex]?.breakdown?.projectedFinishTime ?: Double.POSITIVE_INFINITY
-    }
-        .thenBy { scoresByVmIndex[it.vmIndex]?.totalScore ?: Double.POSITIVE_INFINITY }
+    }.thenBy { scoresByVmIndex[it.vmIndex]?.totalScore ?: Double.POSITIVE_INFINITY }
         .thenBy { it.queueDepth }
         .thenBy { it.vmIndex }

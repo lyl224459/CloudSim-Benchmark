@@ -11,7 +11,10 @@ import kotlin.math.min
 /**
  * Google Trace 数据集云任务生成器。
  */
-@Suppress("UnusedParameter") // GoogleTraceConfig is accepted for source compatibility with older constructors.
+@Suppress(
+    "LongParameterList",
+    "UnusedParameter",
+) // GoogleTraceConfig constructor keeps source compatibility with older trace configuration callers.
 class GoogleTraceCloudletGenerator(
     private val traceFilePath: String = DEFAULT_GOOGLE_TRACE_FILE_PATH,
     private val maxTasks: Int = DEFAULT_GOOGLE_TRACE_MAX_TASKS,
@@ -84,8 +87,7 @@ class GoogleTraceCloudletGenerator(
                 traceRecord,
                 traceArrivalTimestamp(traceRecord, firstTimestamp),
             )
-        }
-            .onSuccess(::add)
+        }.onSuccess(::add)
             .onFailure { Logger.warn("创建云任务失败: ${it.message}") }
     }
 
