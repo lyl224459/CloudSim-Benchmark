@@ -46,7 +46,7 @@ plugins {
 }
 
 group = "com.lyl224459"
-version = "1.2.0"
+version = "1.2.1"
 
 description = "CloudSim-Benchmark: 云任务调度算法对比实验平台"
 

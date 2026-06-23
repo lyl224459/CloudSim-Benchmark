@@ -159,7 +159,7 @@ podman run --rm -v "${PWD}\runs:/app/runs" cloudsim-benchmark --help
 发布镜像位于 GHCR：
 
 ```powershell
-docker pull ghcr.io/lyl224459/cloudsim-benchmark:1.2.0
+docker pull ghcr.io/lyl224459/cloudsim-benchmark:1.2.1
 docker pull ghcr.io/lyl224459/cloudsim-benchmark:latest
 ```
 
@@ -230,7 +230,7 @@ pwsh -File scripts/run-build-warning-audit.ps1
 - 配置无法解析：运行 `.\run.cmd config validate --config <file>`，再对照 [docs/config-reference.md](docs/config-reference.md)。
 - 算法名不被接受：运行 `.\run.cmd list algorithms --mode batch` 或 `--mode realtime`。
 - 实验结果异常：优先检查 `resolved_config.json`、`summary_avg.csv` 和失败 trial 的 `ErrorType`/`ErrorMessage`。
-- 容器镜像拉取版本不对：使用 `:1.2.0`、`:latest` 或 `@sha256:<digest>`，不要使用 `:sha256-...`。
+- 容器镜像拉取版本不对：使用 `:1.2.1`、`:latest` 或 `@sha256:<digest>`，不要使用 `:sha256-...`。
 
 ## License
 

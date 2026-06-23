@@ -113,7 +113,7 @@ ghcr.io/lyl224459/cloudsim-benchmark
 可运行镜像使用语义化版本 tag，并在正式 tag 发布时同步 `latest`：
 
 ```powershell
-docker pull ghcr.io/lyl224459/cloudsim-benchmark:1.2.0
+docker pull ghcr.io/lyl224459/cloudsim-benchmark:1.2.1
 docker pull ghcr.io/lyl224459/cloudsim-benchmark:latest
 ```
 

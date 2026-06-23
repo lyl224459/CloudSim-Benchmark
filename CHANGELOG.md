@@ -9,12 +9,45 @@ attestation 信息以 release manifest 和 GitHub Release 为准。
 
 ### Added
 
-- 补充项目发版记录入口，便于后续版本整理发布说明。
+- 暂无。
 
 ### Changed
 
+- 暂无。
+
+### Fixed
+
+- 暂无。
+
+## 1.2.1 - 2026-06-23
+
+### Added
+
+- 新增 realtime 基线算法：`EDF_REALTIME`、`LLF_REALTIME`、`EFT_REALTIME`、`SRPT_REALTIME` 和 `PRIORITY_DEADLINE_REALTIME`。
+- 新增 realtime 专用候选评分模型，并输出 `realtime_candidate_scores.csv` 用于解释 VM 候选分数。
+- 新增 deadline admission，可按 soft、firm、hard deadline 和 accept、reject、degrade、retry_later 策略处理 deadline miss。
+- 新增周期性重调度，支持 pending、waiting、running 任务的 deadline/score 策略重评估。
+- 新增 periodic、sporadic、diurnal burst、mixed short/long、DAG chain/layered 等 realtime workload，并补充 DAG 依赖强约束。
+- 新增 host 级资源和拓扑模型增强，包括 CPU overcommit、带宽共享、storage IOPS、镜像拉取队列和 noisy-neighbor pressure。
+- 新增 enhanced autoscaling，支持 cooldown、warm pool、scale-in drain、min active VM、arrival-rate 预测和 deadline slack pressure。
+- 新增 realtime 事件级观测输出 `realtime_events.csv`，可复盘 arrival、selection、submission、completion、failure、preemption、reschedule 和 autoscaling 事件。
+- 新增 realtime workload、resource topology、autoscaling advanced、event observation 示例配置。
+- 补充项目 TODO 记录，便于后续版本规划。
+
+### Changed
+
+- realtime `ALL` 和默认算法展开包含新增 realtime baseline。
+- `PSO_REALTIME` 和 `WOA_REALTIME` 默认使用 realtime score objective 作为优化目标。
+- dry-run 文本和 JSON 输出补充 deadline admission、rescheduling、workload、resource topology、autoscaling 和 event observation 配置。
+- realtime trial/summary CSV schema 扩展 dependency、deadline、rescheduling、resource topology、autoscaling、score 等聚合指标。
 - 改进 README 项目概览和配置文件中文注释，降低新用户理解成本。
 - 明确容器镜像 tag 与 digest 用法，避免误用 GHCR attestation fallback tag。
+- 将项目版本更新为 `1.2.1`，同步容器镜像拉取示例。
+
+### Fixed
+
+- 修正 realtime autoscaling 周期 tick 在空队列或仅运行任务场景下可能持续扩容/续约的问题。
+- 修正 rescheduling 失败尝试不消耗上限导致周期 tick 持续重试的问题。
 
 ## 1.2.0 - 2026-06-22
 

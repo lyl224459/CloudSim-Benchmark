@@ -118,26 +118,43 @@ jobs:
         subject-path: build/release-artifacts/cloudsim-benchmark-${{ steps.ver.outputs.version }}.jar
         sbom-path: build/release-artifacts/cloudsim-benchmark-${{ steps.ver.outputs.version }}-sbom.json
 
+    - name: Build release notes from changelog
+      shell: pwsh
+      run: |
+        $version = "${{ steps.ver.outputs.version }}"
+        $lines = Get-Content CHANGELOG.md
+        $headingPattern = "^##\s+$([regex]::Escape($version))\b"
+        $heading = $lines | Select-String -Pattern $headingPattern | Select-Object -First 1
+        if (-not $heading) {
+          throw "CHANGELOG.md does not contain a release section for $version"
+        }
+        $start = $heading.LineNumber - 1
+        $next = $null
+        for ($i = $start + 1; $i -lt $lines.Count; $i++) {
+          if ($lines[$i] -match '^##\s+') {
+            $next = $i
+            break
+          }
+        }
+        if ($null -eq $next) {
+          $section = $lines[$start..($lines.Count - 1)]
+        } else {
+          $section = $lines[$start..($next - 1)]
+        }
+        $notes = @(
+          "# CloudSim-Benchmark v$version",
+          "",
+          "以下内容来自 CHANGELOG.md。",
+          ""
+        ) + $section
+        Set-Content -Path release-notes.md -Encoding UTF8 -Value $notes
+
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v3
       with:
         tag_name: ${{ steps.ver.outputs.tag }}
         name: CloudSim-Benchmark v${{ steps.ver.outputs.version }}
-        body: |
-          ## 🚀 CloudSim-Benchmark ${{ steps.ver.outputs.tag }} 发布
-          
-          ### 📦 包含产物
-          - **Executable JAR**: 包含所有依赖，直接通过 `java -jar` 运行。
-          - **Windows Package**: 包含便捷运行脚本和默认配置。
-          - **Unix Package**: 包含 `scripts/run`、默认配置和日志配置。
-          - **Source Code**: 完整开发环境源码。
-          
-          ### 🛠️ 运行环境
-          - JDK 25+ (推荐)
-          
-          ### 🐳 容器镜像
-          本版本已同步发布至 GitHub Container Registry:
-          `ghcr.io/${{ github.repository_owner }}/cloudsim-benchmark:${{ steps.ver.outputs.version }}`
+        body_path: release-notes.md
         draft: false
         prerelease: false
         files: |
