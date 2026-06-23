@@ -47,6 +47,11 @@
 | AutoscalingCost | cost | 越低越好 | 自动伸缩带来的额外成本。 |
 | ColdStartDelayTotal | seconds | 越低越好 | VM 冷启动延迟总量。 |
 | ResourceRejectedCount | count | 越低越好 | RAM、带宽或 I/O 资源约束导致的拒绝数。 |
+| AvgPhysicalHostUtilization | ratio | 越低越好 | 被选中 placement 的物理 host 资源利用率平均值。 |
+| AvgHostResourceFragmentation | ratio | 越低越好 | 被选中 placement 的物理 host 资源碎片度平均值。 |
+| AvgNetworkTransferDelay | seconds | 越低越好 | 被选中 placement 的数据传输与拓扑网络延迟平均值。 |
+| ImageCacheHitRate | ratio | 越高越好 | 启用 image cache 后被选中 placement 的镜像缓存命中率。 |
+| AvgNoisyNeighborPressure | score | 越低越好 | 被选中 placement 的 noisy-neighbor 压力平均值。 |
 | RuntimeFailureCount | count | 越低越好 | 运行期失败事件数。 |
 | TimeoutCancelledCount | count | 越低越好 | 超时处理中被取消的任务数。 |
 | MigrationCount | count | 越低越好 | 任务迁移事件数。 |

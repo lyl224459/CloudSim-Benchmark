@@ -328,6 +328,16 @@ class RealtimeBroker(
 
     fun getAverageCandidateScoreSpread(): Double = readModel.averageCandidateScoreSpread()
 
+    fun getAveragePhysicalHostUtilization(): Double = readModel.averagePhysicalHostUtilization()
+
+    fun getAverageHostResourceFragmentation(): Double = readModel.averageHostResourceFragmentation()
+
+    fun getAverageNetworkTransferDelay(): Double = readModel.averageNetworkTransferDelay()
+
+    fun getImageCacheHitRate(): Double = readModel.imageCacheHitRate()
+
+    fun getAverageNoisyNeighborPressure(): Double = readModel.averageNoisyNeighborPressure()
+
     fun getCandidateScoreRecords(): List<RealtimeCandidateScoreRecord> = readModel.candidateScoreRecords()
 
     fun getTaskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = readModel.taskMetadata(cloudlet)

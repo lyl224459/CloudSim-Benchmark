@@ -172,6 +172,208 @@ class RealtimeCloudResourceComponentsTest {
     }
 
     @Test
+    fun `cpu overcommit throttles within ratio and rejects above hard limit`() {
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        physicalTopologyEnabled = true,
+                        hostCapacity = HostCapacity(cpu = 2.0),
+                        cpuOvercommitRatio = 1.5,
+                    ),
+            )
+
+        val accepted =
+            requireNotNull(
+                annotator
+                    .annotate(
+                        states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                        vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                        workload = workload(demand = RealtimeResourceDemand(cpu = 2.5)),
+                        records = emptyList(),
+                    ).single()
+                    .acceptedPlacement,
+            )
+        val rejected =
+            annotator
+                .annotate(
+                    states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                    vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                    workload = workload(demand = RealtimeResourceDemand(cpu = 3.1)),
+                    records = emptyList(),
+                ).single()
+                .placement as RealtimePlacementDecision.Rejected
+
+        assertThat(accepted.hostResourceDelay).isGreaterThan(0.0)
+        assertThat(rejected.reason).isEqualTo("physical_cpu_capacity")
+    }
+
+    @Test
+    fun `network bandwidth sharing divides route capacity by active transfers`() {
+        val remote = location(0, region = 1)
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        dataLocalityEnabled = true,
+                        networkBandwidthSharingEnabled = true,
+                        crossRegionBandwidth = 2.0,
+                    ),
+                locationOf = { remote },
+                latencyFor = { 0.0 },
+            )
+        val active =
+            RealtimeTaskRecord(
+                cloudletId = 1,
+                originalArrivalTime = 0.0,
+                assignedVmIndex = 0,
+                lifecycle = RealtimeTaskLifecycle.RUNNING,
+                dataRegion = RegionId(0),
+                inputDataSizeGb = 1.0,
+            )
+
+        val placement =
+            requireNotNull(
+                annotator
+                    .annotate(
+                        states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                        vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                        workload = workload(dataRegion = RegionId(0), inputDataSizeGb = 4.0),
+                        records = listOf(active),
+                    ).single()
+                    .acceptedPlacement,
+            )
+
+        assertThat(placement.networkTransferDelay).isEqualTo(4.0)
+    }
+
+    @Test
+    fun `network sharing rejects remote transfer when configured bandwidth is zero`() {
+        val remote = location(0, region = 1)
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        dataLocalityEnabled = true,
+                        networkBandwidthSharingEnabled = true,
+                        crossRegionBandwidth = 0.0,
+                    ),
+                locationOf = { remote },
+            )
+
+        val placement =
+            annotator
+                .annotate(
+                    states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                    vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                    workload = workload(dataRegion = RegionId(0), inputDataSizeGb = 1.0),
+                    records = emptyList(),
+                ).single()
+                .placement as RealtimePlacementDecision.Rejected
+
+        assertThat(placement.reason).isEqualTo("network_bandwidth_capacity")
+    }
+
+    @Test
+    fun `storage iops sharing adds host resource delay`() {
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        physicalTopologyEnabled = true,
+                        storageIopsSharingEnabled = true,
+                        hostCapacity = HostCapacity(io = 10.0),
+                    ),
+            )
+
+        val placement =
+            requireNotNull(
+                annotator
+                    .annotate(
+                        states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                        vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                        workload = workload(demand = RealtimeResourceDemand(io = 5.0)),
+                        records = emptyList(),
+                    ).single()
+                    .acceptedPlacement,
+            )
+
+        assertThat(placement.hostResourceDelay).isEqualTo(0.5)
+    }
+
+    @Test
+    fun `image pull queue multiplies cache miss delay on same host`() {
+        val host = location(0)
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        imageCacheEnabled = true,
+                        imagePullQueueEnabled = true,
+                    ),
+                locationOf = { host },
+            )
+        val activeMiss =
+            RealtimeTaskRecord(
+                cloudletId = 1,
+                originalArrivalTime = 0.0,
+                assignedVmIndex = 0,
+                lifecycle = RealtimeTaskLifecycle.RUNNING,
+                imageId = "active-image",
+                imageSizeGb = 2.0,
+            )
+
+        val placement =
+            requireNotNull(
+                annotator
+                    .annotate(
+                        states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                        vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                        workload = workload(imageId = "incoming-image", imageSizeGb = 2.0),
+                        records = listOf(activeMiss),
+                    ).single()
+                    .acceptedPlacement,
+            )
+
+        assertThat(placement.imagePullDelay).isEqualTo(0.004)
+    }
+
+    @Test
+    fun `noisy neighbor pressure increases placement resource pressure`() {
+        val host = location(0)
+        val annotator =
+            annotator(
+                config =
+                    annotationConfig(
+                        physicalTopologyEnabled = true,
+                        hostCapacity = HostCapacity(cpu = 4.0),
+                        noisyNeighborPenaltyWeight = 2.0,
+                    ),
+                locationOf = { host },
+            )
+        val active =
+            RealtimeTaskRecord(
+                cloudletId = 1,
+                originalArrivalTime = 0.0,
+                assignedVmIndex = 0,
+                lifecycle = RealtimeTaskLifecycle.RUNNING,
+                requestedCpu = 2.0,
+            )
+
+        val candidate =
+            annotator
+                .annotate(
+                    states = listOf(nodeState(vmIndex = 0, acceptingWork = true, availableTime = 0.0)),
+                    vmList = listOf(createVm(id = 0, ram = 1024, bw = 1000, storage = 1000)),
+                    workload = workload(demand = RealtimeResourceDemand(cpu = 1.0)),
+                    records = listOf(active),
+                ).single()
+
+        assertThat(candidate.acceptedPlacement?.noisyNeighborPressure).isEqualTo(2.0)
+        assertThat(candidate.nodeState.resourcePressure).isEqualTo(2.0)
+    }
+
+    @Test
     fun `image pull delay falls back when image size or vm bandwidth is zero`() {
         val annotator =
             annotator(
@@ -335,6 +537,8 @@ class RealtimeCloudResourceComponentsTest {
             networkTransferDelay = 0.0,
             networkTransferGb = 0.0,
             imagePullDelay = 0.0,
+            hostResourceDelay = 0.0,
+            noisyNeighborPressure = 0.0,
             topologyCost = 0.0,
             score = score,
         )
@@ -378,19 +582,35 @@ class RealtimeCloudResourceComponentsTest {
         imageCacheEnabled: Boolean = false,
         hostCapacity: HostCapacity = HostCapacity(),
         dataLocalityPolicy: DataLocalityPolicy = DataLocalityPolicy.BALANCED,
+        cpuOvercommitRatio: Double = 1.0,
+        networkBandwidthSharingEnabled: Boolean = false,
+        storageIopsSharingEnabled: Boolean = false,
+        imagePullQueueEnabled: Boolean = false,
+        noisyNeighborPenaltyWeight: Double = 0.0,
+        crossRackBandwidth: Double = 4.0,
+        crossRegionBandwidth: Double = 2.0,
     ): TopologyCandidateAnnotationConfig =
         TopologyCandidateAnnotationConfig(
-            enabled = physicalTopologyEnabled || dataLocalityEnabled || imageCacheEnabled,
+            enabled =
+                physicalTopologyEnabled ||
+                    dataLocalityEnabled ||
+                    imageCacheEnabled ||
+                    noisyNeighborPenaltyWeight > 0.0,
             physicalTopologyEnabled = physicalTopologyEnabled,
             dataLocalityEnabled = dataLocalityEnabled,
             imageCacheEnabled = imageCacheEnabled,
             localRegion = RegionId(0),
             hostCpuCapacity = hostCapacity.cpu,
+            cpuOvercommitRatio = cpuOvercommitRatio,
             hostRamCapacity = hostCapacity.ram,
             hostBwCapacity = hostCapacity.bw,
             hostIoCapacity = hostCapacity.io,
-            crossRackBandwidth = 4.0,
-            crossRegionBandwidth = 2.0,
+            networkBandwidthSharingEnabled = networkBandwidthSharingEnabled,
+            storageIopsSharingEnabled = storageIopsSharingEnabled,
+            imagePullQueueEnabled = imagePullQueueEnabled,
+            noisyNeighborPenaltyWeight = noisyNeighborPenaltyWeight,
+            crossRackBandwidth = crossRackBandwidth,
+            crossRegionBandwidth = crossRegionBandwidth,
             dataLocalityPolicy = dataLocalityPolicy,
         )
 
@@ -419,9 +639,10 @@ class RealtimeCloudResourceComponentsTest {
     private fun location(
         index: Int,
         region: Int = 0,
+        rack: Int = 0,
     ): RealtimeTopologyLocation {
         val regionId = RegionId(region)
-        return RealtimeTopologyLocation(regionId, RackId(0), HostId(index), FailureDomainId(index))
+        return RealtimeTopologyLocation(regionId, RackId(rack), HostId(index), FailureDomainId(index))
     }
 
     private fun createCloudlet(id: Int): Cloudlet {

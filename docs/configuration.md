@@ -190,7 +190,7 @@ checkpointInterval = 5.0
 | Queue/deadline | `queuePolicy`、`deadlineFactor`、`deadlineAdmissionEnabled`、`deadlineType`、`deadlineMissAction`、`taskTimeout` | 控制 FIFO、priority、deadline admission 和 timeout。 |
 | Rescheduling | `reschedulingEnabled`、`reschedulingInterval`、`reschedulingPolicy`、`maxReschedulesPerTask` | 控制周期性检查 pending、waiting、running 任务并按内置策略重调度。 |
 | Dependency | `dependencyEnforcementEnabled` | 控制 DAG metadata 存在时是否强制等待前驱成功完成。 |
-| Resource model | `resourceModelEnabled`、`vmQueueCapacity`、`ramWeight`、`bwWeight`、`ioWeight` | 控制资源需求、容量拒绝和候选评分。 |
+| Resource/topology model | `resourceModelEnabled`、`vmQueueCapacity`、`physicalTopologyEnabled`、`cpuOvercommitRatio`、`networkBandwidthSharingEnabled`、`storageIopsSharingEnabled`、`imagePullQueueEnabled`、`noisyNeighborPenaltyWeight` | 控制资源需求、host 级容量拒绝、共享传输/存储延迟、镜像拉取队列和 noisy-neighbor 候选压力。 |
 | Failure/retry | `runtimeFailureRate`、`nodeFailureRate`、`retryLimit`、`retryDelay` | 控制运行时失败、节点失败和重试。 |
 | Autoscaling | `autoscalingEnabled`、`scaleOutQueueThreshold`、`maxDynamicVms`、`vmColdStartDelay` | 控制动态 VM 扩缩容。 |
 | Tenant/topology | `tenantFairnessPolicy`、`topologyPolicy`、`dataLocalityPolicy` | 控制多租户公平、故障域和数据本地性。 |
@@ -229,6 +229,7 @@ realtime 模式会把 trace timestamp 转成仿真秒。默认 `normalizeTimesta
 - `configs/examples/realtime_multi_test.toml`
 - `configs/examples/single_config_example.toml`
 - `configs/examples/realtime_workloads.toml`
+- `configs/examples/realtime_resource_topology.toml`
 
 实验配置：
 

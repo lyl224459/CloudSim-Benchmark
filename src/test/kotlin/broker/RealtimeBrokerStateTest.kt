@@ -8,6 +8,7 @@ import org.cloudsimplus.vms.VmSimple
 import org.junit.jupiter.api.Test
 import scheduler.CloudletId
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeNodeState
 import scheduler.RealtimeScoreBreakdown
 import scheduler.RealtimeTaskLifecycle
 import scheduler.VmIndex
@@ -74,6 +75,44 @@ class RealtimeBrokerStateTest {
         metrics.recordDecisionDelay(4.0)
         metrics.recordQueueDepth(3)
         metrics.recordQueueDepth(7)
+        metrics.recordPlacement(
+            RealtimeNodeState(
+                vmIndex = 0,
+                vmId = 0L,
+                runningCount = 0,
+                pendingCount = 0,
+                queueDepth = 0,
+                availableSlots = 1,
+                acceptingWork = true,
+                estimatedLoad = 0.0,
+                availableTime = 0.0,
+                failurePressure = 0.0,
+                physicalHostUtilization = 0.5,
+                hostResourceFragmentation = 0.25,
+                networkTransferDelay = 1.5,
+                noisyNeighborPressure = 0.75,
+                imageCacheHit = true,
+            ),
+        )
+        metrics.recordPlacement(
+            RealtimeNodeState(
+                vmIndex = 1,
+                vmId = 1L,
+                runningCount = 0,
+                pendingCount = 0,
+                queueDepth = 0,
+                availableSlots = 1,
+                acceptingWork = true,
+                estimatedLoad = 0.0,
+                availableTime = 0.0,
+                failurePressure = 0.0,
+                physicalHostUtilization = 0.25,
+                hostResourceFragmentation = 0.75,
+                networkTransferDelay = 0.5,
+                noisyNeighborPressure = 0.25,
+                imageCacheHit = false,
+            ),
+        )
         metrics.recordRetry()
         metrics.recordRetrySuccess()
         metrics.recordTimeoutCancelled()
@@ -99,6 +138,11 @@ class RealtimeBrokerStateTest {
         assertThat(snapshot.maxQueueDepth).isEqualTo(7)
         assertThat(snapshot.averageRealtimeScore).isZero()
         assertThat(snapshot.averageCandidateScoreSpread).isZero()
+        assertThat(snapshot.averagePhysicalHostUtilization).isEqualTo(0.375)
+        assertThat(snapshot.averageHostResourceFragmentation).isEqualTo(0.5)
+        assertThat(snapshot.averageNetworkTransferDelay).isEqualTo(1.0)
+        assertThat(snapshot.imageCacheHitRate).isEqualTo(0.5)
+        assertThat(snapshot.averageNoisyNeighborPressure).isEqualTo(0.5)
         assertThat(snapshot.retrySuccessCount).isEqualTo(1)
         assertThat(snapshot.timeoutCancelledCount).isEqualTo(1)
         assertThat(snapshot.hostFailureCount).isEqualTo(1)

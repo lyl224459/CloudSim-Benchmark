@@ -31,6 +31,8 @@ data class RealtimeNodeState(
     val physicalHostUtilization: Double = 0.0,
     val hostResourceFragmentation: Double = 0.0,
     val networkTransferDelay: Double = 0.0,
+    val hostResourceDelay: Double = 0.0,
+    val noisyNeighborPressure: Double = 0.0,
     val dataLocalityHit: Boolean = true,
     val imageCacheHit: Boolean = false,
     val placementFailureReason: String? = null,
@@ -88,10 +90,12 @@ sealed interface RealtimePlacementDecision {
         val networkTransferDelay: Double,
         val networkTransferGb: Double,
         val imagePullDelay: Double,
+        val hostResourceDelay: Double,
+        val noisyNeighborPressure: Double,
         val topologyCost: Double,
         val score: Double,
     ) : RealtimePlacementDecision {
-        val placementDelay: Double get() = networkTransferDelay + imagePullDelay
+        val placementDelay: Double get() = networkTransferDelay + imagePullDelay + hostResourceDelay
     }
 
     data class Rejected(

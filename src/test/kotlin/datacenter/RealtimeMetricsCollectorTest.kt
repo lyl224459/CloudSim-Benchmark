@@ -194,6 +194,11 @@ class RealtimeMetricsCollectorTest {
         assertThat(result.autoscalingCost).isEqualTo(14.0)
         assertThat(result.coldStartDelayTotal).isEqualTo(15.0)
         assertThat(result.resourceRejectedCount).isEqualTo(16)
+        assertThat(result.averagePhysicalHostUtilization).isEqualTo(0.6)
+        assertThat(result.averageHostResourceFragmentation).isEqualTo(0.3)
+        assertThat(result.averageNetworkTransferDelay).isEqualTo(1.4)
+        assertThat(result.imageCacheHitRate).isEqualTo(0.75)
+        assertThat(result.averageNoisyNeighborPressure).isEqualTo(0.2)
         assertThat(result.runtimeFailureCount).isEqualTo(17)
         assertThat(result.timeoutCancelledCount).isEqualTo(18)
         assertThat(result.migrationCount).isEqualTo(19)
@@ -265,6 +270,11 @@ class RealtimeMetricsCollectorTest {
         whenever(broker.getAutoscalingCost()).thenReturn(14.0)
         whenever(broker.getColdStartDelayTotal()).thenReturn(15.0)
         whenever(broker.getResourceRejectedCount()).thenReturn(16)
+        whenever(broker.getAveragePhysicalHostUtilization()).thenReturn(0.6)
+        whenever(broker.getAverageHostResourceFragmentation()).thenReturn(0.3)
+        whenever(broker.getAverageNetworkTransferDelay()).thenReturn(1.4)
+        whenever(broker.getImageCacheHitRate()).thenReturn(0.75)
+        whenever(broker.getAverageNoisyNeighborPressure()).thenReturn(0.2)
     }
 
     private fun stubReliabilityMetrics(broker: RealtimeBroker) {

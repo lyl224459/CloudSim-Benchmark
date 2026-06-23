@@ -104,6 +104,16 @@ internal class RealtimeBrokerReadModel(
 
     fun averageCandidateScoreSpread(): Double = scalarMetrics.averageCandidateScoreSpread()
 
+    fun averagePhysicalHostUtilization(): Double = scalarMetrics.averagePhysicalHostUtilization()
+
+    fun averageHostResourceFragmentation(): Double = scalarMetrics.averageHostResourceFragmentation()
+
+    fun averageNetworkTransferDelay(): Double = scalarMetrics.averageNetworkTransferDelay()
+
+    fun imageCacheHitRate(): Double = scalarMetrics.imageCacheHitRate()
+
+    fun averageNoisyNeighborPressure(): Double = scalarMetrics.averageNoisyNeighborPressure()
+
     fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = scalarMetrics.candidateScoreRecords()
 
     fun taskMetadata(cloudlet: Cloudlet): RealtimeTaskMetadata? = tasks.taskMetadata(cloudlet)

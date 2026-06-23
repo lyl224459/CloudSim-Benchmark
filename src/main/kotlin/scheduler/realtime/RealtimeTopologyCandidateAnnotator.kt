@@ -14,9 +14,14 @@ internal data class TopologyCandidateAnnotationConfig(
     val imageCacheEnabled: Boolean,
     val localRegion: RegionId,
     val hostCpuCapacity: Double,
+    val cpuOvercommitRatio: Double,
     val hostRamCapacity: Double,
     val hostBwCapacity: Double,
     val hostIoCapacity: Double,
+    val networkBandwidthSharingEnabled: Boolean,
+    val storageIopsSharingEnabled: Boolean,
+    val imagePullQueueEnabled: Boolean,
+    val noisyNeighborPenaltyWeight: Double,
     val crossRackBandwidth: Double,
     val crossRegionBandwidth: Double,
     val dataLocalityPolicy: DataLocalityPolicy,
@@ -37,12 +42,12 @@ internal class TopologyCandidateAnnotator(
         records: List<RealtimeTaskRecord>,
     ): List<NodeCandidate> {
         if (!shouldAnnotate()) return emptyList()
-        val activeDemandByHost = activeDemandByHost(records)
+        val snapshot = activePlacementSnapshot(records)
         val rawCandidates =
             states.map { state ->
                 val location = locationOf(state.vmIndex)
-                val demand = activeDemandByHost[location] ?: RealtimeResourceDemand()
-                val placement = placementFor(state, vmList.getOrNull(state.vmIndex), workload, demand)
+                val demand = snapshot.demandByHost[location] ?: RealtimeResourceDemand()
+                val placement = placementFor(state, vmList.getOrNull(state.vmIndex), workload, demand, snapshot)
                 NodeCandidate(
                     nodeState = state.withPlacement(placement),
                     placement = placement,
@@ -55,13 +60,15 @@ internal class TopologyCandidateAnnotator(
     private fun shouldAnnotate(): Boolean =
         config.physicalTopologyEnabled ||
             config.dataLocalityEnabled ||
-            config.imageCacheEnabled
+            config.imageCacheEnabled ||
+            config.noisyNeighborPenaltyWeight > ZERO_DELAY
 
     private fun placementFor(
         state: RealtimeNodeState,
         vm: Vm?,
         workload: RealtimeWorkloadDescriptor,
         activeDemand: RealtimeResourceDemand,
+        snapshot: ActivePlacementSnapshot,
     ): RealtimePlacementDecision {
         val location = locationOf(state.vmIndex)
         val incomingDemand = workload.toDemand()
@@ -72,16 +79,24 @@ internal class TopologyCandidateAnnotator(
             return RealtimePlacementDecision.Rejected(VmIndex(state.vmIndex), location, capacityReason)
         }
 
-        val transfer = transferFor(workload, location)
-        val image = imagePullFor(workload, location, vm)
+        val transfer = transferFor(workload, location, snapshot)
+        if (config.networkBandwidthSharingEnabled && transfer.bandwidthMissing) {
+            return RealtimePlacementDecision.Rejected(VmIndex(state.vmIndex), location, "network_bandwidth_capacity")
+        }
+        val image = imagePullFor(workload, location, vm, snapshot.imagePullMissCountByHost[location] ?: 0)
+        val hostResourceDelay = hostResourceDelay(activeDemand, incomingDemand, projectedDemand)
+        val noisyNeighborPressure =
+            noisyNeighborPressure(activeHostState, snapshot.taskCountByHost[location] ?: 0)
         val score =
             state.availableTime +
                 transfer.networkDelay +
                 image.pullDelay +
+                hostResourceDelay +
                 costFor(location) +
                 dataLocalityPenalty(config.dataLocalityPolicy, transfer.dataLocal, transfer.transferGb) +
                 activeHostState.utilization +
-                activeHostState.fragmentation
+                activeHostState.fragmentation +
+                noisyNeighborPressure
         return RealtimePlacementDecision.Accepted(
             vmIndex = VmIndex(state.vmIndex),
             location = location,
@@ -91,6 +106,8 @@ internal class TopologyCandidateAnnotator(
             networkTransferDelay = transfer.networkDelay,
             networkTransferGb = transfer.transferGb,
             imagePullDelay = image.pullDelay,
+            hostResourceDelay = hostResourceDelay,
+            noisyNeighborPressure = noisyNeighborPressure,
             topologyCost = costFor(location),
             score = score,
         )
@@ -104,6 +121,39 @@ internal class TopologyCandidateAnnotator(
                 locationOf(vmIndex) to record.workloadDescriptor(config.localRegion).toDemand()
             }.groupingBy { it.first }
             .fold(RealtimeResourceDemand()) { demand, pair -> demand + pair.second }
+
+    private fun activePlacementSnapshot(records: List<RealtimeTaskRecord>): ActivePlacementSnapshot {
+        val entries =
+            records
+                .filter { it.lifecycle.isActiveForPhysicalPlacement() }
+                .mapNotNull { record ->
+                    val vmIndex = record.assignedVmIndex ?: return@mapNotNull null
+                    val location = locationOf(vmIndex)
+                    val workload = record.workloadDescriptor(config.localRegion)
+                    ActivePlacementEntry(location, workload, workload.toDemand())
+                }
+        val demandByHost =
+            entries
+                .groupingBy { it.location }
+                .fold(RealtimeResourceDemand()) { demand, entry -> demand + entry.demand }
+        val taskCountByHost = entries.groupingBy { it.location }.eachCount()
+        val transferCountByRoute =
+            entries
+                .mapNotNull { routeFor(it.workload, it.location) }
+                .groupingBy { it }
+                .eachCount()
+        val imagePullMissCountByHost =
+            entries
+                .filter { it.workload.imageId != null && !imageCacheHit(it.location, it.workload.imageId) }
+                .groupingBy { it.location }
+                .eachCount()
+        return ActivePlacementSnapshot(
+            demandByHost = demandByHost,
+            taskCountByHost = taskCountByHost,
+            transferCountByRoute = transferCountByRoute,
+            imagePullMissCountByHost = imagePullMissCountByHost,
+        )
+    }
 
     fun hostState(
         location: RealtimeTopologyLocation,
@@ -125,18 +175,32 @@ internal class TopologyCandidateAnnotator(
     private fun transferFor(
         workload: RealtimeWorkloadDescriptor,
         location: RealtimeTopologyLocation,
+        snapshot: ActivePlacementSnapshot,
     ): TopologyTransfer {
-        val dataLocal = !config.dataLocalityEnabled || workload.dataRegion == location.regionId
+        val route = routeFor(workload, location)
+        val dataLocal = !config.dataLocalityEnabled || route == null
         val transferGb =
-            if (dataLocal || !config.dataLocalityEnabled) {
+            if (route == null) {
                 ZERO_DELAY
             } else {
                 workload.inputDataSizeGb.coerceAtLeast(ZERO_DELAY)
             }
-        val bandwidth = bandwidthFor(workload, location, transferGb)
+        val bandwidth = bandwidthFor(route, transferGb)
+        val activeTransferCount =
+            if (config.networkBandwidthSharingEnabled && route != null) {
+                (snapshot.transferCountByRoute[route] ?: 0) + 1
+            } else {
+                1
+            }
+        val effectiveBandwidth =
+            if (bandwidth > ZERO_DELAY && activeTransferCount > 1) {
+                bandwidth / activeTransferCount.toDouble()
+            } else {
+                bandwidth
+            }
         val transferDelay =
-            if (transferGb > ZERO_DELAY && bandwidth > ZERO_DELAY) {
-                transferGb / bandwidth
+            if (transferGb > ZERO_DELAY && effectiveBandwidth > ZERO_DELAY) {
+                transferGb / effectiveBandwidth
             } else {
                 ZERO_DELAY
             }
@@ -146,18 +210,36 @@ internal class TopologyCandidateAnnotator(
             } else {
                 ZERO_DELAY
             }
-        return TopologyTransfer(dataLocal, transferGb, networkDelay)
+        return TopologyTransfer(
+            dataLocal = dataLocal,
+            transferGb = transferGb,
+            networkDelay = networkDelay,
+            bandwidthMissing = route != null && transferGb > ZERO_DELAY && bandwidth <= ZERO_DELAY,
+        )
+    }
+
+    private fun routeFor(
+        workload: RealtimeWorkloadDescriptor,
+        location: RealtimeTopologyLocation,
+    ): TopologyRoute? {
+        if (!config.dataLocalityEnabled || workload.inputDataSizeGb <= ZERO_DELAY) return null
+        return when {
+            workload.dataRegion != location.regionId ->
+                TopologyRoute(workload.dataRegion, location.regionId, null)
+            config.networkBandwidthSharingEnabled && location.rackId.value != 0 ->
+                TopologyRoute(workload.dataRegion, location.regionId, location.rackId)
+            else -> null
+        }
     }
 
     private fun bandwidthFor(
-        workload: RealtimeWorkloadDescriptor,
-        location: RealtimeTopologyLocation,
+        route: TopologyRoute?,
         transferGb: Double,
     ): Double =
         when {
-            !config.dataLocalityEnabled || transferGb <= ZERO_DELAY -> ZERO_DELAY
-            workload.dataRegion != location.regionId -> config.crossRegionBandwidth
-            location.rackId.value != 0 -> config.crossRackBandwidth
+            route == null || transferGb <= ZERO_DELAY -> ZERO_DELAY
+            route.sourceRegion != route.targetRegion -> config.crossRegionBandwidth
+            route.targetRack != null -> config.crossRackBandwidth
             else -> ZERO_DELAY
         }
 
@@ -165,10 +247,11 @@ internal class TopologyCandidateAnnotator(
         workload: RealtimeWorkloadDescriptor,
         location: RealtimeTopologyLocation,
         vm: Vm?,
+        activeMissCount: Int,
     ): ImagePull {
         val imageId = workload.imageId
         val cacheHit = imageCacheHit(location, imageId)
-        val pullDelay =
+        val baseDelay =
             if (config.imageCacheEnabled && imageId != null && !cacheHit) {
                 val imageSize = workload.imageSizeGb.coerceAtLeast(ZERO_DELAY)
                 if (imageSize > ZERO_DELAY) {
@@ -179,6 +262,13 @@ internal class TopologyCandidateAnnotator(
             } else {
                 ZERO_DELAY
             }
+        val queueMultiplier =
+            if (config.imagePullQueueEnabled && baseDelay > ZERO_DELAY) {
+                activeMissCount.coerceAtLeast(0) + 1
+            } else {
+                1
+            }
+        val pullDelay = baseDelay * queueMultiplier.toDouble()
         return ImagePull(cacheHit, pullDelay)
     }
 
@@ -199,6 +289,41 @@ internal class TopologyCandidateAnnotator(
                 ?.takeIf { it > ZERO_DELAY } ?: return UNIT_DELAY
         return UNIT_DELAY / capacity
     }
+
+    private fun hostResourceDelay(
+        activeDemand: RealtimeResourceDemand,
+        incomingDemand: RealtimeResourceDemand,
+        projectedDemand: RealtimeResourceDemand,
+    ): Double =
+        cpuThrottleDelay(projectedDemand) + storageDelay(activeDemand, incomingDemand)
+
+    private fun cpuThrottleDelay(projectedDemand: RealtimeResourceDemand): Double =
+        if (config.physicalTopologyEnabled && config.hostCpuCapacity > ZERO_DELAY) {
+            (projectedDemand.cpu / config.hostCpuCapacity - 1.0).coerceAtLeast(ZERO_DELAY)
+        } else {
+            ZERO_DELAY
+        }
+
+    private fun storageDelay(
+        activeDemand: RealtimeResourceDemand,
+        incomingDemand: RealtimeResourceDemand,
+    ): Double {
+        if (!config.storageIopsSharingEnabled || config.hostIoCapacity <= ZERO_DELAY) return ZERO_DELAY
+        val incomingPressure = incomingDemand.io.coerceAtLeast(ZERO_DELAY) / config.hostIoCapacity
+        val activePressure = activeDemand.io.coerceAtLeast(ZERO_DELAY) / config.hostIoCapacity
+        return incomingPressure * (1.0 + activePressure)
+    }
+
+    private fun noisyNeighborPressure(
+        activeHostState: RealtimeHostState,
+        activeTaskCount: Int,
+    ): Double {
+        val weight = config.noisyNeighborPenaltyWeight
+        if (weight <= ZERO_DELAY) return ZERO_DELAY
+        val concurrencyPressure =
+            if (activeTaskCount <= 0) ZERO_DELAY else activeTaskCount.toDouble() / (activeTaskCount + 1.0)
+        return weight * (activeHostState.utilization + concurrencyPressure)
+    }
 }
 
 private fun capacityRejectionReason(
@@ -206,12 +331,15 @@ private fun capacityRejectionReason(
     demand: RealtimeResourceDemand,
 ): String? =
     when {
-        config.hostCpuCapacity > ZERO_DELAY && demand.cpu > config.hostCpuCapacity -> "physical_cpu_capacity"
+        config.hostCpuCapacity > ZERO_DELAY && demand.cpu > config.effectiveCpuCapacity -> "physical_cpu_capacity"
         config.hostRamCapacity > ZERO_DELAY && demand.ram > config.hostRamCapacity -> "physical_ram_capacity"
         config.hostBwCapacity > ZERO_DELAY && demand.bw > config.hostBwCapacity -> "physical_bw_capacity"
         config.hostIoCapacity > ZERO_DELAY && demand.io > config.hostIoCapacity -> "physical_io_capacity"
         else -> null
     }
+
+private val TopologyCandidateAnnotationConfig.effectiveCpuCapacity: Double
+    get() = hostCpuCapacity * cpuOvercommitRatio.coerceAtLeast(Double.MIN_VALUE)
 
 private fun dataLocalityPenalty(
     policy: DataLocalityPolicy,
@@ -229,9 +357,29 @@ private data class TopologyTransfer(
     val dataLocal: Boolean,
     val transferGb: Double,
     val networkDelay: Double,
+    val bandwidthMissing: Boolean,
 )
 
 private data class ImagePull(
     val cacheHit: Boolean,
     val pullDelay: Double,
+)
+
+private data class TopologyRoute(
+    val sourceRegion: RegionId,
+    val targetRegion: RegionId,
+    val targetRack: RackId?,
+)
+
+private data class ActivePlacementEntry(
+    val location: RealtimeTopologyLocation,
+    val workload: RealtimeWorkloadDescriptor,
+    val demand: RealtimeResourceDemand,
+)
+
+private data class ActivePlacementSnapshot(
+    val demandByHost: Map<RealtimeTopologyLocation, RealtimeResourceDemand>,
+    val taskCountByHost: Map<RealtimeTopologyLocation, Int>,
+    val transferCountByRoute: Map<TopologyRoute, Int>,
+    val imagePullMissCountByHost: Map<RealtimeTopologyLocation, Int>,
 )

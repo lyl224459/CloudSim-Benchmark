@@ -1,0 +1,177 @@
+# 实时资源/拓扑示例：覆盖物理容量、网络瓶颈、镜像缓存和 noisy-neighbor 压力。
+# 可运行：.\run.cmd list profiles --config configs/examples/realtime_resource_topology.toml
+
+# 默认运行网络瓶颈场景，便于检查数据本地性和共享带宽字段。
+defaultProfile = "realtime_network_bottleneck"
+
+# 输出设置。
+[output]
+# 基础结果目录。
+resultsDir = "runs"
+
+[output.csv]
+# 启用 CSV 输出，便于查看资源/拓扑聚合指标。
+enabled = true
+# CSV 分隔符。
+delimiter = ","
+
+# 日志设置。
+[logging]
+# 常规日志级别。
+level = "INFO"
+# 写文件日志。
+file = true
+# 输出控制台日志。
+console = true
+
+# 实验运行设置。
+[experiment]
+# 自动创建输出目录。
+autoCreateDirs = true
+# 资源拓扑实验目录命名模板。
+nameFormat = "realtime_resource_topology_{timestamp}_{algorithms}"
+# 示例 profile 规模较小，默认单并发即可。
+maxConcurrent = 1
+
+# 随机种子。
+[random]
+# 固定 seed，保证 synthetic workload 和随机算法路径可复现。
+seed = 42
+
+# 优化器参数；本文件主要使用轻量 baseline，保留默认值以兼容 ALL/优化算法。
+[optimizer]
+# 种群大小。
+population = 12
+# 最大迭代次数。
+maxIter = 12
+
+# 物理容量场景：CPU 支持 overcommit，RAM/BW/IO 仍为 hard limit。
+[profiles.realtime_physical_capacity]
+mode = "realtime"
+algorithms = ["EFT_REALTIME", "PRIORITY_DEADLINE_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_physical_capacity"
+
+[profiles.realtime_physical_capacity.realtime]
+cloudletCount = 120
+simulationDuration = 240.0
+arrivalRate = 6.0
+
+[profiles.realtime_physical_capacity.realtime.arrival]
+distribution = "poisson"
+workloadPattern = "mixed_short_long"
+shortTaskRatio = 0.65
+shortTaskLengthMultiplier = 0.5
+longTaskLengthMultiplier = 2.0
+runtimeReferenceMips = 1000.0
+
+[profiles.realtime_physical_capacity.realtime.scheduling]
+physicalTopologyEnabled = true
+hostCountPerRack = 2
+hostCpuCapacity = 4.0
+cpuOvercommitRatio = 1.5
+hostRamCapacity = 16.0
+hostBwCapacity = 5000.0
+hostIoCapacity = 2500.0
+storageIopsSharingEnabled = true
+resourceModelEnabled = true
+
+# 网络瓶颈场景：启用数据本地性和 route 级共享带宽。
+[profiles.realtime_network_bottleneck]
+mode = "realtime"
+algorithms = ["EFT_REALTIME", "SRPT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_network_bottleneck"
+
+[profiles.realtime_network_bottleneck.realtime]
+cloudletCount = 100
+simulationDuration = 220.0
+arrivalRate = 5.0
+
+[profiles.realtime_network_bottleneck.realtime.arrival]
+distribution = "diurnal_burst"
+diurnalPeakMultiplier = 2.0
+diurnalOffPeakMultiplier = 0.5
+workloadPattern = "standard"
+
+[profiles.realtime_network_bottleneck.realtime.scheduling]
+topologyEnabled = true
+physicalTopologyEnabled = true
+dataLocalityEnabled = true
+networkBandwidthSharingEnabled = true
+regionCount = 3
+racksPerRegion = 2
+hostCountPerRack = 2
+hostCpuCapacity = 6.0
+hostRamCapacity = 24.0
+hostBwCapacity = 6000.0
+hostIoCapacity = 3000.0
+crossRackLatency = 0.15
+crossRegionLatency = 1.2
+crossRackBandwidth = 8.0
+crossRegionBandwidth = 2.0
+dataLocalityPolicy = "balanced"
+
+# 镜像缓存场景：启用 LRU cache 和同 host image miss 拉取队列。
+[profiles.realtime_image_cache]
+mode = "realtime"
+algorithms = ["EFT_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_image_cache"
+
+[profiles.realtime_image_cache.realtime]
+cloudletCount = 80
+simulationDuration = 180.0
+arrivalRate = 4.0
+
+[profiles.realtime_image_cache.realtime.arrival]
+distribution = "periodic"
+periodSeconds = 1.0
+arrivalJitter = 0.2
+workloadPattern = "standard"
+
+[profiles.realtime_image_cache.realtime.scheduling]
+topologyEnabled = true
+physicalTopologyEnabled = true
+imageCacheEnabled = true
+imagePullQueueEnabled = true
+regionCount = 2
+racksPerRegion = 2
+hostCountPerRack = 2
+hostCpuCapacity = 6.0
+hostRamCapacity = 24.0
+hostBwCapacity = 6000.0
+hostIoCapacity = 3000.0
+imageCacheCapacity = 4
+
+# Noisy-neighbor 场景：按 host utilization 和同 host 活跃任务数增加候选压力。
+[profiles.realtime_noisy_neighbor]
+mode = "realtime"
+algorithms = ["MIN_LOAD", "PRIORITY_DEADLINE_REALTIME"]
+runs = 1
+outputDir = "runs/realtime_noisy_neighbor"
+
+[profiles.realtime_noisy_neighbor.realtime]
+cloudletCount = 120
+simulationDuration = 200.0
+arrivalRate = 7.0
+
+[profiles.realtime_noisy_neighbor.realtime.arrival]
+distribution = "burst"
+workloadPattern = "mixed_short_long"
+shortTaskRatio = 0.7
+shortTaskLengthMultiplier = 0.6
+longTaskLengthMultiplier = 2.4
+runtimeReferenceMips = 1000.0
+
+[profiles.realtime_noisy_neighbor.realtime.scheduling]
+physicalTopologyEnabled = true
+hostCountPerRack = 1
+hostCpuCapacity = 5.0
+cpuOvercommitRatio = 1.25
+hostRamCapacity = 20.0
+hostBwCapacity = 5000.0
+hostIoCapacity = 2500.0
+noisyNeighborPenaltyWeight = 1.2
+queuePolicy = "deadline"
+deadlineFactor = 1.5

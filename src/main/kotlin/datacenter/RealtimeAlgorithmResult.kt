@@ -53,6 +53,11 @@ data class RealtimeAlgorithmResult(
     val autoscalingCost: Double get() = metrics[RealtimeMetricKey.AUTOSCALING_COST]
     val coldStartDelayTotal: Double get() = metrics[RealtimeMetricKey.COLD_START_DELAY_TOTAL]
     val resourceRejectedCount: Int get() = metrics.intValue(RealtimeMetricKey.RESOURCE_REJECTED_COUNT)
+    val averagePhysicalHostUtilization: Double get() = metrics[RealtimeMetricKey.AVERAGE_PHYSICAL_HOST_UTILIZATION]
+    val averageHostResourceFragmentation: Double get() = metrics[RealtimeMetricKey.AVERAGE_HOST_RESOURCE_FRAGMENTATION]
+    val averageNetworkTransferDelay: Double get() = metrics[RealtimeMetricKey.AVERAGE_NETWORK_TRANSFER_DELAY]
+    val imageCacheHitRate: Double get() = metrics[RealtimeMetricKey.IMAGE_CACHE_HIT_RATE]
+    val averageNoisyNeighborPressure: Double get() = metrics[RealtimeMetricKey.AVERAGE_NOISY_NEIGHBOR_PRESSURE]
     val runtimeFailureCount: Int get() = metrics.intValue(RealtimeMetricKey.RUNTIME_FAILURE_COUNT)
     val timeoutCancelledCount: Int get() = metrics.intValue(RealtimeMetricKey.TIMEOUT_CANCELLED_COUNT)
     val migrationCount: Int get() = metrics.intValue(RealtimeMetricKey.MIGRATION_COUNT)

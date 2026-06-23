@@ -240,6 +240,7 @@ internal class RealtimeVmSelectionFacade(
             selectedState != null && !selectedState.acceptingWork -> null
             else -> {
                 if (recordSelectionMetrics) {
+                    placementState?.let(state.metrics::recordPlacement)
                     state.metrics.recordCandidateScores(scoreCalculator.scoreRecords(context, bounded))
                     state.metrics.recordDeadlineAdmission(metricAction)
                 }

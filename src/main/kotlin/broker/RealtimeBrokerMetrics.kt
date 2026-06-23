@@ -1,6 +1,7 @@
 package broker
 
 import scheduler.RealtimeCandidateScoreRecord
+import scheduler.RealtimeNodeState
 
 data class RealtimeBrokerMetricsSnapshot(
     val rejectedCount: Int,
@@ -43,6 +44,11 @@ data class RealtimeBrokerMetricsSnapshot(
     val averageSelectedLatenessPenalty: Double,
     val averageSelectedDeadlineSlack: Double,
     val averageCandidateScoreSpread: Double,
+    val averagePhysicalHostUtilization: Double,
+    val averageHostResourceFragmentation: Double,
+    val averageNetworkTransferDelay: Double,
+    val imageCacheHitRate: Double,
+    val averageNoisyNeighborPressure: Double,
 )
 
 @Suppress("TooManyFunctions") // Metrics facade keeps stable scalar and snapshot accessors in one type.
@@ -121,6 +127,13 @@ class RealtimeBrokerMetrics {
     private var candidateScoreSpreadTotal = 0.0
     private var candidateScoreDecisionCount = 0
     private val candidateScoreRecords = mutableListOf<RealtimeCandidateScoreRecord>()
+    private var physicalHostUtilizationTotal = 0.0
+    private var hostResourceFragmentationTotal = 0.0
+    private var networkTransferDelayTotal = 0.0
+    private var noisyNeighborPressureTotal = 0.0
+    private var placementMetricCount = 0
+    private var imageCacheHitCount = 0
+    private var imageCacheDecisionCount = 0
 
     val averageDecisionDelay: Double
         get() = if (decisionCount > 0) decisionDelayTotal / decisionCount else 0.0
@@ -157,6 +170,16 @@ class RealtimeBrokerMetrics {
             } else {
                 0.0
             }
+    val averagePhysicalHostUtilization: Double
+        get() = if (placementMetricCount > 0) physicalHostUtilizationTotal / placementMetricCount else 0.0
+    val averageHostResourceFragmentation: Double
+        get() = if (placementMetricCount > 0) hostResourceFragmentationTotal / placementMetricCount else 0.0
+    val averageNetworkTransferDelay: Double
+        get() = if (placementMetricCount > 0) networkTransferDelayTotal / placementMetricCount else 0.0
+    val imageCacheHitRate: Double
+        get() = if (imageCacheDecisionCount > 0) imageCacheHitCount.toDouble() / imageCacheDecisionCount else 0.0
+    val averageNoisyNeighborPressure: Double
+        get() = if (placementMetricCount > 0) noisyNeighborPressureTotal / placementMetricCount else 0.0
 
     fun recordRejected(reason: RealtimeRejectReason) {
         rejectedCount++
@@ -289,6 +312,18 @@ class RealtimeBrokerMetrics {
 
     fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = candidateScoreRecords.toList()
 
+    fun recordPlacement(state: RealtimeNodeState) {
+        placementMetricCount++
+        physicalHostUtilizationTotal += state.physicalHostUtilization
+        hostResourceFragmentationTotal += state.hostResourceFragmentation
+        networkTransferDelayTotal += state.networkTransferDelay
+        noisyNeighborPressureTotal += state.noisyNeighborPressure
+        imageCacheDecisionCount++
+        if (state.imageCacheHit) {
+            imageCacheHitCount++
+        }
+    }
+
     fun recordTopologyFailure(domain: RealtimeFailureDomain) {
         when (domain) {
             RealtimeFailureDomain.HOST -> hostFailureCount++
@@ -339,6 +374,11 @@ class RealtimeBrokerMetrics {
             averageSelectedLatenessPenalty,
             averageSelectedDeadlineSlack,
             averageCandidateScoreSpread,
+            averagePhysicalHostUtilization,
+            averageHostResourceFragmentation,
+            averageNetworkTransferDelay,
+            imageCacheHitRate,
+            averageNoisyNeighborPressure,
         )
 }
 

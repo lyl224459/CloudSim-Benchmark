@@ -237,6 +237,10 @@
 | `dataLocalityPolicy` | `prefer_local` | `prefer_local`、`balanced`、`ignore`。 |
 | `imageCacheEnabled` | `false` | 是否启用 image cache。 |
 | `imageCacheCapacity` | `0` | cache 容量。 |
+| `networkBandwidthSharingEnabled` | `false` | 是否按 route 活跃传输数共享跨 rack/region 带宽。 |
+| `storageIopsSharingEnabled` | `false` | 是否按 host I/O 容量增加 storage delay。 |
+| `imagePullQueueEnabled` | `false` | 是否让同 host image miss 进入共享拉取队列。 |
+| `noisyNeighborPenaltyWeight` | `0.0` | noisy-neighbor 压力权重，必须非负。 |
 
 ## Physical Host Capacity
 
@@ -244,6 +248,7 @@
 | :--- | :--- |
 | `hostCountPerRack` | `2` |
 | `hostCpuCapacity` | `0.0` |
+| `cpuOvercommitRatio` | `1.0` |
 | `hostRamCapacity` | `0.0` |
 | `hostBwCapacity` | `0.0` |
 | `hostIoCapacity` | `0.0` |

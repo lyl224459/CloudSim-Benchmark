@@ -124,6 +124,16 @@ internal class RealtimeBrokerScalarMetricsView(
 
     fun averageCandidateScoreSpread(): Double = metrics.averageCandidateScoreSpread
 
+    fun averagePhysicalHostUtilization(): Double = metrics.averagePhysicalHostUtilization
+
+    fun averageHostResourceFragmentation(): Double = metrics.averageHostResourceFragmentation
+
+    fun averageNetworkTransferDelay(): Double = metrics.averageNetworkTransferDelay
+
+    fun imageCacheHitRate(): Double = metrics.imageCacheHitRate
+
+    fun averageNoisyNeighborPressure(): Double = metrics.averageNoisyNeighborPressure
+
     fun candidateScoreRecords(): List<RealtimeCandidateScoreRecord> = metrics.candidateScoreRecords()
 
     fun retrySuccessRate(): Double = metrics.retrySuccessRate

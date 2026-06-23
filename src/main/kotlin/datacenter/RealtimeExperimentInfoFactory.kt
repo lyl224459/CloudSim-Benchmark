@@ -112,9 +112,14 @@ internal object RealtimeExperimentInfoFactory {
         this["镜像缓存"] = scheduling.imageCacheEnabled
         this["物理每 Rack Host 数"] = scheduling.hostCountPerRack
         this["Host CPU 容量"] = scheduling.hostCpuCapacity
+        this["CPU Overcommit 比例"] = scheduling.cpuOvercommitRatio
         this["Host RAM 容量"] = scheduling.hostRamCapacity
         this["Host 带宽容量"] = scheduling.hostBwCapacity
         this["Host I/O 容量"] = scheduling.hostIoCapacity
+        this["网络带宽共享"] = scheduling.networkBandwidthSharingEnabled
+        this["Storage IOPS 共享"] = scheduling.storageIopsSharingEnabled
+        this["镜像拉取队列"] = scheduling.imagePullQueueEnabled
+        this["Noisy-neighbor 惩罚权重"] = scheduling.noisyNeighborPenaltyWeight
         this["跨 Rack 带宽"] = scheduling.crossRackBandwidth
         this["跨 Region 带宽"] = scheduling.crossRegionBandwidth
         this["数据本地性策略"] = scheduling.dataLocalityPolicy

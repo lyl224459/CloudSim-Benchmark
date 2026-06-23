@@ -287,6 +287,11 @@ Autoscaling 会创建动态 VM。动态 VM 有冷启动延迟和成本，相关�
 - `dataLocalityPolicy`
 - `imageCacheEnabled`
 - `imageCacheCapacity`
+- `cpuOvercommitRatio`
+- `networkBandwidthSharingEnabled`
+- `storageIopsSharingEnabled`
+- `imagePullQueueEnabled`
+- `noisyNeighborPenaltyWeight`
 
 策略：
 
@@ -296,6 +301,8 @@ Autoscaling 会创建动态 VM。动态 VM 有冷启动延迟和成本，相关�
 | `dataLocalityPolicy` | `prefer_local`, `balanced`, `ignore` |
 
 Data locality 会影响候选排序和成本。Image cache 会影响冷启动和镜像拉取。
+
+物理拓扑默认不改变旧行为。启用 `physicalTopologyEnabled` 后，RAM/BW/IO 是 host 级 hard limit；CPU 默认按 `hostCpuCapacity` 限制，`cpuOvercommitRatio > 1.0` 时允许超过原始 CPU 容量但不超过 overcommit 上限，并增加 throttling delay。启用 `networkBandwidthSharingEnabled` 后，同 route 的跨 rack/region 传输按活跃传输数共享带宽，带宽为 0 的远端传输会被拒绝。启用 `storageIopsSharingEnabled` 后，host I/O 容量会增加 storage delay。启用 `imagePullQueueEnabled` 后，同 host image miss 会叠加拉取队列延迟。`noisyNeighborPenaltyWeight` 大于 0 时，host utilization 和同 host 活跃任务数会进入 resource pressure 和 realtime score。
 
 ## Candidate Selection
 
@@ -316,7 +323,7 @@ Realtime PSO/WOA 只在 accepted candidates 上优化。返回值最终必须是
 | SLA | SLA violation、SLA penalty、average waiting/response time。 |
 | DAG dependency | dependency blocked/released/rejected、response time、deadline slack。 |
 | Tenant fairness | Jain index、DRF、tenant SLA penalty、fairness violation。 |
-| Topology | topology cost、latency、cross-region/rack placement。 |
+| Topology/resource | topology cost、latency、cross-region/rack placement、physical host utilization、host fragmentation、network transfer delay、image cache hit rate、noisy-neighbor pressure。 |
 | Autoscaling | dynamic VM peak、cold start delay、autoscaling cost。 |
 | Reliability | runtime failure、retry count、retry success rate、checkpoint loss。 |
 

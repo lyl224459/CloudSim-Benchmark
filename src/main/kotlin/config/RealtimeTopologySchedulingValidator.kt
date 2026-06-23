@@ -87,9 +87,22 @@ internal object RealtimeTopologySchedulingValidator {
             )
         }
         nonNegative(context, "realtime.scheduling.hostCpuCapacity", scheduling.hostCpuCapacity, "Host CPU 容量不能为负数")
+        if (scheduling.cpuOvercommitRatio <= 0.0) {
+            context.addError(
+                "realtime.scheduling.cpuOvercommitRatio",
+                scheduling.cpuOvercommitRatio,
+                "CPU overcommit 比例必须大于 0",
+            )
+        }
         nonNegative(context, "realtime.scheduling.hostRamCapacity", scheduling.hostRamCapacity, "Host RAM 容量不能为负数")
         nonNegative(context, "realtime.scheduling.hostBwCapacity", scheduling.hostBwCapacity, "Host 带宽容量不能为负数")
         nonNegative(context, "realtime.scheduling.hostIoCapacity", scheduling.hostIoCapacity, "Host I/O 容量不能为负数")
+        nonNegative(
+            context,
+            "realtime.scheduling.noisyNeighborPenaltyWeight",
+            scheduling.noisyNeighborPenaltyWeight,
+            "Noisy-neighbor 惩罚权重不能为负数",
+        )
         nonNegative(
             context,
             "realtime.scheduling.crossRackBandwidth",
