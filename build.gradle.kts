@@ -140,22 +140,65 @@ val cloudSimPlusDependencyVersion =
         if (enforceLock) locked.version else providers.gradleProperty("cloudsimplus.version").orNull ?: "latest.release"
     }
 
-repositories {
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = "cloudSimPlusSourceBuild"
-                url = uri(cloudSimPlusLocalMavenRepo.get().asFile)
-                metadataSources {
-                    mavenPom()
-                    artifact()
-                }
-            }
+// ── 前置检查：若 CloudSim Plus 本地 JAR 不存在，先触发源码构建 ──
+// 跳过子构建中的递归调用（子构建本身就执行 sanitizeCloudSimPlusJarManifest）
+val isSubBuild = gradle.startParameter.taskNames.any { it.contains("sanitizeCloudSimPlusJarManifest") }
+if (!isSubBuild) {
+    val preCheckVersion = cloudSimPlusDependencyVersion.get()
+    val preCheckRepo = cloudSimPlusLocalMavenRepo.get().asFile
+    val preCheckGroupPath = cloudSimPlusGroup.replace('.', '/')
+    val preCheckJarPath = "$preCheckGroupPath/$cloudSimPlusArtifact/$preCheckVersion/$cloudSimPlusArtifact-$preCheckVersion.jar"
+    if (!File(preCheckRepo, preCheckJarPath).exists()) {
+        if (cloudSimPlusOffline.get()) {
+            throw GradleException(
+                "CloudSim Plus $preCheckVersion JAR not found at $preCheckRepo/$preCheckJarPath and cloudsimplus.offline=true. " +
+                    "Run: .\\gradlew sanitizeCloudSimPlusJarManifest --no-configuration-cache",
+            )
         }
-        filter {
+        logger.lifecycle("⚙️  CloudSim Plus $preCheckVersion 本地 JAR 缺失，触发源码构建...")
+        val gradlewFile =
+            layout.projectDirectory
+                .file(
+                    if (System.getProperty("os.name").lowercase().contains("windows")) "gradlew.bat" else "gradlew",
+                ).asFile
+        try {
+            val process =
+                ProcessBuilder(
+                    gradlewFile.absolutePath,
+                    "sanitizeCloudSimPlusJarManifest",
+                    "--no-configuration-cache",
+                    "--no-daemon",
+                ).directory(layout.projectDirectory.asFile)
+                    .inheritIO()
+                    .start()
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                throw GradleException("CloudSim Plus 源码构建失败 (exit code $exitCode)。请确认已安装 Maven (mvn --version)。")
+            }
+        } catch (e: Exception) {
+            throw GradleException(
+                "CloudSim Plus 源码构建失败。请确认已安装 Maven 并可通过 PATH 访问 (mvn --version)。\n" +
+                    "详情参见: docs/troubleshooting.md #Maven Not Installed",
+                e,
+            )
+        }
+        logger.lifecycle("✅ CloudSim Plus 源码构建完成，继续主项目构建...")
+    }
+}
+
+repositories {
+    maven {
+        name = "cloudSimPlusSourceBuild"
+        url = uri(cloudSimPlusLocalMavenRepo.get().asFile)
+        metadataSources {
+            mavenPom()
+            artifact()
+        }
+        mavenContent {
             includeGroup(cloudSimPlusGroup)
         }
     }
+    maven { url = uri("https://maven.aliyun.com/repository/public") }
     mavenCentral()
 }
 

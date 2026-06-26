@@ -30,6 +30,7 @@ CloudSim-Benchmark 是一个基于 CloudSim Plus 和 Kotlin 的云任务调度�
 ## Requirements
 
 - JDK 25 或更高版本。
+- Apache Maven 3.9+（构建时若缺失 CloudSim Plus JAR 会自动触发子构建，首次需能访问 `mvn`）。
 - Git submodule 支持。
 - PowerShell 7+ 或 Bash。
 - Podman 可选，仅用于容器构建、镜像 smoke 和本地容器运行。
@@ -42,6 +43,14 @@ CloudSim Plus 由 `third_party/cloudsimplus` submodule 提供源码。普通构�
 
 ```powershell
 git submodule update --init --recursive
+```
+
+> **国内用户建议**：配置 Gradle 中国镜像源可大幅提升首次构建速度。参见 [docs/troubleshooting.md](docs/troubleshooting.md) 中「首次构建与环境准备」章节的步骤 2。
+
+构建项目（首次会自动编译 CloudSim Plus 源码，需 Maven）：
+
+```powershell
+.\gradlew.bat build --no-configuration-cache
 ```
 
 运行完整本地门禁并查看 CLI 帮助：
@@ -218,7 +227,7 @@ pwsh -File scripts/run-build-warning-audit.ps1
 | [docs/supply-chain.md](docs/supply-chain.md) | dependency verification、OSV、许可证、SBOM、attestation 和 Dependabot。 |
 | [docs/performance.md](docs/performance.md) | smoke、JMH 趋势、baseline delta 和性能结果使用边界。 |
 | [docs/testing.md](docs/testing.md) | JUnit inventory、JaCoCo、TestKit、文档漂移和测试新增规则。 |
-| [docs/troubleshooting.md](docs/troubleshooting.md) | JDK、CloudSim Plus、代理、Podman、warning audit 和本地 Git 噪音排错。 |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | JDK、Maven 安装、CloudSim Plus、代理、Podman、warning audit、首次构建流程和本地 Git 噪音排错。 |
 | [docs/glossary.md](docs/glossary.md) | 项目术语和指标名解释。 |
 | [docs/wiki-sync.md](docs/wiki-sync.md) | GitHub Wiki 生成、链接重写和 CI 自动同步。 |
 | [docs/realtime-metrics.md](docs/realtime-metrics.md) | 实时调度 CSV 指标、单位、趋势和字段定义。 |

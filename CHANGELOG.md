@@ -9,15 +9,18 @@ attestation 信息以 release manifest 和 GitHub Release 为准。
 
 ### Added
 
-- 暂无。
+- 构建时自动检测 CloudSim Plus 本地 JAR 是否缺失，若缺失则通过子构建自动编译源码，无需手动执行 `sanitizeCloudSimPlusJarManifest`。
+- 新增 Gradle 依赖与插件中国镜像源配置（阿里云优先 → 官方回退），提升国内网络环境下的首次构建速度。
+- 新增 `docs/troubleshooting.md` 章节：Maven 安装指南（Windows/macOS/Linux）和首次构建 5 步流程。
 
 ### Changed
 
-- 暂无。
+- CloudSim Plus 本地仓库声明从 `exclusiveContent` 改为 `mavenContent`，允许依赖解析在本地 JAR 缺失时回退到镜像源，避免配置阶段直接失败。
+- KtLint 格式化 `build.gradle.kts` 新增代码段（trailing comma、chain method continuation）。
 
 ### Fixed
 
-- 暂无。
+- 修复新环境中直接运行 `build` 因 CloudSim Plus 未编译而失败的问题（`Could not find org.cloudsimplus:cloudsimplus:X.Y.Z`）。
 
 ## 1.2.1 - 2026-06-23
 

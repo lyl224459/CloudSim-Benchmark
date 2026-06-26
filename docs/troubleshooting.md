@@ -70,6 +70,152 @@ git submodule update --init --recursive
 
 同时提交 `gradle/cloudsimplus.lock` 和 submodule gitlink。
 
+## Maven Not Installed (CloudSim Plus Source Build Fails)
+
+### Symptom
+
+```text
+Execution failed for task ':buildCloudSimPlusFromSource'
+> A problem occurred starting process 'command 'mvn.cmd''
+```
+
+或者：
+
+```text
+Could not find org.cloudsimplus:cloudsimplus:X.Y.Z
+Required by: root project 'CloudSim-Benchmark'
+```
+
+### Cause
+
+CloudSim Plus 是 Maven 项目，通过 Git 子模块（`third_party/cloudsimplus`）提供源码。`buildCloudSimPlusFromSource` 任务需要调用 `mvn`（Maven）从源码编译出 JAR，才能供主项目依赖解析。
+
+子模块中通常不含 Maven Wrapper（`mvnw.cmd` / `maven-wrapper.jar`），因此系统必须单独安装 Maven。
+
+### Action — 安装 Maven
+
+**Windows（无包管理器）**：
+
+```powershell
+# 查看最新版本
+Invoke-WebRequest -Uri "https://dlcdn.apache.org/maven/maven-3/" -UseBasicParsing |
+  Select-Object -ExpandProperty Links |
+  Where-Object { $_.href -match '^\d+\.\d+\.\d+/$' } |
+  Select-Object -Last 1 -ExpandProperty href
+
+# 下载（国内建议用阿里云镜像加速）
+$ver = "3.9.16"  # 替换为实际最新版
+$url = "https://mirrors.aliyun.com/apache/maven/maven-3/$ver/binaries/apache-maven-$ver-bin.zip"
+Invoke-WebRequest -Uri $url -OutFile "$env:TEMP\maven.zip" -UseBasicParsing
+
+# 解压到用户目录（避免 Program Files 权限问题）
+$installDir = "$env:LOCALAPPDATA\Programs\Maven"
+Expand-Archive -Path "$env:TEMP\maven.zip" -DestinationPath $installDir -Force
+
+# 永久加入 PATH
+$mavenHome = Get-ChildItem $installDir -Directory | Select-Object -First 1
+[Environment]::SetEnvironmentVariable("MAVEN_HOME", "$installDir\$($mavenHome.Name)", "User")
+$path = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($path -notlike "*$installDir\$($mavenHome.Name)\bin*") {
+  [Environment]::SetEnvironmentVariable("Path", "$installDir\$($mavenHome.Name)\bin;$path", "User")
+}
+```
+
+**macOS / Linux**：
+
+```bash
+# Homebrew (macOS)
+brew install maven
+
+# SDKMAN (通用)
+sdk install maven
+
+# 手动安装
+curl -fsSL https://dlcdn.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.tar.gz |
+  tar -xz -C ~/bin/
+echo 'export PATH="$HOME/bin/apache-maven-3.9.16/bin:$PATH"' >> ~/.bashrc
+```
+
+安装后**重新打开终端**验证：
+
+```powershell
+mvn --version
+```
+
+> **注意**：`winget` 源中不存在 Apache Maven 包，无法通过 `winget install` 安装。
+
+## 首次构建与环境准备
+
+新克隆或新系统上的首次构建流程，按顺序执行：
+
+### 步骤 1：初始化子模块
+
+```powershell
+git submodule update --init --recursive
+```
+
+### 步骤 2：配置中国镜像源（国内网络推荐）
+
+编辑三个 Gradle 文件，在官方源前添加阿里云镜像，确保**镜像优先、官方回退**：
+
+**`build.gradle.kts`** — 依赖仓库：
+
+```kotlin
+repositories {
+    maven {
+        name = "cloudSimPlusSourceBuild"
+        url = uri(layout.buildDirectory.dir("cloudsimplus-m2"))
+        mavenContent { includeGroup("org.cloudsimplus") }
+    }
+    maven { url = uri("https://maven.aliyun.com/repository/public") }
+    mavenCentral()
+}
+```
+
+**`buildSrc/build.gradle.kts`** — buildSrc 仓库：
+
+```kotlin
+repositories {
+    maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+    gradlePluginPortal()
+    maven { url = uri("https://maven.aliyun.com/repository/public") }
+    mavenCentral()
+}
+```
+
+**`settings.gradle.kts`** — 插件仓库：
+
+```kotlin
+pluginManagement {
+    repositories {
+        maven { url = uri("https://maven.aliyun.com/repository/gradle-plugin") }
+        gradlePluginPortal()
+    }
+}
+```
+
+> 其他常用镜像：腾讯云 `https://mirrors.cloud.tencent.com/nexus/repository/maven-public/`、华为云 `https://repo.huaweicloud.com/repository/maven/`。
+
+### 步骤 3：确保 Maven 可用
+
+参考上节 [Maven 安装](#maven-not-installed-cloudsim-plus-source-build-fails)。
+
+### 步骤 4：同步 JUnit 测试清单
+
+不同 JDK 版本或编译环境下，JUnit 发现的测试入口点可能略有差异：
+
+```powershell
+.\gradlew.bat updateJUnitTestInventory --no-configuration-cache
+```
+
+### 步骤 5：完整构建
+
+```powershell
+.\gradlew.bat build --no-configuration-cache
+```
+
+> `--no-configuration-cache` 在首次构建时必须使用，避免配置缓存中残留的依赖解析失败状态阻塞 CloudSim Plus 源码构建任务链。后续增量构建可省略此参数。
+
 ## Proxy Or Network
 
 PowerShell dotted property 需要加引号：
