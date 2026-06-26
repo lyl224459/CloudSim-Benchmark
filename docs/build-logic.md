@@ -184,3 +184,5 @@ Checklist：
 | warning audit unknown warning | 工具链新增 warning | 定位来源，不要全局 suppress。 |
 | release manifest mismatch | asset 列表或 metadata 漂移 | 重新生成并验证 release manifest。 |
 | container context too large | build/cache/source 进入 context | 检查 `verifyContainerBuildContext` 报告。 |
+| buildSrc dependency verification after Gradle upgrade | Gradle 内置 Kotlin 版本变化引入新 buildSrc 依赖，`--write-verification-metadata` 无法捕获 | 见 [troubleshooting.md](troubleshooting.md#gradle-升级后-buildsrc-依赖验证失败)。 |
+| IDE shows Unresolved reference for buildlogic.* | Gradle 升级后 IDE 缓存未刷新 | 见 [troubleshooting.md](troubleshooting.md#gradle-升级后-ide-全红-unresolved-reference)。 |

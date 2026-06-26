@@ -334,6 +334,59 @@ containerImageSmoke fails
 
 只提交相关 checksum diff。
 
+### Gradle 升级后 buildSrc 依赖验证失败
+
+Gradle 大版本或小版本升级（如 9.5.1 → 9.6.0）后，内置 Kotlin 版本变化会引入新的 buildSrc 依赖（如 `kotlin-reflect`、`kotlin-assignment` 的 `.pom` 和 `.module` 文件）。由于 `--write-verification-metadata` 无法捕获 buildSrc 层依赖，需手动计算缺失文件的 SHA256 并补充到 `gradle/verification-metadata.xml`。
+
+**临时绕过**（仅用于诊断，不要长期使用）：
+
+```powershell
+.\gradlew.bat build --dependency-verification=off
+```
+
+**永久修复**：定位 Gradle 缓存中缺失依赖的实际文件，计算 SHA256 后写入对应 `<component>` 条目。常见缺失项示例：
+
+- `org.gradle.kotlin:gradle-kotlin-dsl-plugins:6.6.4` → `.module`
+- `org.jetbrains.kotlin:kotlin-assignment:2.3.21` → `.module`
+- `org.jetbrains.kotlin:kotlin-sam-with-receiver:2.3.21` → `.module`
+- `org.jetbrains.kotlin:kotlin-reflect:2.3.21` → `.pom`
+- `org.gradle.kotlin.kotlin-dsl:org.gradle.kotlin.kotlin-dsl.gradle.plugin:6.6.4` → `.pom`
+- `org.jetbrains.kotlin:kotlin-assignment-compiler-plugin-embeddable:2.3.21` → `.pom`
+- `org.jetbrains.kotlin:kotlin-sam-with-receiver-compiler-plugin-embeddable:2.3.21` → `.pom`
+
+添加后运行不带 `--dependency-verification=off` 的 `build` 验证。
+
+## Gradle 升级后 IDE 全红 (Unresolved reference)
+
+### Symptom
+
+升级 Gradle wrapper（如 9.5.1 → 9.6.0）后，IDE 中 `build.gradle.kts` 和 `buildSrc/build.gradle.kts` 所有 `import buildlogic.*` 均报 `Unresolved reference`，文件全红。
+
+### Cause
+
+IDE 的 Gradle 同步缓存了旧版本 buildSrc 编译产物。Gradle wrapper 版本变化后，IDE 仍使用旧索引，无法解析 buildSrc 中定义的自定义 Task 类。
+
+### Action
+
+**1. 命令行编译 buildSrc（确认代码无问题）：**
+
+```powershell
+.\gradlew.bat buildSrc:classes --no-configuration-cache
+```
+
+**2. IDE 重新导入 Gradle 项目：**
+
+- IntelliJ IDEA：右侧 Gradle 面板 → 点击刷新按钮（Reload All Gradle Projects）
+- 或 `File` → `Invalidate Caches...` → `Invalidate and Restart`
+
+**3. 确认 IDE Gradle 设置：**
+
+- `File` → `Settings` → `Build Tools` → `Gradle`
+- `Distribution`：选择 `Gradle wrapper`
+- `Gradle JVM`：选择 JDK 25
+
+重启后 IDE 会下载新 Gradle 发行版、重新编译 buildSrc 并索引所有类。
+
 ## Git Global Ignore Permission Noise
 
 ### Symptom

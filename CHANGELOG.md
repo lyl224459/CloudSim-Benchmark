@@ -15,8 +15,19 @@ attestation 信息以 release manifest 和 GitHub Release 为准。
 
 ### Changed
 
+- **Gradle 从 9.5.1 升级至 9.6.0**，内含 Kotlin 2.3.21、Groovy 4.0.32，提升 Configuration Cache 命中率和 CLI 渲染能力。
+- `gradle-wrapper.properties` distributionUrl 指向 `gradle-9.6.0-bin.zip`。
+- `gradle/verification-metadata.xml` 补充 10 个 SHA256 校验和（`kotlin-dsl 6.6.4` POM、`kotlin-assignment 2.3.21` module、`kotlin-sam-with-receiver 2.3.21` module、`kotlin-reflect 2.3.21` POM、`gradle-kotlin-dsl-plugins 6.6.4` module 及 2 个 compiler-plugin-embeddable POM），并添加 4 个 `trusted-artifacts` 条目信任 Gradle 9.6.0 内置的 kotlin-dsl 构件，覆盖 Kotlin 2.3.21 新 buildSrc 依赖的完整校验链。
+- `README.md` Gradle 徽章更新为 9.6.0。
+- `docs/build-logic.md` Common Failures 表新增 Gradle 升级后 buildSrc 依赖验证失败条目。
+- `docs/troubleshooting.md` 新增「Gradle 升级后 buildSrc 依赖验证失败」与「Gradle 升级后 IDE 全红」排错章节。
 - CloudSim Plus 本地仓库声明从 `exclusiveContent` 改为 `mavenContent`，允许依赖解析在本地 JAR 缺失时回退到镜像源，避免配置阶段直接失败。
 - KtLint 格式化 `build.gradle.kts` 新增代码段（trailing comma、chain method continuation）。
+
+### Deprecated
+
+- Gradle 9.6 标记 `val name by registering(Type::class) { }` 和 `val name by registering { }` Kotlin DSL 委托语法为弃用，应迁移为 `val element = register<Type>(name) { }` 或 `val element = register(name) { }`。共计 ~30 处，位于 `build.gradle.kts`。
+- Gradle 9.6 标记 `val name by creating { }` 语法为弃用，应迁移为 `val element = create(name) { }`。1 处，位于 `buildSrc/build.gradle.kts:25`。不影响构建，但 Gradle 10 将移除该语法。
 
 ### Fixed
 

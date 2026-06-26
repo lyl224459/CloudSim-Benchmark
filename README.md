@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![JDK](https://img.shields.io/badge/JDK-25+-blue.svg)](https://jdk.java.net/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.3.21-purple.svg)](https://kotlinlang.org/)
-[![Gradle](https://img.shields.io/badge/Gradle-9.5.1-green.svg)](https://gradle.org/)
+[![Gradle](https://img.shields.io/badge/Gradle-9.6.0-green.svg)](https://gradle.org/)
 [![CI](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/lyl224459/CloudSim-Benchmark/actions/workflows/ci.yml)
 
 CloudSim-Benchmark 是一个基于 CloudSim Plus 和 Kotlin 的云任务调度实验平台。它面向批处理调度、实时调度、算法对比、配置复现和结果分析，提供 CLI、TOML profile、CSV 指标、JMH 性能趋势、发布包和容器镜像。
