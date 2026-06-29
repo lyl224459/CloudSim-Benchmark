@@ -430,9 +430,9 @@ dependencies {
     testImplementation(kotlin("test"))
 
     // JUnit 5 测试框架
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.1")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.1")
 
     // Mockito for mocking
     testImplementation("org.mockito:mockito-core:5.23.0")

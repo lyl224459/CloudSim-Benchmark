@@ -39,7 +39,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 
 dependencies {
     testImplementation(kotlin("test"))
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.1.1")
     testImplementation(gradleTestKit())
     testKitJacocoAgent("org.jacoco:org.jacoco.agent:${jacoco.toolVersion}:runtime")
 }
