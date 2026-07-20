@@ -41,7 +41,7 @@ plugins {
     id("io.gitlab.arturbosch.detekt") version "1.23.8"
     id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
     id("me.champeau.jmh") version "0.7.3"
-    id("org.cyclonedx.bom") version "3.2.4"
+    id("org.cyclonedx.bom") version "3.3.0"
     id("com.github.jk1.dependency-license-report") version "3.1.4"
 }
 
