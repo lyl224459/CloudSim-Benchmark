@@ -1,6 +1,6 @@
 # Performance Trend Report
 
-- Generated: `2026-07-20T05:38:27.487108587Z`
+- Generated: `2026-07-27T05:49:24.274759508Z`
 - JVM: `OpenJDK 64-Bit Server VM`
 - JDK: `25.0.3`
 - JVM args: `--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/java.nio=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED --enable-native-access=ALL-UNNAMED -Xms1g -Xmx1g -XX:+UseG1GC -Dfile.encoding=UTF-8 -Dconsole.encoding=UTF-8 -Dlogback.configurationFile=/home/runner/work/CloudSim-Benchmark/CloudSim-Benchmark/src/main/resources/cloudsim-benchmark-logback.xml`
@@ -8,17 +8,17 @@
 
 | Benchmark | Mode | Score | Unit | Allocation/op | Delta vs baseline |
 | :--- | :--- | ---: | :--- | ---: | ---: |
-| batchMetaheuristicSchedule [algorithm=GWO, cloudletCount=100] | avgt | 0.627 | ms/op | 92881.020 | -0.800% |
-| batchMetaheuristicSchedule [algorithm=HHO, cloudletCount=100] | avgt | 0.119 | ms/op | 186448.194 | 1.140% |
-| batchMetaheuristicSchedule [algorithm=PSO, cloudletCount=100] | avgt | 0.306 | ms/op | 106000.498 | -0.364% |
-| batchMetaheuristicSchedule [algorithm=WOA, cloudletCount=100] | avgt | 0.172 | ms/op | 91224.281 | 3.110% |
-| objectiveFunctionCalculate [cloudletCount=1000] | avgt | 0.002 | ms/op | 136.002 | 2.226% |
-| realtimeSchedule [algorithm=MIN_LOAD, cloudletCount=100] | avgt | 0.376 | ms/op | 852968.612 | -2.765% |
-| realtimeSchedule [algorithm=MIN_LOAD, cloudletCount=500] | avgt | 7.329 | ms/op | 16355579.657 | 2.397% |
-| realtimeSchedule [algorithm=MIN_LOAD, cloudletCount=50] | avgt | 0.127 | ms/op | 346680.207 | -4.485% |
-| realtimeSchedule [algorithm=PSO_REALTIME, cloudletCount=100] | avgt | 17.448 | ms/op | 2348539.200 | 0.539% |
-| realtimeSchedule [algorithm=PSO_REALTIME, cloudletCount=500] | avgt | 420.350 | ms/op | 48115288.000 | -1.835% |
-| realtimeSchedule [algorithm=PSO_REALTIME, cloudletCount=50] | avgt | 4.316 | ms/op | 761191.034 | 0.685% |
-| realtimeSchedule [algorithm=WOA_REALTIME, cloudletCount=100] | avgt | 8.118 | ms/op | 1618685.161 | 0.384% |
-| realtimeSchedule [algorithm=WOA_REALTIME, cloudletCount=500] | avgt | 185.135 | ms/op | 28007836.000 | -1.045% |
-| realtimeSchedule [algorithm=WOA_REALTIME, cloudletCount=50] | avgt | 2.159 | ms/op | 551091.517 | -1.756% |
+| batchMetaheuristicSchedule [algorithm=GWO, cloudletCount=100] | avgt | 0.688 | ms/op | 92881.121 | 9.868% |
+| batchMetaheuristicSchedule [algorithm=HHO, cloudletCount=100] | avgt | 0.125 | ms/op | 186448.203 | 4.900% |
+| batchMetaheuristicSchedule [algorithm=PSO, cloudletCount=100] | avgt | 0.299 | ms/op | 106000.486 | -2.252% |
+| batchMetaheuristicSchedule [algorithm=WOA, cloudletCount=100] | avgt | 0.169 | ms/op | 91224.276 | -1.636% |
+| objectiveFunctionCalculate [cloudletCount=1000] | avgt | 0.002 | ms/op | 136.003 | 15.475% |
+| realtimeSchedule [algorithm=MIN_LOAD, cloudletCount=100] | avgt | 0.409 | ms/op | 946568.667 | 8.958% |
+| realtimeSchedule [algorithm=MIN_LOAD, cloudletCount=500] | avgt | 7.984 | ms/op | 14295580.750 | 8.936% |
+| realtimeSchedule [algorithm=MIN_LOAD, cloudletCount=50] | avgt | 0.132 | ms/op | 346680.214 | 4.063% |
+| realtimeSchedule [algorithm=PSO_REALTIME, cloudletCount=100] | avgt | 19.528 | ms/op | 2348543.385 | 11.926% |
+| realtimeSchedule [algorithm=PSO_REALTIME, cloudletCount=500] | avgt | 464.895 | ms/op | 48115288.000 | 10.597% |
+| realtimeSchedule [algorithm=PSO_REALTIME, cloudletCount=50] | avgt | 4.532 | ms/op | 761191.286 | 4.998% |
+| realtimeSchedule [algorithm=WOA_REALTIME, cloudletCount=100] | avgt | 8.490 | ms/op | 1525085.600 | 4.577% |
+| realtimeSchedule [algorithm=WOA_REALTIME, cloudletCount=500] | avgt | 190.798 | ms/op | 28007836.000 | 3.058% |
+| realtimeSchedule [algorithm=WOA_REALTIME, cloudletCount=50] | avgt | 2.198 | ms/op | 551043.579 | 1.804% |
