@@ -416,8 +416,8 @@ dependencies {
     implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
     // 日志实现：slf4j + logback
-    implementation("org.slf4j:slf4j-api:2.0.18")
-    implementation("ch.qos.logback:logback-classic:1.5.34")
+    implementation("org.slf4j:slf4j-api:2.0.19")
+    implementation("ch.qos.logback:logback-classic:1.6.3")
 
     // TOML配置文件解析库
     implementation("com.akuleshov7:ktoml-core:0.7.1")
